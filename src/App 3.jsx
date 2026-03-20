@@ -11298,7 +11298,8 @@ const _generarCertificadoHTMLNormalizado = (
   signature,
   ipsData
 ) => {
-  const fechaHoy = new Date().toLocaleDateString("es-CO", {
+const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : new Date();
+  const fechaHoy = _dateRef.toLocaleDateString("es-CO", {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -15858,7 +15859,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
           {view === "historia" && (
             <>
               <button
-                onClick={() => goBack()}
+                onClick={() => data.estadoHistoria === "Cerrada" ? goTo("dashboard") : goBack()}
                 className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-200 flex items-center gap-1 border border-gray-200 no-print"
               >
                 ← Volver
@@ -15906,6 +15907,15 @@ Esta historia clínica debe conservarse mínimo 20 años.
                   >
                     <ClipboardList className="w-3 h-3" /> Evolución
                   </button>
+                                <button
+                onClick={() => {
+                  setEvolucionForm((p) => ({ ...p, activeEvTab: "concepto", nuevoConcept: p.nuevoConcept || "", recomendaciones: p.recomendaciones || "" }));
+                  setShowEvolucionModal(true);
+                }}
+                className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 shadow hover:bg-emerald-700"
+              >
+                📄 Nuevo Certificado
+              </button>
                   {/* Mini-botón admin: Nota Aclaratoria / Reapertura */}
                   {(_isAdmin(currentUser?.role) ||
                     currentUser?.role === "admin_empresa") && (
@@ -42427,6 +42437,7 @@ ${
               { id: "plan", label: "📋 Plan" },
               { id: "formula", label: "💊 Fórmula" },
               { id: "incapacidad", label: "🏥 Incapacidad" },
+                          { id: "concepto", label: "📄 Concepto Médico" },
             ].map((t) => (
               <button
                 key={t.id}
@@ -42992,6 +43003,64 @@ ${
               </div>
             )}
           </div>
+                    {/* TAB: Concepto Médico + Certificado */}
+          {evTab === "concepto" && (
+            <div className="space-y-3">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                <h4 className="text-xs font-bold text-emerald-800 mb-2">📄 Concepto Médico Ocupacional</h4>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-600 block mb-1">Concepto de Aptitud</label>
+                    <select
+                      value={evolucionForm.nuevoConcept || ""}
+                      onChange={(e) => setEvolucionForm((p) => ({ ...p, nuevoConcept: e.target.value }))}
+                      className="w-full p-2 border border-emerald-300 rounded text-xs bg-white"
+                    >
+                      <option value="">-- Seleccione concepto --</option>
+                      <option value="APTO">APTO</option>
+                      <option value="APTO CON RESTRICCIONES">APTO CON RESTRICCIONES</option>
+                      <option value="NO APTO">NO APTO</option>
+                      <option value="APTO CON LIMITACIONES">APTO CON LIMITACIONES</option>
+                      <option value="PENDIENTE">PENDIENTE - Requiere evaluación adicional</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-600 block mb-1">Recomendaciones y Restricciones</label>
+                    <textarea
+                      rows={3}
+                      value={evolucionForm.recomendaciones || ""}
+                      onChange={(e) => setEvolucionForm((p) => ({ ...p, recomendaciones: e.target.value }))}
+                      className="w-full p-2 border border-emerald-300 rounded text-xs"
+                      placeholder="Describa restricciones, recomendaciones y condiciones especiales..."
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-600 block mb-1">Observaciones adicionales</label>
+                    <textarea
+                      rows={2}
+                      value={evolucionForm.texto || ""}
+                      onChange={(e) => setEvolucionForm((p) => ({ ...p, texto: e.target.value }))}
+                      className="w-full p-2 border border-emerald-300 rounded text-xs"
+                      placeholder="Observaciones del médico..."
+                    />
+                  </div>
+                </div>
+              </div>
+              {evolucionForm.nuevoConcept && (
+                <button
+                  onClick={() => {
+                    const certData = { ...data, conceptoMedico: evolucionForm.nuevoConcept, recomendaciones: evolucionForm.recomendaciones, fechaCierre: new Date().toISOString().split("T")[0] };
+                    const html = _generarCertificadoHTMLNormalizado(certData, activeDoctorData || {}, activeSignature, companies.find((c) => c.id === currentUser?.empresaId) || {});
+                    const win = window.open("", "_blank");
+                    if (win) { win.document.write(html); win.document.close(); win.print(); }
+                  }}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-xs flex items-center justify-center gap-2"
+                >
+                  📄 Expedir Nuevo Certificado Médico
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Footer: guardar */}
           <div className="border-t border-gray-100 px-4 py-3 flex justify-between items-center flex-shrink-0 bg-gray-50 rounded-b-2xl">
