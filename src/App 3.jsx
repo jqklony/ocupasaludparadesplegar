@@ -14202,7 +14202,6 @@ JSON REQUERIDO (sin markdown, sin texto adicional):
     _ls.setItem("siso_ai_config_version", "v3");
     showAlert("✅ Configuración de IA guardada en la nube.");
   };
-  };
   
 const handleLogin = (u, p) => {
     // SEC: Rate limiting - verificar bloqueo
