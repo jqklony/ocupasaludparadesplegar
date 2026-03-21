@@ -57,6 +57,88 @@ import {
   Download,
   Upload,
 } from "lucide-react";
+
+// ============================================================
+// SECURITY UTILITIES v1.0 - OcupaSalud
+// ============================================================
+
+// SEC-U1: Sanitización de inputs para prevenir XSS
+const sanitizeInput = (str) => {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;')
+    .trim();
+};
+
+// SEC-U2: Validación fuerte de contraseña
+const validatePasswordStrength = (password) => {
+  const errors = [];
+  if (!password || password.length < 8) errors.push('Mínimo 8 caracteres');
+  if (!/[A-Z]/.test(password)) errors.push('Al menos una mayúscula');
+  if (!/[a-z]/.test(password)) errors.push('Al menos una minúscula');
+  if (!/[0-9]/.test(password)) errors.push('Al menos un número');
+  return { valid: errors.length === 0, errors };
+};
+
+// SEC-U3: Logger de auditoría
+const _auditLog = (action, user, detail = '') => {
+  try {
+    const logs = JSON.parse(localStorage.getItem('siso_audit_log') || '[]');
+    logs.push({
+      ts: new Date().toISOString(),
+      action: sanitizeInput(String(action)),
+      user: sanitizeInput(String(user || 'anonymous')),
+      detail: sanitizeInput(String(detail)),
+      ua: navigator.userAgent.substring(0, 80),
+    });
+    // Mantener solo los últimos 200 registros
+    if (logs.length > 200) logs.splice(0, logs.length - 200);
+    localStorage.setItem('siso_audit_log', JSON.stringify(logs));
+  } catch (_) {}
+};
+
+// SEC-U4: Rate limiting de login (max 5 intentos, bloqueo 15 min)
+const _rl = {
+  maxAttempts: 5,
+  blockMinutes: 15,
+  getKey: () => 'siso_rl_login',
+  get: () => { try { return JSON.parse(localStorage.getItem('siso_rl_login') || '{"attempts":0,"blockedUntil":0}'); } catch(_){ return {attempts:0,blockedUntil:0}; } },
+  set: (data) => { try { localStorage.setItem('siso_rl_login', JSON.stringify(data)); } catch(_){} },
+  isBlocked: () => { const d = _rl.get(); return d.blockedUntil && Date.now() < d.blockedUntil; },
+  getRemainingMs: () => { const d = _rl.get(); return Math.max(0, d.blockedUntil - Date.now()); },
+  getRemainingMin: () => Math.ceil(_rl.getRemainingMs() / 60000),
+  recordFailure: () => {
+    const d = _rl.get();
+    d.attempts = (d.attempts || 0) + 1;
+    if (d.attempts >= _rl.maxAttempts) {
+      d.blockedUntil = Date.now() + _rl.blockMinutes * 60000;
+      d.attempts = 0;
+    }
+    _rl.set(d);
+  },
+  reset: () => _rl.set({attempts: 0, blockedUntil: 0}),
+  getAttempts: () => _rl.get().attempts || 0,
+};
+
+// SEC-U5: Timeout de sesión inactiva (30 minutos)
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+let _sessionTimer = null;
+const _resetSessionTimer = (logoutCallback) => {
+  if (_sessionTimer) clearTimeout(_sessionTimer);
+  _sessionTimer = setTimeout(() => {
+    if (logoutCallback) logoutCallback();
+  }, SESSION_TIMEOUT_MS);
+};
+const _clearSessionTimer = () => {
+  if (_sessionTimer) { clearTimeout(_sessionTimer); _sessionTimer = null; }
+};
+
+// ============================================================
 // ==========================================
 // MÓDULO 0: STORAGE PERSISTENTE
 // FIX C-02: localStorage para datos clínicos (persiste entre sesiones)
@@ -14130,7 +14212,94 @@ JSON REQUERIDO (sin markdown, sin texto adicional):
     _ls.setItem("siso_ai_config_version", "v3");
     showAlert("✅ Configuración de IA guardada en la nube.");
   };
-  const handleLogin = (u, p) => {
+  co} from "lucide-react";
+
+// ============================================================
+// SECURITY UTILITIES v1.0 - OcupaSalud
+// ============================================================
+
+// SEC-U1: Sanitización de inputs para prevenir XSS
+const sanitizeInput = (str) => {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;')
+    .trim();
+};
+
+// SEC-U2: Validación fuerte de contraseña
+const validatePasswordStrength = (password) => {
+  const errors = [];
+  if (!password || password.length < 8) errors.push('Mínimo 8 caracteres');
+  if (!/[A-Z]/.test(password)) errors.push('Al menos una mayúscula');
+  if (!/[a-z]/.test(password)) errors.push('Al menos una minúscula');
+  if (!/[0-9]/.test(password)) errors.push('Al menos un número');
+  return { valid: errors.length === 0, errors };
+};
+
+// SEC-U3: Logger de auditoría
+const _auditLog = (action, user, detail = '') => {
+  try {
+    const logs = JSON.parse(localStorage.getItem('siso_audit_log') || '[]');
+    logs.push({
+      ts: new Date().toISOString(),
+      action: sanitizeInput(String(action)),
+      user: sanitizeInput(String(user || 'anonymous')),
+      detail: sanitizeInput(String(detail)),
+      ua: navigator.userAgent.substring(0, 80),
+    });
+    // Mantener solo los últimos 200 registros
+    if (logs.length > 200) logs.splice(0, logs.length - 200);
+    localStorage.setItem('siso_audit_log', JSON.stringify(logs));
+  } catch (_) {}
+};
+
+// SEC-U4: Rate limiting de login (max 5 intentos, bloqueo 15 min)
+const _rl = {
+  maxAttempts: 5,
+  blockMinutes: 15,
+  getKey: () => 'siso_rl_login',
+  get: () => { try { return JSON.parse(localStorage.getItem('siso_rl_login') || '{"attempts":0,"blockedUntil":0}'); } catch(_){ return {attempts:0,blockedUntil:0}; } },
+  set: (data) => { try { localStorage.setItem('siso_rl_login', JSON.stringify(data)); } catch(_){} },
+  isBlocked: () => { const d = _rl.get(); return d.blockedUntil && Date.now() < d.blockedUntil; },
+  getRemainingMs: () => { const d = _rl.get(); return Math.max(0, d.blockedUntil - Date.now()); },
+  getRemainingMin: () => Math.ceil(_rl.getRemainingMs() / 60000),
+  recordFailure: () => {
+    const d = _rl.get();
+    d.attempts = (d.attempts || 0) + 1;
+    if (d.attempts >= _rl.maxAttempts) {
+      d.blockedUntil = Date.now() + _rl.blockMinutes * 60000;
+      d.attempts = 0;
+    }
+    _rl.set(d);
+  },
+  reset: () => _rl.set({attempts: 0, blockedUntil: 0}),
+  getAttempts: () => _rl.get().attempts || 0,
+};
+
+// SEC-U5: Timeout de sesión inactiva (30 minutos)
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+let _sessionTimer = null;
+const _resetSessionTimer = (logoutCallback) => {
+  if (_sessionTimer) clearTimeout(_sessionTimer);
+  _sessionTimer = setTimeout(() => {
+    if (logoutCallback) logoutCallback();
+  }, SESSION_TIMEOUT_MS);
+};nst handleLogin = (u, p) => {
+    // SEC: Rate limiting - verificar bloqueo
+    if (_rl.isBlocked()) {
+      showAlert(`⛔ Demasiados intentos fallidos. Intente de nuevo en ${_rl.getRemainingMin()} minuto(s).`);
+      return;
+    }
+const _clearSessionTimer = () => {
+  if (_sessionTimer) { clearTimeout(_sessionTimer); _sessionTimer = null; }
+};
+
+// ============================================================
     // FIX C-01: SOLO comparar contra passHash (SHA-256) - eliminado fallback texto plano
     _sha256(p).then(async (hash) => {
       // Migración automática: si el usuario tiene .pass en texto plano (versión anterior),
@@ -14158,6 +14327,30 @@ JSON REQUERIDO (sin markdown, sin texto adicional):
           }
         }
       }
+                // CAMBIO 7 - SEC: Fallback a Supabase si usuario no hallado en lista local
+                          // Resuelve el caso de nuevo dispositivo / caché borrado / contraseña cambiada
+                                    if (!found) {
+                                                  const cloudData = await _sbGetAll();
+                                                              if (cloudData?.["siso_users"]?.value && Array.isArray(cloudData["siso_users"].value)) {
+                                                                              const cloudUserList = cloudData["siso_users"].value;
+                                                                                            // Sincronizar lista local con datos de Supabase
+                                                                                                          setUsersList(prev => {
+                                                                                                                            const merged = [...prev];
+                                                                                                                                            cloudUserList.forEach(cu => {
+                                                                                                                                                                if (!merged.find(m => m.user === cu.user)) merged.push(cu);
+                                                                                                                                                                                });
+                                                                                                                                                                                                _ls.setItem("siso_users", JSON.stringify(merged));
+                                                                                                                                                                                                                return merged;
+                                                                                                                                                                                                                              });
+                                                                                                                                                                                                                                            // Re-verificar credenciales contra lista de Supabase
+                                                                                                                                                                                                                                                          for (const x of cloudUserList) {
+                                                                                                                                                                                                                                                                            if (x.user === u) {
+                                                                                                                                                                                                                                                                                                const ok = await _verifyPassword(p, x.passHash, x.passSalt);
+                                                                                                                                                                                                                                                                                                                  if (ok) { found = x; break; }
+                                                                                                                                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                                                      }
       if (found && found.activo === false) {
         showAlert(
           "⛔ Esta cuenta está desactivada. Contacte al administrador."
