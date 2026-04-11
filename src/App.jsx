@@ -16839,10 +16839,11 @@ Esta historia clínica debe conservarse mínimo 20 años.
       sections.push(sec("🦴", "Maniobras Ortopédicas — Énfasis Osteomuscular") + '<table style="width:100%;border-collapse:collapse;margin-top:4px;"><thead><tr><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Maniobra</th><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;">Resultado</th><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Hallazgo</th></tr></thead><tbody>' + manioRows + '</tbody></table>');
     }
 
-    // ═══ 12. ÉNFASIS ESPECIALES ═══
-    // ALTURAS
+    // ═══ 12. ÉNFASIS ESPECIALES — Solo se imprime el énfasis que tiene la HC ═══
+    var _enfasisHC = (data.enfasisExamen || "").toUpperCase();
+    // ALTURAS — solo si el énfasis es ALTURAS
     var alt = data.examenAlturas || {};
-    if (alt.romberg || alt.marcha || alt.vertigo || alt.coordinacion || alt.nistagmus || alt.testMiedo || alt.observaciones) {
+    if (_enfasisHC === "ALTURAS" && (alt.romberg || alt.marcha || alt.vertigo || alt.coordinacion || alt.nistagmus || alt.testMiedo || alt.observaciones)) {
       sections.push(sec("🧗", "Énfasis: Trabajo en Alturas") + tb(
         r2("Romberg", alt.romberg||"--", "Marcha", alt.marcha||"--") +
         r2("Vértigo", alt.vertigo||"No", "Coordinación", alt.coordinacion||"--") +
@@ -16850,18 +16851,18 @@ Esta historia clínica debe conservarse mínimo 20 años.
         (alt.observaciones ? r1("Observaciones", alt.observaciones) : "")
       ));
     }
-    // ALIMENTOS
+    // ALIMENTOS — solo si el énfasis es ALIMENTOS
     var alim = data.examenAlimentos || {};
-    if (alim.pielFaneras || alim.orl || alim.gastrointestinal || alim.observaciones) {
+    if (_enfasisHC === "ALIMENTOS" && (alim.pielFaneras || alim.orl || alim.gastrointestinal || alim.observaciones)) {
       sections.push(sec("🍽️", "Énfasis: Manipulación de Alimentos") + tb(
         r2("Piel y Faneras", alim.pielFaneras||"--", "ORL", alim.orl||"--") +
         r1("Gastrointestinal", alim.gastrointestinal||"--") +
         (alim.observaciones ? r1("Observaciones", alim.observaciones) : "")
       ));
     }
-    // CONFINADOS
+    // CONFINADOS — solo si el énfasis es CONFINADOS
     var conf = data.examenConfinados || {};
-    if (conf.cardiovascular || conf.respiratorio || conf.neurologico || conf.psicologico || conf.otorrino || conf.usoEpp || conf.observaciones) {
+    if (_enfasisHC === "CONFINADOS" && (conf.cardiovascular || conf.respiratorio || conf.neurologico || conf.psicologico || conf.otorrino || conf.usoEpp || conf.observaciones)) {
       sections.push(sec("🔒", "Énfasis: Espacios Confinados") + tb(
         r2("Cardiovascular", conf.cardiovascular||"--", "Respiratorio", conf.respiratorio||"--") +
         r2("Neurológico", conf.neurologico||"--", "Psicológico", conf.psicologico||"--") +
@@ -16870,9 +16871,9 @@ Esta historia clínica debe conservarse mínimo 20 años.
         (conf.observaciones ? r1("Observaciones", conf.observaciones) : "")
       ));
     }
-    // OSTEOMUSCULAR
+    // OSTEOMUSCULAR — solo si el énfasis es OSTEOMUSCULAR
     var osteo = data.examenOsteomuscular || {};
-    if (osteo.columna || osteo.miembrosSup || osteo.miembrosInf || osteo.muscular || osteo.articular || osteo.postural || osteo.hallazgos || osteo.diagnosticoFuncional) {
+    if (_enfasisHC === "OSTEOMUSCULAR" && (osteo.columna || osteo.miembrosSup || osteo.miembrosInf || osteo.muscular || osteo.articular || osteo.postural || osteo.hallazgos || osteo.diagnosticoFuncional)) {
       sections.push(sec("💪", "Énfasis: Osteomuscular") + tb(
         r2("Columna", osteo.columna||"--", "Miembros Superiores", osteo.miembrosSup||"--") +
         r2("Miembros Inferiores", osteo.miembrosInf||"--", "Muscular", osteo.muscular||"--") +
@@ -16881,9 +16882,9 @@ Esta historia clínica debe conservarse mínimo 20 años.
         (osteo.diagnosticoFuncional ? r1("Diagnóstico Funcional", osteo.diagnosticoFuncional) : "")
       ));
     }
-    // CORAZÓN
+    // CORAZÓN — solo si el énfasis es CORAZON
     var cora = data.examenCorazon || {};
-    if (cora.frecuenciaCardiaca || cora.presionArterial || cora.ritmoyTonos || cora.pulsos || cora.edemas || cora.perfusionPeriferica || cora.riesgoCV || cora.hallazgos || cora.restricciones) {
+    if (_enfasisHC === "CORAZON" && (cora.frecuenciaCardiaca || cora.presionArterial || cora.ritmoyTonos || cora.pulsos || cora.edemas || cora.perfusionPeriferica || cora.riesgoCV || cora.hallazgos || cora.restricciones)) {
       sections.push(sec("❤️", "Énfasis: Cardiovascular") + tb(
         r2("F. Cardíaca", cora.frecuenciaCardiaca||"--", "Presión Arterial", cora.presionArterial||"--") +
         r2("Ritmo y Tonos", cora.ritmoyTonos||"--", "Pulsos", cora.pulsos||"--") +
