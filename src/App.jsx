@@ -13862,6 +13862,27 @@ function AppInner() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [_hcDirty, view]);
+  // ── AUTOGUARDADO LOCAL cada 15 segundos ─────────────────────────────────
+  useEffect(() => {
+    if (view !== "historia" || !data.nombres) return;
+    const autoSaveInterval = setInterval(() => {
+      const saveData = { ...data, _autoSaved: new Date().toISOString(), _userId: currentUser?.user };
+      _ls.setItem("siso_active_form", JSON.stringify(saveData));
+      _ls.setItem("siso_autosave_" + (data.id || "new"), JSON.stringify(saveData));
+    }, 15000);
+    return () => clearInterval(autoSaveInterval);
+  }, [view, data, currentUser]);
+  // ── SYNC A SUPABASE cada 60 segundos ────────────────────────────────────
+  useEffect(() => {
+    if (view !== "historia" || !data.id || !data.nombres) return;
+    const cloudSaveInterval = setInterval(() => {
+      if (_hcDirty) {
+        const key = "siso_autosave_cloud_" + (currentUser?.user || "anon") + "_" + data.id;
+        _sbSet(key, { ...data, _cloudSaved: new Date().toISOString() });
+      }
+    }, 60000);
+    return () => clearInterval(cloudSaveInterval);
+  }, [view, data, _hcDirty, currentUser]);
   // Auto-IMC
   useEffect(() => {
     if (data.peso && data.talla) {
@@ -14223,7 +14244,17 @@ CONTEXTO ESPECÍFICO DEL TIPO DE EXAMEN: ${_contextoTipo}
 CRITERIOS OBLIGATORIOS: 1) El concepto de aptitud debe citar el artículo de la Res. 1843/2025 correspondiente (norma vigente desde 29 abril 2025 - Res. 2346/2007 derogada). 2) Si es egreso o post-incapacidad, incluir análisis de reintegro laboral. 3) Las restricciones deben ser operativas, cuantificables y con base normativa (GTC-45, GATISO). 4) Las recomendaciones deben ser específicas para el cargo y los riesgos, no genéricas, y deben responder al contexto del tipo de examen indicado arriba.
 JSON REQUERIDO (sin markdown, sin texto adicional):
 {"diagnosticoPrincipal":"Z10.0 - EXAMEN MÉDICO OCUPACIONAL","diagnosticoSecundario1":"CIE-10 - Hallazgo clínico identificado o cadena vacía","diagnosticoSecundario2":"CIE-10 - Segundo hallazgo o cadena vacía","conceptoAptitud":"Concepto de aptitud laboral (APTO/APTO CON RESTRICCIONES/NO APTO) con justificación cargo-hallazgos. NO mencionar diagnósticos específicos, medicamentos, ni tratamientos. Solo aptitud y condiciones laborales. Conforme Res. 1843/2025 Art. 20","vigencia":"X meses con justificación clínica","recomendaciones":"Mínimo 10 recomendaciones de medicina preventiva y salud ocupacional enfocadas en cargo y riesgos. NO incluir medicamentos ni tratamiento farmacológico. NO referir tratamiento médico actual","restriccionesTexto":"Restricciones médico-laborales operativas y cuantificables (mínimo 5 si hay hallazgos), formato: [TIPO] (Segmento) Descripción - Base legal","derivaciones":[{"especialidad":"Especialidad médica requerida","motivo":"Motivo clínico concreto","urgencia":"Electiva"}],"examenesSugeridos":["Examen paraclínico 1"],"interconsultaResumen":"Resumen clínico para interconsulta o cadena vacía","incapacidadSugerida":{"aplica":false,"dias":0,"motivo":"","diagnosticoCIE":""},"analisisClinico":"Análisis clínico detallado con lenguaje técnico-formal de médico especialista en medicina laboral con más de 15 años de experiencia. Incluir: interpretación de hallazgos, correlación cargo-riesgos ocupacionales, referencias a normativa colombiana (Dec. 1072/2015, Res. 2346/2007, Res. 1843/2025). Mínimo 200 palabras.","sveRecomendado":["SVE Osteomuscular si aplica según GATISO-DME Res. 2844/2007","SVE Psicosocial si aplica según Res. 2764/2022","SVE Visual / SVE Respiratorio / SVE Neurológico / SVE Dermatológico según hallazgos"]}`;    try {
-      const text = await callAI(prompt, true);
+      let text;
+      try {
+        text = await callAI(prompt, true);
+      } catch (e1) {
+        try {
+          const retryPrompt = "Analiza esta HC ocupacional y devuelve JSON: " + JSON.stringify({cargo: data.cargo, hallazgos, antecedentes, riesgos, edad: data.edad, tipoExamen: data.tipoExamen});
+          text = await callAI(retryPrompt, true);
+        } catch (e2) {
+          throw e1;
+        }
+      }
       const parsed = parseAIJSON(text);
       // Para énfasis OCUPACIONAL: diagnóstico principal siempre Z10.0 (examen ocupacional)
       // Los diagnósticos encontrados pasan a secundarios
@@ -14403,18 +14434,17 @@ Maniobras osteomusculares positivas: ${osteo || "Ninguna"}
 IMC: ${data.imc} | TA: ${data.ta} | Diagnóstico principal: ${
       data.diagnosticoPrincipal
     }
-INSTRUCCIÓN: Las restricciones deben ser operativas, cuantificables (en kg, min, grados o frecuencias), con segmento anatómico identificado, tipo (TEMPORAL/PERMANENTE/PREVENTIVA), duración si temporal, y base normativa. Si el examen es egreso, post-incapacidad o retorno-laboral (Res. 1843/2025 Art. 13), incluir restricciones de reintegro progresivo.
+INSTRUCCIÓN: Las restricciones deben ser operativas, cuantificables (en kg, min, grados o frecuencias), con segmento anatómico identificado, tipo (TEMPORAL/PERMANENTE/PREVENTIVA), duración si temporal (ej: "Temporal 30 días", "Permanente"), y base normativa. Si el examen es egreso, post-incapacidad o retorno-laboral (Res. 1843/2025 Art. 13), incluir restricciones de reintegro progresivo.
+FORMATO DESEADO: [TIPO: Temporal X días / Permanente] (Segmento) Descripción — Normativa
 JSON REQUERIDO (sin markdown):
-{"restricciones":[{"segmento":"Miembro Superior/Lumbar/Cervical/Postural/General","tipo":"TEMPORAL/PERMANENTE/PREVENTIVA","duracion":"X semanas o N/A","descripcion":"Restricción específica, operativa y cuantificable para el puesto de trabajo","normativa":"GTC-45:2012 / GATISO-DME / GATISO-TME / Res. 1843/2025 / Res. 2404/2019"}]}`;
+{"restricciones":[{"segmento":"Miembro Superior/Lumbar/Cervical/Postural/General","tipo":"TEMPORAL/PERMANENTE/PREVENTIVA","duracion":"X semanas o N/A","texto":"Restricción específica, operativa y cuantificable para el puesto de trabajo","normativa":"GTC-45:2012 / GATISO-DME / GATISO-TME / Res. 1843/2025 / Res. 2404/2019"}]}`;
     try {
       const text = await callAI(prompt, true);
       const parsed = parseAIJSON(text);
       const lista = (parsed.restricciones || [])
         .map(
           (r, i) =>
-            `${i + 1}. [${r.tipo}${
-              r.duracion && r.duracion !== "N/A" ? " - " + r.duracion : ""
-            }] (${r.segmento}) ${r.descripcion} -- ${r.normativa}`
+            `${i + 1}. [${(r.tipo || "TEMPORAL").toUpperCase()}${r.duracion && r.duracion !== "N/A" ? " - " + r.duracion : ""}] (${r.segmento || "General"}) ${r.texto || r.descripcion} — ${r.normativa || "Res. 1843/2025"}`
         )
         .join("\n");
       setData((prev) => ({ ...prev, analisisRestricciones: lista }));
@@ -15196,6 +15226,27 @@ const handleLogin = (u, p) => {
       setShowSecretariaPatientModal(p);
       return;
     }
+    // ── Recuperación de autoguardado ──
+    const _autoRaw = _ls.getItem("siso_autosave_" + p.id);
+    if (_autoRaw) {
+      try {
+        const _autoData = JSON.parse(_autoRaw);
+        if (_autoData?._autoSaved) {
+          const autoTime = new Date(_autoData._autoSaved).getTime();
+          const now = Date.now();
+          if (now - autoTime < 86400000) {
+            if (window.confirm("Se encontraron datos autoguardados. ¿Desea recuperarlos?")) {
+              setData({ ...p, ..._autoData, id: p.id });
+              setDataType(p.type || "ocupacional");
+              setActiveTab(p.type === "general" ? "formGeneral" : "form");
+              _setHcDirty(true);
+              setView("historia");
+              return;
+            }
+          }
+        }
+      } catch(_) {}
+    }
     setData(p);
     setDataType(p.type || "ocupacional");
     setActiveTab(p.type === "general" ? "formGeneral" : "form");
@@ -15687,146 +15738,314 @@ const handleLogin = (u, p) => {
       showAlert("⛔ La secretaria no puede modificar historias clínicas.");
       return;
     }
-    // Selector de acción mediante showPrompt (selector de número)
-    showPrompt(
-      `📋 HC Cerrada - ${data.nombres}\nCódigo: ${
-        data.codigoVerificacion || "-"
-      }\n\nEscriba el número de la opción:\n1 - Evolución clínica + Re-emitir documentos\n2 - Nota Aclaratoria\n3 - Reapertura (solo Administrador)${currentUser?.role === "super_admin" ? "\n4 - Editar HC (Super Administrador - Código 9207)" : ""}`,
-      (opcion) => {
-        const op = (opcion || "").trim();
-        if (op === "4" && currentUser?.role === "super_admin") {
-          // Editar HC cerrada - solo super_admin con código 9207
-          showPrompt("🔐 Ingrese el código de autorización (9207):", (code) => {
-            if (code !== "9207") {
-              showAlert("⛔ Código incorrecto. Acceso denegado.");
-              return;
-            }
-            // Reabrir HC para edición manteniendo todos los datos
-            setData((p) => ({
-              ...p,
-              _cerrada: false,
-              _editadaPorAdmin: true,
-              _editTimestamp: new Date().toISOString(),
-              _editAutor: currentUser?.name || currentUser?.user,
-              _codigoOriginal: p.codigoVerificacion,
-            }));
-            _auditLog("EditHC_SuperAdmin", currentUser?.user, `HC ${data.codigoVerificacion} editada con código 9207`);
-            showAlert("✅ HC abierta para edición.\nAl guardar/cerrar se generará un nuevo código vinculado al original.");
-          });
-          return;
-        }
-        if (op === "1") {
-          // Evolución - escribe nota clínica + puede re-emitir documentos bajo el mismo código
-          setShowEvolucionModal(true);
-        } else if (op === "2") {
-          // Nota aclaratoria
-          showPrompt(
-            "Escriba la nota aclaratoria (se registrará con su nombre, fecha y hora):",
-            (nota) => {
-              if (!nota || nota.trim().length < 10) {
-                showAlert("La nota debe tener al menos 10 caracteres.");
-                return;
-              }
-              const notaAclaratoria = {
-                id: Date.now(),
-                fecha: new Date().toISOString(),
-                autor: currentUser?.name || currentUser?.user,
-                rol: currentUser?.role,
-                contenido: nota.trim(),
-                hcId: data.id,
-                codigoHC:
-                  data.codigoVerificacion ||
-                  data.firmaDigital?.codigoQR ||
-                  "N/A",
-              };
-              setData((p) => ({
-                ...p,
-                notasAclaratorias: [
-                  ...(p.notasAclaratorias || []),
-                  notaAclaratoria,
-                ],
-              }));
-              setTimeout(() => {
-                const updPats = patientsList.map((p) =>
-                  p.id === data.id
-                    ? {
-                        ...p,
-                        notasAclaratorias: [
-                          ...(p.notasAclaratorias || []),
-                          notaAclaratoria,
-                        ],
-                      }
-                    : p
-                );
-                setPatientsList(updPats);
-                _sync(_patKey(currentUser?.user), JSON.stringify(updPats));
-              }, 0);
-              logAccess("NotaAclaratoria", data.id, dataType);
-              showAlert(
-                `✅ Nota aclaratoria registrada.\nAutor: ${
-                  notaAclaratoria.autor
-                }\nFecha: ${new Date(notaAclaratoria.fecha).toLocaleString(
-                  "es-CO"
-                )}\n\nLa HC original permanece intacta.`
-              );
-            }
-          );
-        } else if (op === "3") {
-          // Reapertura (solo admin)
-          if (currentUser?.role !== "administrador") {
-            showAlert(
-              "⛔ Solo el administrador puede reabrir una HC firmada.\nUse la opción 1 (Evolución) o 2 (Nota Aclaratoria)."
-            );
-            return;
+    const isAdminUser = _isAdmin(currentUser?.role) || currentUser?.role === "super_admin";
+    
+    // Usar confirmConfig con botones claros en lugar de input de número
+    setConfirmConfig({
+      msg: `📋 HC Cerrada — ${data.nombres}\nCódigo: ${data.codigoVerificacion || "—"}\n\n¿Qué desea hacer?`,
+      buttons: [
+        {
+          label: "📝 Evolución clínica",
+          color: "bg-purple-600 hover:bg-purple-700",
+          action: () => {
+            setConfirmConfig(null);
+            setShowEvolucionModal(true);
           }
-          showPrompt("Código de administrador:", (adminCode) => {
-            _sha256(adminCode).then((h) => {
-              const storedCode = _ls.getItem("siso_admin_code_hash") || "";
-              if (!storedCode) {
-                showAlert(
-                  "Configure el código de administrador primero desde el panel de usuarios."
-                );
-                return;
-              }
-              if (h !== storedCode) {
-                showAlert("⛔ Código incorrecto.");
-                return;
-              }
+        },
+        {
+          label: "📌 Nota Aclaratoria",
+          color: "bg-amber-600 hover:bg-amber-700",
+          action: () => {
+            setConfirmConfig(null);
+            setTimeout(() => {
               showPrompt(
-                "Motivo de reapertura (mín. 20 caracteres - queda en auditoría):",
-                (reason) => {
-                  if (!reason || reason.trim().length < 20) {
-                    showAlert("El motivo debe tener al menos 20 caracteres.");
+                "📌 Escriba la nota aclaratoria:\n(Se registrará con su nombre, fecha y hora en la HC)",
+                (nota) => {
+                  if (!nota || nota.trim().length < 10) {
+                    setTimeout(() => showAlert("La nota debe tener al menos 10 caracteres."), 100);
                     return;
                   }
+                  const notaObj = {
+                    id: Date.now(),
+                    fecha: new Date().toISOString(),
+                    autor: currentUser?.name || currentUser?.user,
+                    rol: currentUser?.role,
+                    contenido: nota.trim(),
+                    hcId: data.id,
+                    codigoHC: data.codigoVerificacion || "N/A",
+                  };
                   setData((p) => ({
                     ...p,
-                    estadoHistoria: "Abierta",
-                    conteoEdiciones: (p.conteoEdiciones || 0) + 1,
-                    motivoEdicion: reason,
-                    reaperturas: [
-                      ...(p.reaperturas || []),
-                      {
-                        fecha: new Date().toISOString(),
-                        autor: currentUser?.name,
-                        motivo: reason,
-                        codigoAnterior: data.codigoVerificacion,
-                      },
-                    ],
+                    notasAclaratorias: [...(p.notasAclaratorias || []), notaObj],
                   }));
-                  logAccess("ReaperturaAdmin", data.id, dataType);
-                  showAlert(
-                    "⚠️ HC reabierta. Este evento quedó registrado en el audit log."
-                  );
+                  setTimeout(() => {
+                    const updPats = patientsList.map((p) =>
+                      p.id === data.id
+                        ? { ...p, notasAclaratorias: [...(p.notasAclaratorias || []), notaObj] }
+                        : p
+                    );
+                    setPatientsList(updPats);
+                    const _suid = currentUser?.empresaId ? "empresa_" + currentUser.empresaId : currentUser?.user;
+                    _sync(_patKey(_suid), JSON.stringify(updPats));
+                  }, 0);
+                  logAccess("NotaAclaratoria", data.id, dataType);
+                  setTimeout(() => showAlert(`✅ Nota aclaratoria registrada.\nAutor: ${notaObj.autor}\nFecha: ${new Date(notaObj.fecha).toLocaleString("es-CO")}`), 100);
                 }
               );
-            });
-          });
-        } else {
-          showAlert("Opción no válida. Ingrese 1, 2 o 3.");
+            }, 150);
+          }
+        },
+        ...(isAdminUser ? [{
+          label: "🔓 Reapertura completa",
+          color: "bg-red-600 hover:bg-red-700",
+          action: () => {
+            setConfirmConfig(null);
+            setTimeout(() => {
+              showPrompt(
+                "🔐 Ingrese el código de administrador para reabrir la HC:",
+                (adminCode) => {
+                  if (!adminCode) return;
+                  _sha256(adminCode).then((h) => {
+                    const storedCode = _ls.getItem("siso_admin_code_hash") || "";
+                    if (h !== storedCode) {
+                      setTimeout(() => showAlert("⛔ Código incorrecto."), 100);
+                      return;
+                    }
+                    setTimeout(() => {
+                      showPrompt(
+                        "📋 Motivo de reapertura (mín. 20 caracteres — queda en auditoría):",
+                        (reason) => {
+                          if (!reason || reason.trim().length < 20) {
+                            setTimeout(() => showAlert("El motivo debe tener al menos 20 caracteres."), 100);
+                            return;
+                          }
+                          setData((p) => ({
+                            ...p,
+                            estadoHistoria: "Abierta",
+                            conteoEdiciones: (p.conteoEdiciones || 0) + 1,
+                            motivoEdicion: reason,
+                            reaperturas: [
+                              ...(p.reaperturas || []),
+                              {
+                                fecha: new Date().toISOString(),
+                                autor: currentUser?.name || currentUser?.user,
+                                motivo: reason,
+                                codigoAnterior: data.codigoVerificacion,
+                              },
+                            ],
+                          }));
+                          logAccess("ReaperturaAdmin", data.id, `Motivo: ${reason}`);
+                          setTimeout(() => showAlert("⚠️ HC reabierta para edición completa.\nEste evento quedó registrado en auditoría."), 100);
+                        }
+                      );
+                    }, 150);
+                  });
+                }
+              );
+            }, 150);
+          }
+        }] : []),
+        ...(isAdminUser ? [{
+          label: "✏️ Editar campos específicos",
+          color: "bg-blue-600 hover:bg-blue-700",
+          action: () => {
+            setConfirmConfig(null);
+            setTimeout(() => {
+              showPrompt(
+                "🔐 Código de administrador para editar campos:",
+                (adminCode) => {
+                  if (!adminCode) return;
+                  _sha256(adminCode).then((h) => {
+                    const storedCode = _ls.getItem("siso_admin_code_hash") || "";
+                    if (h !== storedCode) {
+                      setTimeout(() => showAlert("⛔ Código incorrecto."), 100);
+                      return;
+                    }
+                    // Mostrar selector de campo a editar
+                    setTimeout(() => {
+                      setConfirmConfig({
+                        msg: `✏️ Editar campo de HC cerrada\nPaciente: ${data.nombres}\n\nSeleccione el campo a modificar:`,
+                        buttons: [
+                          {
+                            label: "📋 Tipo de Evaluación (actual: " + (data.tipoExamen || "—") + ")",
+                            color: "bg-indigo-600 hover:bg-indigo-700",
+                            action: () => {
+                              setConfirmConfig(null);
+                              setTimeout(() => {
+                                showPrompt(
+                                  `Nuevo tipo de evaluación:\n(Actual: ${data.tipoExamen || "—"})\n\nOpciones: INGRESO, PERIÓDICO, EGRESO, POST-INCAPACIDAD, SEGUIMIENTO, RETIRO`,
+                                  (nuevoValor) => {
+                                    if (!nuevoValor || nuevoValor.trim().length < 3) return;
+                                    setTimeout(() => {
+                                      showPrompt(
+                                        "📝 Motivo del cambio (obligatorio — queda en auditoría):",
+                                        (motivo) => {
+                                          if (!motivo || motivo.trim().length < 10) {
+                                            setTimeout(() => showAlert("El motivo debe tener al menos 10 caracteres."), 100);
+                                            return;
+                                          }
+                                          const cambio = {
+                                            id: Date.now(),
+                                            fecha: new Date().toISOString(),
+                                            autor: currentUser?.name || currentUser?.user,
+                                            rol: currentUser?.role,
+                                            campo: "tipoExamen",
+                                            valorAnterior: data.tipoExamen || "",
+                                            valorNuevo: nuevoValor.trim().toUpperCase(),
+                                            motivo: motivo.trim(),
+                                            hcId: data.id,
+                                            codigoHC: data.codigoVerificacion || "N/A",
+                                          };
+                                          setData((p) => ({
+                                            ...p,
+                                            tipoExamen: nuevoValor.trim().toUpperCase(),
+                                            _cambiosPostCierre: [...(p._cambiosPostCierre || []), cambio],
+                                          }));
+                                          setTimeout(() => {
+                                            const updPats = patientsList.map((pt) =>
+                                              pt.id === data.id ? { ...pt, tipoExamen: nuevoValor.trim().toUpperCase(), _cambiosPostCierre: [...(pt._cambiosPostCierre || []), cambio] } : pt
+                                            );
+                                            setPatientsList(updPats);
+                                            const _suid = currentUser?.empresaId ? "empresa_" + currentUser.empresaId : currentUser?.user;
+                                            _sync(_patKey(_suid), JSON.stringify(updPats));
+                                          }, 0);
+                                          logAccess("EditCampoHCCerrada", data.id, `tipoExamen: ${data.tipoExamen} → ${nuevoValor.trim().toUpperCase()} | Motivo: ${motivo}`);
+                                          setTimeout(() => showAlert(`✅ Tipo de evaluación cambiado.\n\n${data.tipoExamen} → ${nuevoValor.trim().toUpperCase()}\nMotivo: ${motivo}\n\nRegistrado en auditoría.`), 100);
+                                        }
+                                      );
+                                    }, 150);
+                                  }
+                                );
+                              }, 150);
+                            }
+                          },
+                          {
+                            label: "🏢 Empresa (actual: " + (data.empresaNombre || "—") + ")",
+                            color: "bg-teal-600 hover:bg-teal-700",
+                            action: () => {
+                              setConfirmConfig(null);
+                              setTimeout(() => {
+                                showPrompt(
+                                  `Nueva empresa:\n(Actual: ${data.empresaNombre || "—"})`,
+                                  (nuevoValor) => {
+                                    if (!nuevoValor || nuevoValor.trim().length < 3) return;
+                                    setTimeout(() => {
+                                      showPrompt(
+                                        "📝 Motivo del cambio (obligatorio — queda en auditoría):",
+                                        (motivo) => {
+                                          if (!motivo || motivo.trim().length < 10) {
+                                            setTimeout(() => showAlert("El motivo debe tener al menos 10 caracteres."), 100);
+                                            return;
+                                          }
+                                          const cambio = {
+                                            id: Date.now(),
+                                            fecha: new Date().toISOString(),
+                                            autor: currentUser?.name || currentUser?.user,
+                                            rol: currentUser?.role,
+                                            campo: "empresaNombre",
+                                            valorAnterior: data.empresaNombre || "",
+                                            valorNuevo: nuevoValor.trim(),
+                                            motivo: motivo.trim(),
+                                            hcId: data.id,
+                                            codigoHC: data.codigoVerificacion || "N/A",
+                                          };
+                                          setData((p) => ({
+                                            ...p,
+                                            empresaNombre: nuevoValor.trim(),
+                                            _cambiosPostCierre: [...(p._cambiosPostCierre || []), cambio],
+                                          }));
+                                          setTimeout(() => {
+                                            const updPats = patientsList.map((pt) =>
+                                              pt.id === data.id ? { ...pt, empresaNombre: nuevoValor.trim(), _cambiosPostCierre: [...(pt._cambiosPostCierre || []), cambio] } : pt
+                                            );
+                                            setPatientsList(updPats);
+                                            const _suid = currentUser?.empresaId ? "empresa_" + currentUser.empresaId : currentUser?.user;
+                                            _sync(_patKey(_suid), JSON.stringify(updPats));
+                                          }, 0);
+                                          logAccess("EditCampoHCCerrada", data.id, `empresaNombre: ${data.empresaNombre} → ${nuevoValor.trim()} | Motivo: ${motivo}`);
+                                          setTimeout(() => showAlert(`✅ Empresa cambiada.\n\n${data.empresaNombre} → ${nuevoValor.trim()}\nMotivo: ${motivo}\n\nRegistrado en auditoría.`), 100);
+                                        }
+                                      );
+                                    }, 150);
+                                  }
+                                );
+                              }, 150);
+                            }
+                          },
+                          {
+                            label: "🔬 Énfasis (actual: " + (data.enfasisExamen || "—") + ")",
+                            color: "bg-purple-600 hover:bg-purple-700",
+                            action: () => {
+                              setConfirmConfig(null);
+                              setTimeout(() => {
+                                showPrompt(
+                                  `Nuevo énfasis:\n(Actual: ${data.enfasisExamen || "—"})\n\nOpciones: GENERAL, ALTURAS, ALIMENTOS, CONFINADOS, OSTEOMUSCULAR, CORAZON`,
+                                  (nuevoValor) => {
+                                    if (!nuevoValor || nuevoValor.trim().length < 3) return;
+                                    setTimeout(() => {
+                                      showPrompt(
+                                        "📝 Motivo del cambio (obligatorio — queda en auditoría):",
+                                        (motivo) => {
+                                          if (!motivo || motivo.trim().length < 10) {
+                                            setTimeout(() => showAlert("El motivo debe tener al menos 10 caracteres."), 100);
+                                            return;
+                                          }
+                                          const cambio = {
+                                            id: Date.now(),
+                                            fecha: new Date().toISOString(),
+                                            autor: currentUser?.name || currentUser?.user,
+                                            rol: currentUser?.role,
+                                            campo: "enfasisExamen",
+                                            valorAnterior: data.enfasisExamen || "",
+                                            valorNuevo: nuevoValor.trim().toUpperCase(),
+                                            motivo: motivo.trim(),
+                                            hcId: data.id,
+                                            codigoHC: data.codigoVerificacion || "N/A",
+                                          };
+                                          setData((p) => ({
+                                            ...p,
+                                            enfasisExamen: nuevoValor.trim().toUpperCase(),
+                                            _cambiosPostCierre: [...(p._cambiosPostCierre || []), cambio],
+                                          }));
+                                          setTimeout(() => {
+                                            const updPats = patientsList.map((pt) =>
+                                              pt.id === data.id ? { ...pt, enfasisExamen: nuevoValor.trim().toUpperCase(), _cambiosPostCierre: [...(pt._cambiosPostCierre || []), cambio] } : pt
+                                            );
+                                            setPatientsList(updPats);
+                                            const _suid = currentUser?.empresaId ? "empresa_" + currentUser.empresaId : currentUser?.user;
+                                            _sync(_patKey(_suid), JSON.stringify(updPats));
+                                          }, 0);
+                                          logAccess("EditCampoHCCerrada", data.id, `enfasisExamen: ${data.enfasisExamen} → ${nuevoValor.trim().toUpperCase()} | Motivo: ${motivo}`);
+                                          setTimeout(() => showAlert(`✅ Énfasis cambiado.\n\n${data.enfasisExamen} → ${nuevoValor.trim().toUpperCase()}\nMotivo: ${motivo}\n\nRegistrado en auditoría.`), 100);
+                                        }
+                                      );
+                                    }, 150);
+                                  }
+                                );
+                              }, 150);
+                            }
+                          },
+                          {
+                            label: "← Volver",
+                            color: "bg-gray-400 hover:bg-gray-500",
+                            action: () => { setConfirmConfig(null); setTimeout(() => handleEditHistory(), 100); }
+                          }
+                        ]
+                      });
+                    }, 150);
+                  });
+                }
+              );
+            }, 150);
+          }
+        }] : []),
+        {
+          label: "Cancelar",
+          color: "bg-gray-400 hover:bg-gray-500",
+          action: () => setConfirmConfig(null)
         }
-      }
-    );
+      ]
+    });
   };
   const handleCompanySelect = (e) => {
     const id = e.target.value;
@@ -16377,10 +16596,16 @@ Esta historia clínica debe conservarse mínimo 20 años.
     }
   };
   const handlePrint = (title) => {
+    const printStyle = document.createElement('style');
+    printStyle.textContent = `@media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } table { border-collapse: collapse !important; } th { background-color: #1e293b !important; color: white !important; } td { border: 1px solid #d1d5db !important; } tr:nth-child(even) { background-color: #f8fafc !important; } .no-print { display: none !important; } @page { size: letter portrait; margin: 1.1cm 1.3cm; } }`;
+    document.head.appendChild(printStyle);
     const orig = document.title;
     document.title = `[OCUPASALUD] ${title || "Documento"}`;
-    window.print();
-    document.title = orig;
+    setTimeout(() => {
+      window.print();
+      document.title = orig;
+      document.head.removeChild(printStyle);
+    }, 100);
   };
   // ══ FIX: Imprimir HC como documento HTML limpio (sin sobreposición) ══
   const _printHCClean = () => {
@@ -16608,6 +16833,10 @@ Esta historia clínica debe conservarse mínimo 20 años.
     }
   };
   const _goToDirect = (newView) => {
+    // Autoguardado antes de navegar
+    if (view === "historia" && data.nombres) {
+      _ls.setItem("siso_active_form", JSON.stringify({ ...data, _autoSaved: new Date().toISOString() }));
+    }
     // Al entrar al dashboard, asegurar que todos los datos del _ls estén cargados
     if (newView === "dashboard") {
       // AISLAMIENTO: usar clave específica del usuario activo (o empresa compartida)
@@ -46767,28 +46996,39 @@ body{padding-top:52px;}
       {/* Modal Confirm */}
       {confirmConfig && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[200] p-4">
-          <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center animate-fade-in">
-            <AlertTriangle className="w-10 h-10 text-yellow-500 mx-auto mb-3" />
-            <p className="text-gray-800 font-bold mb-5 text-sm">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-md w-full animate-fade-in">
+            {!confirmConfig.buttons && <AlertTriangle className="w-10 h-10 text-yellow-500 mx-auto mb-3" />}
+            <p className="text-gray-800 font-bold mb-4 text-sm whitespace-pre-wrap">
               {confirmConfig.msg}
             </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmConfig(null)}
-                className="flex-1 py-2 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50 text-sm"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  confirmConfig.onConfirm();
-                  setConfirmConfig(null);
-                }}
-                className="flex-1 py-2 bg-yellow-500 text-white rounded-xl font-bold hover:bg-yellow-600 text-sm"
-              >
-                Confirmar
-              </button>
-            </div>
+            {confirmConfig.buttons ? (
+              <div className="flex flex-col gap-2">
+                {confirmConfig.buttons.map((btn, idx) => (
+                  <button
+                    key={idx}
+                    onClick={btn.action}
+                    className={`w-full py-2.5 text-white rounded-xl font-bold text-sm transition ${btn.color}`}
+                  >
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { confirmConfig.onCancel?.(); setConfirmConfig(null); }}
+                  className="flex-1 py-2 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50 text-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => { confirmConfig.onConfirm(); setConfirmConfig(null); }}
+                  className="flex-1 py-2 bg-yellow-500 text-white rounded-xl font-bold hover:bg-yellow-600 text-sm"
+                >
+                  Confirmar
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
