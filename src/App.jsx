@@ -16790,7 +16790,9 @@ Esta historia clínica debe conservarse mínimo 20 años.
       var isAnormal = estado === "Anormal" || (hallazgo && hallazgo !== "Sin hallazgos patológicos");
       var color = isAnormal ? "#dc2626" : "#065f46";
       var bgColor = isAnormal ? "#fef2f2" : "#f0fdf4";
-      return '<tr style="background:' + bgColor + '"><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:25%;font-weight:700;">' + _e(label) + '</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:15%;color:' + color + ';font-weight:700;">' + _e(estado) + '</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;color:' + color + ';">' + _e(hallazgo || (isAnormal ? "" : "Sin hallazgos patológicos")) + '</td></tr>';
+      var descNormal = NORMAL_DESCRIPTIONS_SYSTEMS[k] || "Sin hallazgos patológicos";
+      var descFinal = isAnormal ? (hallazgo || "Hallazgo registrado") : (hallazgo || descNormal);
+      return '<tr style="background:' + bgColor + '"><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:25%;font-weight:700;">' + _e(label) + '</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:15%;color:' + color + ';font-weight:700;">' + _e(estado) + '</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;color:' + color + ';">' + _e(descFinal) + '</td></tr>';
     }).join("");
     // Also any extra systems not in the standard list
     Object.keys(efSis).forEach(function(k) {
@@ -16805,7 +16807,9 @@ Esta historia clínica debe conservarse mínimo 20 años.
     });
     sections.push(sec("🏥", "Examen Físico por Sistemas") + '<table style="width:100%;border-collapse:collapse;margin-top:4px;"><thead><tr><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Sistema</th><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;">Estado</th><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Hallazgo</th></tr></thead><tbody>' + sysRows + '</tbody></table>');
 
-    // ═══ 11. MANIOBRAS ORTOPÉDICAS — TODAS ═══
+    // ═══ 11. MANIOBRAS ORTOPÉDICAS — Solo si énfasis OSTEOMUSCULAR ═══
+    var _enfasis = (data.enfasisExamen || "").toUpperCase();
+    var _mostrarManiobras = _enfasis === "OSTEOMUSCULAR" || _enfasis.includes("OSTEO");
     var manio = data.maniobrasOsteomusculares || {};
     var allManiobras = ["phalen","tinel","finkelstein","jobe","lasegue","adams","wells","schober"];
     var manioLabels = {phalen:"Phalen",tinel:"Tinel",finkelstein:"Finkelstein",jobe:"Jobe",lasegue:"Lasègue",adams:"Adams",wells:"Wells",schober:"Schober"};
@@ -16831,7 +16835,9 @@ Esta historia clínica debe conservarse mínimo 20 años.
         manioRows += '<tr><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:25%;font-weight:700;">' + _e(k) + '</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:20%;color:' + color + ';font-weight:700;">' + _e(estado) + '</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">' + _e(hallazgo) + '</td></tr>';
       }
     });
-    sections.push(sec("🦴", "Maniobras Ortopédicas") + '<table style="width:100%;border-collapse:collapse;margin-top:4px;"><thead><tr><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Maniobra</th><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;">Resultado</th><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Hallazgo</th></tr></thead><tbody>' + manioRows + '</tbody></table>');
+    if (_mostrarManiobras) {
+      sections.push(sec("🦴", "Maniobras Ortopédicas — Énfasis Osteomuscular") + '<table style="width:100%;border-collapse:collapse;margin-top:4px;"><thead><tr><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Maniobra</th><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;">Resultado</th><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Hallazgo</th></tr></thead><tbody>' + manioRows + '</tbody></table>');
+    }
 
     // ═══ 12. ÉNFASIS ESPECIALES ═══
     // ALTURAS
