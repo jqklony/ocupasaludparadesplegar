@@ -15806,7 +15806,7 @@ const handleLogin = (u, p) => {
                 (adminCode) => {
                   if (!adminCode) return;
                   _sha256(adminCode).then((h) => {
-                    const storedCode = _ls.getItem("siso_admin_code_hash") || "";
+                    const storedCode = _ls.getItem("siso_admin_code_hash") || _H.adminCode;
                     if (h !== storedCode) {
                       setTimeout(() => showAlert("⛔ Código incorrecto."), 100);
                       return;
@@ -15856,7 +15856,7 @@ const handleLogin = (u, p) => {
                 (adminCode) => {
                   if (!adminCode) return;
                   _sha256(adminCode).then((h) => {
-                    const storedCode = _ls.getItem("siso_admin_code_hash") || "";
+                    const storedCode = _ls.getItem("siso_admin_code_hash") || _H.adminCode;
                     if (h !== storedCode) {
                       setTimeout(() => showAlert("⛔ Código incorrecto."), 100);
                       return;
@@ -16609,11 +16609,11 @@ Esta historia clínica debe conservarse mínimo 20 años.
   };
   // ══ FIX: Imprimir HC como documento HTML limpio (sin sobreposición) ══
   const _printHCClean = () => {
-    const _e = (v) => String(v || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const _nl2br = (v) => _e(v).replace(/\n/g, "<br/>");
+    const _e = (v) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const _nl = (v) => _e(v).replace(/\n/g, "<br/>");
     const doc = activeDoctorData || {};
     const sig = activeSignature || "";
-    const sigHtml = sig ? `<img src="${sig}" style="max-height:65px;display:block;margin:0 auto 4px;" alt="Firma"/>` : '<div style="height:60px;"></div>';
+    const sigHtml = sig ? '<img src="' + sig + '" style="max-height:65px;display:block;margin:0 auto 4px;" alt="Firma"/>' : '<div style="height:60px;"></div>';
     const _miIPS = currentUser?.empresaId ? companies.find(c => c.id === currentUser.empresaId) : null;
     const ipsName = _miIPS?.nombre || doc.nombre || "OcupaSalud";
     const fmtList = (txt) => {
@@ -16623,203 +16623,439 @@ Esta historia clínica debe conservarse mínimo 20 años.
       if (lines.some(l => /^[•*\-\d]/.test(l))) {
         return '<ul style="margin:4px 0;padding-left:16px;">' + lines.map(l => '<li style="margin-bottom:2px;font-size:9pt;">' + _e(l).replace(/^[•*\-]+\s*/, "").replace(/^\d+\.\s*/, "") + '</li>').join("") + '</ul>';
       }
-      return '<p style="font-size:9pt;white-space:pre-wrap;line-height:1.5;">' + _nl2br(s) + '</p>';
+      return '<p style="font-size:9pt;white-space:pre-wrap;line-height:1.5;">' + _nl(s) + '</p>';
     };
-    const sec = (icon, text) => `<div style="background:#ecfdf5;border-left:4px solid #065f46;padding:6px 12px;margin:14px 0 6px 0;font-weight:900;font-size:9.5pt;text-transform:uppercase;color:#065f46;">${icon} ${_e(text)}</div>`;
-    const r2 = (l1,v1,l2,v2) => `<tr><th style="background:#d1fae5;font-weight:700;width:20%;font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">${_e(l1)}</th><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:30%;">${_e(v1)}</td><th style="background:#d1fae5;font-weight:700;width:20%;font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">${_e(l2)}</th><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:30%;">${_e(v2)}</td></tr>`;
-    const r1 = (l,v) => `<tr><th style="background:#d1fae5;font-weight:700;width:28%;font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">${_e(l)}</th><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;" colspan="3">${typeof v === "string" && v.includes("<") ? v : _e(v)}</td></tr>`;
-    const tb = (rows) => `<table style="width:100%;border-collapse:collapse;">${rows}</table>`;
+    const sec = (icon, text) => '<div style="background:#ecfdf5;border-left:4px solid #065f46;padding:6px 12px;margin:14px 0 6px 0;font-weight:900;font-size:9.5pt;text-transform:uppercase;color:#065f46;">' + icon + " " + _e(text) + '</div>';
+    const r2 = (l1,v1,l2,v2) => '<tr><th style="background:#d1fae5;font-weight:700;width:20%;font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">' + _e(l1) + '</th><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:30%;">' + _e(v1) + '</td><th style="background:#d1fae5;font-weight:700;width:20%;font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">' + _e(l2) + '</th><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:30%;">' + _e(v2) + '</td></tr>';
+    const r1 = (l,v) => '<tr><th style="background:#d1fae5;font-weight:700;width:28%;font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">' + _e(l) + '</th><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;" colspan="3">' + (typeof v === "string" && v.includes("<") ? v : _e(v)) + '</td></tr>';
+    const tb = (rows) => '<table style="width:100%;border-collapse:collapse;">' + rows + '</table>';
+    const pill = (txt, color) => '<span style="display:inline-block;background:' + color + ';color:white;padding:2px 8px;border-radius:10px;font-size:7.5pt;margin:2px;font-weight:700;">' + _e(txt) + '</span>';
 
     const sections = [];
 
-    // ═══ HEADER ═══
-    sections.push(`<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #065f46;padding-bottom:10px;margin-bottom:12px;">
-      <div><div style="font-size:12pt;font-weight:900;color:#065f46;">${_e(ipsName)}</div>
-      <p style="font-size:8pt;color:#555;">${_e(doc.titulo || "Médico Especialista SST")}</p>
-      <p style="font-size:8pt;color:#555;">Lic: ${_e(doc.licencia || "--")} · ${_e(doc.ciudad || "")}</p>
-      ${doc.celular ? `<p style="font-size:7.5pt;color:#888;">Tel: ${_e(doc.celular)}${doc.email ? " · " + _e(doc.email) : ""}</p>` : ""}</div>
-      <div style="text-align:right;"><div style="font-size:13pt;font-weight:900;color:#065f46;text-transform:uppercase;">HISTORIA CLÍNICA ${_e(dataType === "ocupacional" ? "OCUPACIONAL" : "GENERAL")}</div>
-      <p style="font-size:8.5pt;color:#555;">Fecha: ${_e(data.fechaExamen || data.fechaConsulta || new Date().toLocaleDateString("es-CO"))}</p>
-      <p style="font-size:8pt;color:#888;">Tipo: ${_e(data.tipoExamen || "CONSULTA")} · ${_e(data.enfasisExamen || "")}</p>
-      ${data.codigoVerificacion ? `<p style="font-size:7.5pt;font-family:monospace;color:#065f46;font-weight:900;">Código: ${_e(data.codigoVerificacion)}</p>` : ""}</div></div>`);
+    // ═══ 1. HEADER ═══
+    var hdrLeft = '<div><div style="font-size:12pt;font-weight:900;color:#065f46;">' + _e(ipsName) + '</div>';
+    hdrLeft += '<p style="font-size:8pt;color:#555;">' + _e(doc.titulo || "Médico Especialista SST") + '</p>';
+    hdrLeft += '<p style="font-size:8pt;color:#555;">Lic: ' + _e(doc.licencia || "--") + ' · ' + _e(doc.ciudad || "") + '</p>';
+    if (doc.celular) hdrLeft += '<p style="font-size:7.5pt;color:#888;">Tel: ' + _e(doc.celular) + (doc.email ? " · " + _e(doc.email) : "") + '</p>';
+    hdrLeft += '</div>';
+    var hdrRight = '<div style="text-align:right;"><div style="font-size:13pt;font-weight:900;color:#065f46;text-transform:uppercase;">HISTORIA CLÍNICA ' + _e(dataType === "ocupacional" ? "OCUPACIONAL" : "GENERAL") + '</div>';
+    hdrRight += '<p style="font-size:8.5pt;color:#555;">Fecha: ' + _e(data.fechaExamen || data.fechaConsulta || new Date().toLocaleDateString("es-CO")) + '</p>';
+    hdrRight += '<p style="font-size:8pt;color:#888;">Tipo: ' + _e(data.tipoExamen || "CONSULTA") + ' · ' + _e(data.enfasisExamen || "") + '</p>';
+    if (data.codigoVerificacion) hdrRight += '<p style="font-size:7.5pt;font-family:monospace;color:#065f46;font-weight:900;">Código: ' + _e(data.codigoVerificacion) + '</p>';
+    if (data.estado) hdrRight += '<p style="font-size:8pt;color:#555;">Estado: ' + _e(data.estado) + '</p>';
+    hdrRight += '</div>';
+    sections.push('<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #065f46;padding-bottom:10px;margin-bottom:12px;">' + hdrLeft + hdrRight + '</div>');
 
-    // ═══ 1. DATOS DEL PACIENTE ═══
+    // ═══ 2. DATOS DEL PACIENTE ═══
     sections.push(sec("👤", "Datos del Paciente") + tb(
       r2("Nombres", data.nombres, "Documento", (data.docTipo||"CC")+" "+(data.docNumero||"")) +
       r2("Fecha Nac.", data.fechaNacimiento, "Edad", (data.edad||"--")+" años") +
       r2("Género", data.genero, "Estado Civil", data.estadoCivil) +
+      r2("Escolaridad", data.escolaridad, "Grupo Sanguíneo", data.grupoSanguineo) +
+      r2("Lateralidad", data.lateralidad, "Grupo Étnico", data.grupoEtnico) +
+      r2("Estrato", data.estrato, "Tipo Vivienda", data.tipoVivienda) +
+      r2("Zona Residencia", data.zonaResidencia, "Residencia", data.residencia) +
+      r2("Celular", data.celular||data.telefono, "Email", data.email) +
       r2("EPS", data.eps, "AFP", data.afp) +
-      r2("ARL", data.arl, "Nivel Riesgo", data.nivelRiesgoARL) +
-      r2("Teléfono", data.celular||data.telefono, "Email", data.email) +
-      r2("Residencia", data.residencia, "Escolaridad", data.escolaridad) +
-      r2("Grupo Sang.", data.grupoSanguineo, "Lateralidad", data.lateralidad)
+      r1("Consentimiento Informado", data.consentimiento || "Firmado")
     ));
 
-    // ═══ 2. DATOS LABORALES ═══
+    // ═══ 3. DATOS LABORALES (solo ocupacional) ═══
     if (dataType === "ocupacional") {
       sections.push(sec("🏢", "Datos Laborales") + tb(
-        r2("Empresa", data.empresaNombre||data.empresa, "NIT", data.empresaNit||"") +
-        r2("Cargo", data.cargo, "Dependencia", data.dependencia) +
-        r2("Contrato", data.tipoContrato, "Turno", data.turnoTrabajo) +
-        r2("Antigüedad", data.antiguedadEmpresa, "Tipo Examen", data.tipoExamen)
+        r2("Empresa", data.empresaNombre||data.empresa, "NIT", data.empresaNit||data.NIT||"") +
+        r2("Actividad Económica", data.actividadEconomica, "ARL", data.arl) +
+        r2("Nivel Riesgo ARL", data.nivelRiesgoARL, "Cargo", data.cargo) +
+        r2("Dependencia", data.dependencia, "Tipo Contrato", data.tipoContrato) +
+        r2("Turno Trabajo", data.turnoTrabajo, "Antigüedad Empresa", data.antiguedadEmpresa) +
+        r2("Tipo Examen", data.tipoExamen, "Énfasis", data.enfasisExamen)
       ));
     }
 
-    // ═══ 3. MOTIVO DE CONSULTA ═══
-    const motivoTxt = data.motivoConsulta || data.enfermedadActual || data.sintomatologia || "";
-    if (motivoTxt) sections.push(sec("🩺", "Motivo de Consulta / Enfermedad Actual") + `<div style="padding:6px 10px;">${fmtList(motivoTxt)}</div>`);
+    // ═══ 4. FACTORES DE RIESGO ═══
+    var riesgos = data.riesgos || {};
+    var riesgoCategories = ["fisicos","quimicos","biologicos","mecanicos","biomecanicos","psicosocial","seguridad","locativos"];
+    var riesgoLabels = {fisicos:"Físicos",quimicos:"Químicos",biologicos:"Biológicos",mecanicos:"Mecánicos",biomecanicos:"Biomecánicos",psicosocial:"Psicosocial",seguridad:"Seguridad",locativos:"Locativos"};
+    var riesgoPills = "";
+    riesgoCategories.forEach(function(cat) {
+      var val = riesgos[cat];
+      if (val) {
+        if (Array.isArray(val)) {
+          val.forEach(function(r) { riesgoPills += pill(riesgoLabels[cat] + ": " + r, "#0d9488"); });
+        } else if (typeof val === "object") {
+          Object.entries(val).forEach(function(entry) { if (entry[1]) riesgoPills += pill(riesgoLabels[cat] + ": " + entry[0], "#0d9488"); });
+        } else {
+          riesgoPills += pill(riesgoLabels[cat] + ": " + val, "#0d9488");
+        }
+      }
+    });
+    // Also handle any extra keys not in the standard list
+    Object.keys(riesgos).forEach(function(k) {
+      if (riesgoCategories.indexOf(k) === -1 && riesgos[k]) {
+        riesgoPills += pill(k + ": " + (typeof riesgos[k] === "object" ? JSON.stringify(riesgos[k]) : riesgos[k]), "#6b7280");
+      }
+    });
+    if (riesgoPills) sections.push(sec("⚠️", "Factores de Riesgo Ocupacional") + '<div style="padding:6px 10px;">' + riesgoPills + '</div>');
 
-    // ═══ 4. HÁBITOS ═══
-    const hab = data.habitos || {};
-    if (hab.fuma || hab.alcohol || hab.deporte) {
-      sections.push(sec("🚬", "Hábitos") + tb(
-        r2("Tabaquismo", hab.fuma||"No", "Alcohol", hab.alcohol||"No") +
-        r2("Actividad Física", hab.deporte||"No", "Sustancias", hab.drogas||"No")
-      ));
+    // ═══ 5. MOTIVO DE CONSULTA ═══
+    var motivoParts = [data.motivoConsulta, data.enfermedadActual].filter(Boolean);
+    if (motivoParts.length > 0) {
+      var motivoHtml = "";
+      if (data.motivoConsulta) motivoHtml += '<p style="font-size:9pt;"><strong>Motivo de consulta:</strong> ' + _nl(data.motivoConsulta) + '</p>';
+      if (data.enfermedadActual) motivoHtml += '<p style="font-size:9pt;"><strong>Enfermedad actual:</strong> ' + _nl(data.enfermedadActual) + '</p>';
+      sections.push(sec("🩺", "Motivo de Consulta / Enfermedad Actual") + '<div style="padding:6px 10px;">' + motivoHtml + '</div>');
     }
 
-    // ═══ 5. ANTECEDENTES ═══
-    const antFields = [
-      ["Personales", data.antecedentesPersonales], ["Familiares", data.antecedentesFamiliares],
-      ["Quirúrgicos", data.antecedentesQuirurgicos], ["Toxicológicos", data.antecedentesToxicologicos],
-      ["Alérgicos", data.antecedentesAlergicos], ["Traumáticos", data.antecedentesTraumaticos],
-      ["Gineco-obstétricos", data.antecedentesGinecoObstetricos], ["Ocupacionales", data.antecedentesOcupacionales],
-      ["Farmacológicos", data.antecedentesFarmacologicos], ["Hospitalarios", data.antecedentesHospitalarios],
-    ].filter(([,v]) => v);
-    if (antFields.length > 0) {
-      sections.push(sec("📋", "Antecedentes") + tb(antFields.map(([l,v]) => r1(l,v)).join("")));
-    }
-
-    // ═══ 6. REVISIÓN POR SISTEMAS ═══
-    const revSis = data.revisionSistemas || {};
-    const revEntries = Object.entries(revSis).filter(([,v]) => v && v !== "Normal" && v !== "Niega" && v !== "false" && v !== false);
-    if (revEntries.length > 0) {
-      sections.push(sec("📝", "Revisión por Sistemas") + tb(revEntries.map(([k,v]) => r1(k.charAt(0).toUpperCase()+k.slice(1), typeof v === "object" ? JSON.stringify(v) : v)).join("")));
-    }
-
-    // ═══ 7. EXAMEN FÍSICO — SIGNOS VITALES ═══
-    const vitalRows = [
-      data.talla ? r2("Talla", data.talla+" cm", "Peso", (data.peso||"--")+" kg") : "",
-      data.imc ? r2("IMC", data.imc, "Clasificación", data.clasificacionIMC||"") : "",
-      data.tensionArterial ? r2("T.A.", data.tensionArterial, "F.C.", (data.frecuenciaCardiaca||"--")+" lpm") : "",
-      data.frecuenciaRespiratoria ? r2("F.R.", data.frecuenciaRespiratoria+" rpm", "Temperatura", (data.temperatura||"--")+"°C") : "",
-      data.satO2 ? r2("SpO2", data.satO2+"%", "Perímetro Abd.", data.perimetroAbdominal||"--") : "",
-    ].filter(Boolean).join("");
-    sections.push(sec("🔍", "Examen Físico") + (vitalRows ? tb(vitalRows) : ""));
-
-    // ═══ 8. EXAMEN FÍSICO POR SISTEMAS ═══
-    const efSis = data.examenFisicoSistemas || {};
-    const efEntries = Object.entries(efSis);
-    if (efEntries.length > 0) {
-      const sysLabels = {cabeza:"Cabeza",ojos:"Ojos",oidos:"Oídos",nariz:"Nariz",boca:"Boca/Faringe",cuello:"Cuello",torax:"Tórax",corazon:"Corazón",pulmones:"Pulmones",abdomen:"Abdomen",genitourinario:"Genitourinario",columna:"Columna",extremidades:"Extremidades",piel:"Piel/Faneras",neurologico:"Neurológico"};
-      const sysRows = efEntries.map(([k,v]) => {
-        const label = sysLabels[k] || k;
-        const estado = v?.estado || "Normal";
-        const hallazgo = v?.hallazgo || "";
-        const color = estado === "Anormal" ? "#dc2626" : "#065f46";
-        return `<tr><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:25%;font-weight:700;">${_e(label)}</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:15%;color:${color};font-weight:700;">${_e(estado)}</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">${_e(hallazgo)}</td></tr>`;
-      }).join("");
-      sections.push(`<table style="width:100%;border-collapse:collapse;margin-top:4px;"><thead><tr><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Sistema</th><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;">Estado</th><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Hallazgo</th></tr></thead><tbody>${sysRows}</tbody></table>`);
-    }
-
-    // ═══ 9. MANIOBRAS OSTEOMUSCULARES ═══
-    const manio = data.maniobrasOsteomusculares || {};
-    const manioEntries = Object.entries(manio).filter(([,v]) => v?.estado && v.estado !== "Normal");
-    if (manioEntries.length > 0) {
-      sections.push(sec("🦴", "Maniobras Osteomusculares") + tb(manioEntries.map(([k,v]) => r2(k.charAt(0).toUpperCase()+k.slice(1), v.estado, "Hallazgo", v.hallazgo||"")).join("")));
-    }
-
-    // ═══ 10. RIESGOS OCUPACIONALES ═══
-    const riesgos = data.riesgos || {};
-    const riesgoEntries = Object.entries(riesgos).filter(([,v]) => v);
-    if (riesgoEntries.length > 0) {
-      sections.push(sec("⚠️", "Factores de Riesgo Ocupacional") + tb(riesgoEntries.map(([k,v]) => r1(k.charAt(0).toUpperCase()+k.slice(1).replace(/([A-Z])/g," $1"), typeof v === "object" ? JSON.stringify(v) : v)).join("")));
-    }
-
-    // ═══ 11. DIAGNÓSTICOS ═══
-    const dxList = data.diagnosticos?.length ? data.diagnosticos : [];
-    sections.push(sec("🏥", "Diagnósticos") + tb(
-      r2("Dx Principal", data.diagnosticoPrincipal||"Z10.0", "Dx Secundario 1", data.diagnosticoSecundario1||"") +
-      (data.diagnosticoSecundario2 ? r1("Dx Secundario 2", data.diagnosticoSecundario2) : "") +
-      dxList.map((d,i) => r1(`Dx ${i+1} (${d.tipo||"—"})`, (d.cie10||"")+" "+(d.descripcion||""))).join("")
+    // ═══ 6. HÁBITOS ═══
+    var hab = data.habitos || {};
+    sections.push(sec("🚬", "Hábitos") + tb(
+      r2("Tabaquismo", hab.fuma||"No", "Alcohol", hab.alcohol||"No") +
+      r2("Actividad Física", hab.deporte||"No", "Sustancias Psicoactivas", hab.psicoactivas||hab.drogas||"No") +
+      (hab.detalle ? r1("Detalle", hab.detalle) : "")
     ));
 
-    // ═══ 12. CONCEPTO DE APTITUD ═══
-    sections.push(sec("✅", "Concepto de Aptitud y Recomendaciones") +
-      `<div style="background:#065f46;color:white;text-align:center;padding:10px;border-radius:6px;font-size:12pt;font-weight:900;margin:8px 0;text-transform:uppercase;">${_e(data.conceptoAptitud||"PENDIENTE")}</div>` +
-      (data.vigencia ? `<p style="text-align:center;font-size:8.5pt;color:#555;margin-bottom:8px;">Vigencia: ${_e(data.vigencia)}</p>` : ""));
-
-    // ═══ 13. RECOMENDACIONES ═══
-    const recomTxt = [data.recomendacionesOcupacionales, data.recomendacionesMedicas, data.recomendaciones].filter(Boolean).join("\n");
-    if (recomTxt) sections.push(`<div style="margin:8px 0;"><strong style="font-size:9.5pt;color:#065f46;">RECOMENDACIONES:</strong>${fmtList(recomTxt)}</div>`);
-
-    // ═══ 14. RESTRICCIONES ═══
-    const restricTxt = Array.isArray(data.analisisRestricciones) ? data.analisisRestricciones.join("\n") : (data.analisisRestricciones || data.restricciones || "");
-    if (restricTxt) sections.push(`<div style="margin:8px 0;"><strong style="font-size:9.5pt;color:#dc2626;">RESTRICCIONES LABORALES:</strong>${fmtList(restricTxt)}</div>`);
-
-    // ═══ 15. ANÁLISIS CLÍNICO ═══
-    if (data.analisisIA) sections.push(sec("🧠", "Análisis Clínico") + `<div style="padding:6px 10px;font-size:9pt;white-space:pre-wrap;line-height:1.5;">${_nl2br(data.analisisIA)}</div>`);
-
-    // ═══ 16. SVE ═══
-    if (data.sveRecomendado?.length > 0) sections.push(sec("🛡️", "Sistema de Vigilancia Epidemiológica") + `<ul style="padding-left:16px;margin:4px 0;">${data.sveRecomendado.map(s=>`<li style="font-size:9pt;margin-bottom:3px;">${_e(s)}</li>`).join("")}</ul>`);
-
-    // ═══ 17. DERIVACIONES ═══
-    const derivs = data.derivaciones || [];
-    if (derivs.length > 0) {
-      sections.push(sec("🔗", "Derivaciones / Interconsultas") + `<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="background:#2563eb;color:white;padding:4px 8px;font-size:8pt;">Especialidad</th><th style="background:#2563eb;color:white;padding:4px 8px;font-size:8pt;">Motivo</th><th style="background:#2563eb;color:white;padding:4px 8px;font-size:8pt;">Urgencia</th></tr></thead><tbody>${derivs.map((d,i)=>`<tr style="background:${i%2===0?"#eff6ff":"white"}"><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;font-weight:700;">${_e(d.especialidad)}</td><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;">${_e(d.motivo)}</td><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;">${_e(d.urgencia)}</td></tr>`).join("")}</tbody></table>`);
+    // ═══ 7. ANTECEDENTES (FUENTE CORRECTA) ═══
+    var antAgrup = data.antecedentesAgrupados || {};
+    var antRows = "";
+    // Antecedentes Agrupados
+    var antCats = [
+      ["Patológicos", antAgrup.patologicos],
+      ["Quirúrgicos", antAgrup.quirurgicos],
+      ["Traumáticos", antAgrup.traumaticos],
+      ["Farmacológicos", antAgrup.farmacologicos],
+      ["Alérgicos", antAgrup.alergicos]
+    ];
+    antCats.forEach(function(pair) {
+      var label = pair[0];
+      var obj = pair[1] || {};
+      var det = obj.det || obj.val || "";
+      var hasData = det && det !== "Niega" && det !== "No";
+      antRows += '<tr><th style="background:#d1fae5;font-weight:700;width:28%;font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">' + _e(label) + '</th>';
+      if (hasData) {
+        antRows += '<td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;color:#dc2626;font-weight:700;" colspan="3">Sí — ' + _e(det) + '</td></tr>';
+      } else {
+        antRows += '<td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;color:#065f46;" colspan="3">Niega</td></tr>';
+      }
+    });
+    // Antecedentes generales (texto libre)
+    var antGeneral = [
+      ["Personales", data.antecedentes?.personales || data.antecedentesPersonales],
+      ["Familiares", data.antecedentes?.familiares || data.antecedentesFamiliares],
+      ["Gineco-obstétricos", data.antecedentes?.ginecologicos || data.antecedentesGinecoObstetricos],
+      ["Ocupacionales", data.antecedentesOcupacionales],
+      ["Hospitalarios", data.antecedentesHospitalarios],
+      ["Toxicológicos", data.antecedentesToxicologicos]
+    ];
+    antGeneral.forEach(function(pair) {
+      if (pair[1]) antRows += r1(pair[0], pair[1]);
+    });
+    // Vacunas
+    var vacunas = data.vacunas || [];
+    if (vacunas.length > 0 || data.vacunacionCompleta) {
+      var vacHtml = (data.vacunacionCompleta ? '<strong>Esquema completo: </strong>' + _e(data.vacunacionCompleta) + '<br/>' : '');
+      vacHtml += vacunas.map(function(v) { return _e(typeof v === "string" ? v : (v.nombre || "") + (v.dosis ? " (" + v.dosis + ")" : "") + (v.fecha ? " - " + v.fecha : "")); }).join(", ");
+      antRows += r1("Vacunas", vacHtml);
     }
+    sections.push(sec("📋", "Antecedentes") + tb(antRows || r1("Sin antecedentes", "No registra")));
 
-    // ═══ 18. FÓRMULA MÉDICA ═══
-    const meds = data.formulaMedicamentos || [];
-    if (meds.length > 0) {
-      sections.push(sec("💊", "Fórmula Médica") + `<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="background:#7c3aed;color:white;padding:4px 8px;font-size:8pt;">Medicamento</th><th style="background:#7c3aed;color:white;padding:4px 8px;font-size:8pt;">Presentación</th><th style="background:#7c3aed;color:white;padding:4px 8px;font-size:8pt;">Dosis</th><th style="background:#7c3aed;color:white;padding:4px 8px;font-size:8pt;">Frecuencia</th><th style="background:#7c3aed;color:white;padding:4px 8px;font-size:8pt;">Duración</th></tr></thead><tbody>${meds.map((m,i)=>`<tr style="background:${i%2===0?"#faf5ff":"white"}"><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;font-weight:700;">${_e(m.nombre)}</td><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;">${_e(m.presentacion)}</td><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;">${_e(m.dosis)}</td><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;">${_e(m.frecuencia)}</td><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;">${_e(m.duracion)}</td></tr>`).join("")}</tbody></table>`);
-    }
+    // ═══ 8. SIGNOS VITALES ═══
+    sections.push(sec("🔍", "Signos Vitales") + tb(
+      r2("Tensión Arterial", data.ta||data.tensionArterial||"--", "F. Cardíaca", (data.fc||data.frecuenciaCardiaca||"--")+" lpm") +
+      r2("F. Respiratoria", (data.fr||data.frecuenciaRespiratoria||"--")+" rpm", "Temperatura", (data.temp||data.temperatura||"--")+"°C") +
+      r2("Peso", (data.peso||"--")+" kg", "Talla", (data.talla||"--")+" cm") +
+      r2("IMC", data.imc||"--", "Clasificación IMC", data.clasificacionIMC||"--") +
+      r2("SpO2", (data.satO2||"--")+"%", "Perímetro Abdominal", (data.perimetroAbdominal||"--")+" cm")
+    ));
 
-    // ═══ 19. INCAPACIDAD ═══
-    const inc = data.incapacidad || {};
-    if (inc.aplica || inc.dias > 0) {
-      sections.push(sec("🏥", "Incapacidad Médica") + tb(
-        r2("Días", inc.dias||0, "Origen", inc.origen||"Enfermedad General") +
-        r2("Desde", inc.desde||"--", "Hasta", inc.hasta||"--") +
-        r1("Diagnóstico", inc.diagnosticoCIE||inc.diagnostico||"--")
+    // ═══ 9. AGUDEZA VISUAL ═══
+    var av = data.agudezaVisual || {};
+    if (av.lejanaOD || av.lejanaOI || av.proximaOD || av.proximaOI) {
+      sections.push(sec("👁️", "Agudeza Visual") + tb(
+        r2("Lejana OD", av.lejanaOD||"--", "Lejana OI", av.lejanaOI||"--") +
+        r2("Próxima OD", av.proximaOD||"--", "Próxima OI", av.proximaOI||"--") +
+        r1("Corrección", av.correccion||"Sin corrección")
       ));
     }
 
-    // ═══ 20. NOTAS ACLARATORIAS ═══
-    const notas = data.notasAclaratorias || [];
+    // ═══ 10. EXAMEN FÍSICO POR SISTEMAS — TODOS 15 SISTEMAS ═══
+    var efSis = data.examenFisicoSistemas || {};
+    var allSystems = ["cabeza","ojos","oidos","nariz","boca","cuello","torax","corazon","pulmones","abdomen","genitourinario","columna","extremidades","piel","neurologico"];
+    var sysLabels = {cabeza:"Cabeza",ojos:"Ojos",oidos:"Oídos",nariz:"Nariz",boca:"Boca/Faringe",cuello:"Cuello",torax:"Tórax",corazon:"Corazón",pulmones:"Pulmones",abdomen:"Abdomen",genitourinario:"Genitourinario",columna:"Columna",extremidades:"Extremidades",piel:"Piel/Faneras",neurologico:"Neurológico"};
+    var sysRows = allSystems.map(function(k) {
+      var v = efSis[k] || {};
+      var label = sysLabels[k] || k;
+      var estado = v.estado || "Normal";
+      var hallazgo = v.hallazgo || "";
+      var isAnormal = estado === "Anormal" || (hallazgo && hallazgo !== "Sin hallazgos patológicos");
+      var color = isAnormal ? "#dc2626" : "#065f46";
+      var bgColor = isAnormal ? "#fef2f2" : "#f0fdf4";
+      return '<tr style="background:' + bgColor + '"><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:25%;font-weight:700;">' + _e(label) + '</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:15%;color:' + color + ';font-weight:700;">' + _e(estado) + '</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;color:' + color + ';">' + _e(hallazgo || (isAnormal ? "" : "Sin hallazgos patológicos")) + '</td></tr>';
+    }).join("");
+    // Also any extra systems not in the standard list
+    Object.keys(efSis).forEach(function(k) {
+      if (allSystems.indexOf(k) === -1) {
+        var v = efSis[k] || {};
+        var estado = v.estado || "Normal";
+        var hallazgo = v.hallazgo || "";
+        var isAnormal = estado === "Anormal";
+        var color = isAnormal ? "#dc2626" : "#065f46";
+        sysRows += '<tr><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:25%;font-weight:700;">' + _e(k) + '</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:15%;color:' + color + ';font-weight:700;">' + _e(estado) + '</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">' + _e(hallazgo) + '</td></tr>';
+      }
+    });
+    sections.push(sec("🏥", "Examen Físico por Sistemas") + '<table style="width:100%;border-collapse:collapse;margin-top:4px;"><thead><tr><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Sistema</th><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;">Estado</th><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Hallazgo</th></tr></thead><tbody>' + sysRows + '</tbody></table>');
+
+    // ═══ 11. MANIOBRAS ORTOPÉDICAS — TODAS ═══
+    var manio = data.maniobrasOsteomusculares || {};
+    var allManiobras = ["phalen","tinel","finkelstein","jobe","lasegue","adams","wells","schober"];
+    var manioLabels = {phalen:"Phalen",tinel:"Tinel",finkelstein:"Finkelstein",jobe:"Jobe",lasegue:"Lasègue",adams:"Adams",wells:"Wells",schober:"Schober"};
+    var manioRows = allManiobras.map(function(k) {
+      var v = manio[k] || {};
+      var label = manioLabels[k] || k;
+      var estado = v.estado || v || "";
+      if (typeof estado === "object") estado = estado.estado || "No evaluado";
+      var hallazgo = (typeof v === "object" ? v.hallazgo : "") || "";
+      var isPositive = estado === "Positivo" || estado === "Anormal" || estado === "Positiva";
+      var color = isPositive ? "#dc2626" : "#065f46";
+      var bgColor = isPositive ? "#fef2f2" : "#f0fdf4";
+      return '<tr style="background:' + bgColor + '"><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:25%;font-weight:700;">' + _e(label) + '</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:20%;color:' + color + ';font-weight:700;">' + _e(estado || "Negativo") + '</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">' + _e(hallazgo) + '</td></tr>';
+    }).join("");
+    // Also any extra maniobras
+    Object.keys(manio).forEach(function(k) {
+      if (allManiobras.indexOf(k) === -1) {
+        var v = manio[k] || {};
+        var estado = (typeof v === "object" ? v.estado : v) || "";
+        var hallazgo = (typeof v === "object" ? v.hallazgo : "") || "";
+        var isPositive = estado === "Positivo" || estado === "Anormal";
+        var color = isPositive ? "#dc2626" : "#065f46";
+        manioRows += '<tr><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:25%;font-weight:700;">' + _e(k) + '</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:20%;color:' + color + ';font-weight:700;">' + _e(estado) + '</td><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">' + _e(hallazgo) + '</td></tr>';
+      }
+    });
+    sections.push(sec("🦴", "Maniobras Ortopédicas") + '<table style="width:100%;border-collapse:collapse;margin-top:4px;"><thead><tr><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Maniobra</th><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;">Resultado</th><th style="background:#065f46;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Hallazgo</th></tr></thead><tbody>' + manioRows + '</tbody></table>');
+
+    // ═══ 12. ÉNFASIS ESPECIALES ═══
+    // ALTURAS
+    var alt = data.examenAlturas || {};
+    if (alt.romberg || alt.marcha || alt.vertigo || alt.coordinacion || alt.nistagmus || alt.testMiedo || alt.observaciones) {
+      sections.push(sec("🧗", "Énfasis: Trabajo en Alturas") + tb(
+        r2("Romberg", alt.romberg||"--", "Marcha", alt.marcha||"--") +
+        r2("Vértigo", alt.vertigo||"No", "Coordinación", alt.coordinacion||"--") +
+        r2("Nistagmus", alt.nistagmus||"No", "Test de Miedo", alt.testMiedo||"--") +
+        (alt.observaciones ? r1("Observaciones", alt.observaciones) : "")
+      ));
+    }
+    // ALIMENTOS
+    var alim = data.examenAlimentos || {};
+    if (alim.pielFaneras || alim.orl || alim.gastrointestinal || alim.observaciones) {
+      sections.push(sec("🍽️", "Énfasis: Manipulación de Alimentos") + tb(
+        r2("Piel y Faneras", alim.pielFaneras||"--", "ORL", alim.orl||"--") +
+        r1("Gastrointestinal", alim.gastrointestinal||"--") +
+        (alim.observaciones ? r1("Observaciones", alim.observaciones) : "")
+      ));
+    }
+    // CONFINADOS
+    var conf = data.examenConfinados || {};
+    if (conf.cardiovascular || conf.respiratorio || conf.neurologico || conf.psicologico || conf.otorrino || conf.usoEpp || conf.observaciones) {
+      sections.push(sec("🔒", "Énfasis: Espacios Confinados") + tb(
+        r2("Cardiovascular", conf.cardiovascular||"--", "Respiratorio", conf.respiratorio||"--") +
+        r2("Neurológico", conf.neurologico||"--", "Psicológico", conf.psicologico||"--") +
+        r2("Otorrino", conf.otorrino||"--", "Uso EPP", conf.usoEpp||"--") +
+        (conf.hallazgosCardio ? r1("Hallazgos Cardio", conf.hallazgosCardio) : "") +
+        (conf.observaciones ? r1("Observaciones", conf.observaciones) : "")
+      ));
+    }
+    // OSTEOMUSCULAR
+    var osteo = data.examenOsteomuscular || {};
+    if (osteo.columna || osteo.miembrosSup || osteo.miembrosInf || osteo.muscular || osteo.articular || osteo.postural || osteo.hallazgos || osteo.diagnosticoFuncional) {
+      sections.push(sec("💪", "Énfasis: Osteomuscular") + tb(
+        r2("Columna", osteo.columna||"--", "Miembros Superiores", osteo.miembrosSup||"--") +
+        r2("Miembros Inferiores", osteo.miembrosInf||"--", "Muscular", osteo.muscular||"--") +
+        r2("Articular", osteo.articular||"--", "Postural", osteo.postural||"--") +
+        (osteo.hallazgos ? r1("Hallazgos", osteo.hallazgos) : "") +
+        (osteo.diagnosticoFuncional ? r1("Diagnóstico Funcional", osteo.diagnosticoFuncional) : "")
+      ));
+    }
+    // CORAZÓN
+    var cora = data.examenCorazon || {};
+    if (cora.frecuenciaCardiaca || cora.presionArterial || cora.ritmoyTonos || cora.pulsos || cora.edemas || cora.perfusionPeriferica || cora.riesgoCV || cora.hallazgos || cora.restricciones) {
+      sections.push(sec("❤️", "Énfasis: Cardiovascular") + tb(
+        r2("F. Cardíaca", cora.frecuenciaCardiaca||"--", "Presión Arterial", cora.presionArterial||"--") +
+        r2("Ritmo y Tonos", cora.ritmoyTonos||"--", "Pulsos", cora.pulsos||"--") +
+        r2("Edemas", cora.edemas||"No", "Perfusión Periférica", cora.perfusionPeriferica||"--") +
+        r2("IMC", cora.imc||data.imc||"--", "Riesgo CV", cora.riesgoCV||"--") +
+        (cora.hallazgos ? r1("Hallazgos", cora.hallazgos) : "") +
+        (cora.restricciones ? r1("Restricciones", cora.restricciones) : "")
+      ));
+    }
+
+    // ═══ 13. PARACLÍNICOS ═══
+    var paraCheck = data.paraclinicosCheck || {};
+    var paraKeys = Object.keys(paraCheck).filter(function(k) { return k !== "_aiSugeridos" && paraCheck[k]; });
+    var examList = data.solicitudExamenes || [];
+    if (paraKeys.length > 0 || examList.length > 0) {
+      var paraHtml = '';
+      if (paraKeys.length > 0) {
+        paraHtml += '<div style="padding:6px 10px;margin-bottom:6px;">' + paraKeys.map(function(k) { return pill(k, "#0d9488"); }).join("") + '</div>';
+      }
+      if (examList.length > 0) {
+        paraHtml += '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="background:#0d9488;color:white;padding:4px 8px;font-size:8pt;text-align:left;">N°</th><th style="background:#0d9488;color:white;padding:4px 8px;font-size:8pt;text-align:left;">Examen / Procedimiento</th><th style="background:#0d9488;color:white;padding:4px 8px;font-size:8pt;text-align:center;">Urgente</th></tr></thead><tbody>';
+        examList.forEach(function(ex, i) {
+          paraHtml += '<tr style="background:' + (i % 2 === 0 ? "#f0fdfa" : "white") + '"><td style="padding:4px 8px;font-size:8.5pt;border:1px solid #ccc;">' + (i+1) + '</td><td style="padding:4px 8px;font-size:8.5pt;border:1px solid #ccc;">' + _e(ex.nombre) + '</td><td style="padding:4px 8px;font-size:8.5pt;border:1px solid #ccc;text-align:center;">' + (ex.urgente ? "⚡ SÍ" : "") + '</td></tr>';
+        });
+        paraHtml += '</tbody></table>';
+      }
+      sections.push(sec("🔬", "Paraclínicos y Exámenes Solicitados") + paraHtml);
+    }
+
+    // ═══ 14. DIAGNÓSTICOS CIE-10 ═══
+    var dxList = data.diagnosticos?.length ? data.diagnosticos : [];
+    sections.push(sec("🏥", "Diagnósticos CIE-10") + tb(
+      r2("Dx Principal", data.diagnosticoPrincipal||"Z10.0", "Dx Secundario 1", data.diagnosticoSecundario1||"") +
+      (data.diagnosticoSecundario2 ? r1("Dx Secundario 2", data.diagnosticoSecundario2) : "") +
+      dxList.map(function(d,i) { return r1("Dx " + (i+1) + " (" + _e(d.tipo||"—") + ")", (d.cie10||"") + " " + (d.descripcion||"")); }).join("")
+    ));
+
+    // ═══ 15. CONCEPTO DE APTITUD ═══
+    var aptitud = data.conceptoAptitud || "PENDIENTE";
+    var aptColor = "#065f46"; // default green
+    var aptLower = String(aptitud).toLowerCase();
+    if (aptLower.indexOf("no apto") !== -1 || aptLower.indexOf("no cumple") !== -1) aptColor = "#dc2626";
+    else if (aptLower.indexOf("restriccion") !== -1 || aptLower.indexOf("condicion") !== -1 || aptLower.indexOf("aplazado") !== -1) aptColor = "#d97706";
+    sections.push(sec("✅", "Concepto de Aptitud") +
+      '<div style="background:' + aptColor + ';color:white;text-align:center;padding:10px;border-radius:6px;font-size:12pt;font-weight:900;margin:8px 0;text-transform:uppercase;">' + _e(aptitud) + '</div>' +
+      (data.vigencia ? '<p style="text-align:center;font-size:8.5pt;color:#555;margin-bottom:8px;">Vigencia: ' + _e(data.vigencia) + '</p>' : ""));
+
+    // ═══ 16. RECOMENDACIONES ═══
+    var recomParts = [data.recomendaciones, data.recomendacionesOcupacionales, data.recomendacionesMedicas].filter(Boolean);
+    var recomChecklist = data.recomendacionesChecklist || [];
+    if (recomParts.length > 0 || recomChecklist.length > 0) {
+      var recomHtml = '<div style="margin:8px 0;"><strong style="font-size:9.5pt;color:#065f46;">RECOMENDACIONES:</strong>';
+      recomParts.forEach(function(txt) { recomHtml += fmtList(txt); });
+      if (recomChecklist.length > 0) {
+        recomHtml += '<ul style="margin:4px 0;padding-left:16px;">';
+        recomChecklist.forEach(function(item) {
+          var txt = typeof item === "string" ? item : (item.texto || item.label || item.nombre || JSON.stringify(item));
+          recomHtml += '<li style="margin-bottom:2px;font-size:9pt;">' + _e(txt) + '</li>';
+        });
+        recomHtml += '</ul>';
+      }
+      recomHtml += '</div>';
+      sections.push(recomHtml);
+    }
+
+    // ═══ 17. RESTRICCIONES ═══
+    var restricTxt = Array.isArray(data.analisisRestricciones) ? data.analisisRestricciones.join("\n") : (data.analisisRestricciones || data.restricciones || "");
+    var restricChecklist = data.restriccionesChecklist || [];
+    if (restricTxt || restricChecklist.length > 0) {
+      var restricHtml = '<div style="margin:8px 0;"><strong style="font-size:9.5pt;color:#dc2626;">RESTRICCIONES LABORALES:</strong>';
+      if (restricTxt) restricHtml += fmtList(restricTxt);
+      if (restricChecklist.length > 0) {
+        restricHtml += '<ul style="margin:4px 0;padding-left:16px;">';
+        restricChecklist.forEach(function(item) {
+          var txt = typeof item === "string" ? item : (item.texto || item.label || "");
+          var normativa = typeof item === "object" ? (item.normativa || "") : "";
+          restricHtml += '<li style="margin-bottom:2px;font-size:9pt;">' + _e(txt) + (normativa ? ' <em style="color:#6b7280;font-size:8pt;">(' + _e(normativa) + ')</em>' : '') + '</li>';
+        });
+        restricHtml += '</ul>';
+      }
+      restricHtml += '</div>';
+      sections.push(restricHtml);
+    }
+
+    // ═══ 18. ANÁLISIS CLÍNICO IA ═══
+    if (data.analisisIA) sections.push(sec("🧠", "Análisis Clínico IA") + '<div style="padding:6px 10px;font-size:9pt;white-space:pre-wrap;line-height:1.5;background:#fefce8;border:1px solid #fde68a;border-radius:4px;margin:4px 0;">' + _nl(data.analisisIA) + '</div>');
+
+    // ═══ 19. SVE ═══
+    if (data.sveRecomendado?.length > 0) {
+      sections.push(sec("🛡️", "Sistema de Vigilancia Epidemiológica (SVE)") + '<ul style="padding-left:16px;margin:4px 0;">' + data.sveRecomendado.map(function(s) { return '<li style="font-size:9pt;margin-bottom:3px;">' + _e(typeof s === "string" ? s : (s.nombre || JSON.stringify(s))) + '</li>'; }).join("") + '</ul>');
+    }
+
+    // ═══ 20. DERIVACIONES ═══
+    var derivs = data.derivaciones || [];
+    if (derivs.length > 0) {
+      var derivRows = derivs.map(function(d, i) {
+        return '<tr style="background:' + (i % 2 === 0 ? "#eff6ff" : "white") + '"><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;font-weight:700;">' + _e(d.especialidad) + '</td><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;">' + _e(d.motivo) + '</td><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;">' + _e(d.urgencia) + '</td></tr>';
+      }).join("");
+      sections.push(sec("🔗", "Derivaciones / Interconsultas") + '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="background:#2563eb;color:white;padding:4px 8px;font-size:8pt;">Especialidad</th><th style="background:#2563eb;color:white;padding:4px 8px;font-size:8pt;">Motivo</th><th style="background:#2563eb;color:white;padding:4px 8px;font-size:8pt;">Urgencia</th></tr></thead><tbody>' + derivRows + '</tbody></table>');
+    }
+
+    // ═══ 21. FÓRMULA MÉDICA ═══
+    var meds = data.formulaMedicamentos || [];
+    var formulaTxt = data.formulaMedica || "";
+    if (meds.length > 0 || formulaTxt) {
+      var medHtml = "";
+      if (meds.length > 0) {
+        medHtml += '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="background:#7c3aed;color:white;padding:4px 8px;font-size:8pt;">Medicamento</th><th style="background:#7c3aed;color:white;padding:4px 8px;font-size:8pt;">Presentación</th><th style="background:#7c3aed;color:white;padding:4px 8px;font-size:8pt;">Dosis</th><th style="background:#7c3aed;color:white;padding:4px 8px;font-size:8pt;">Frecuencia</th><th style="background:#7c3aed;color:white;padding:4px 8px;font-size:8pt;">Duración</th></tr></thead><tbody>';
+        meds.forEach(function(m, i) {
+          medHtml += '<tr style="background:' + (i % 2 === 0 ? "#faf5ff" : "white") + '"><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;font-weight:700;">' + _e(m.nombre) + '</td><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;">' + _e(m.presentacion) + '</td><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;">' + _e(m.dosis) + '</td><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;">' + _e(m.frecuencia) + '</td><td style="padding:4px 8px;border:1px solid #ccc;font-size:8.5pt;">' + _e(m.duracion) + '</td></tr>';
+        });
+        medHtml += '</tbody></table>';
+      }
+      if (formulaTxt) medHtml += '<div style="padding:6px 10px;margin-top:6px;">' + fmtList(formulaTxt) + '</div>';
+      sections.push(sec("💊", "Fórmula Médica") + medHtml);
+    }
+
+    // ═══ 22. INCAPACIDAD ═══
+    var inc = data.incapacidad || {};
+    if (inc.aplica || inc.dias > 0) {
+      sections.push(sec("📋", "Incapacidad Médica") + tb(
+        r2("Días", inc.dias||0, "Origen", inc.origen||"Enfermedad General") +
+        r2("Desde", inc.desde||"--", "Hasta", inc.hasta||"--") +
+        r1("Diagnóstico CIE", inc.diagnosticoCIE||inc.diagnostico||"--")
+      ));
+    }
+
+    // ═══ 23. ADJUNTOS ═══
+    var adjuntos = data.adjuntos || [];
+    if (adjuntos.length > 0) {
+      sections.push(sec("📎", "Adjuntos") + '<ul style="padding-left:16px;margin:4px 0;">' + adjuntos.map(function(a) {
+        var nombre = typeof a === "string" ? a : (a.nombre || a.name || a.url || "Archivo adjunto");
+        return '<li style="font-size:9pt;margin-bottom:3px;">' + _e(nombre) + '</li>';
+      }).join("") + '</ul>');
+    }
+
+    // ═══ 24. NOTAS ACLARATORIAS ═══
+    var notas = data.notasAclaratorias || [];
     if (notas.length > 0) {
-      sections.push(sec("📌", "Notas Aclaratorias") + notas.map(n => `<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:4px;padding:8px;margin:4px 0;font-size:8.5pt;"><strong>${_e(n.fecha ? new Date(n.fecha).toLocaleString("es-CO") : "")} — ${_e(n.autor||"")}</strong><br/>${_e(n.contenido||"")}</div>`).join(""));
+      var notasHtml = notas.map(function(n) {
+        var fecha = n.fecha ? new Date(n.fecha).toLocaleString("es-CO") : "";
+        return '<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:4px;padding:8px;margin:4px 0;font-size:8.5pt;"><strong>' + _e(fecha) + ' — ' + _e(n.autor||"") + '</strong><br/>' + _nl(n.contenido||"") + '</div>';
+      }).join("");
+      sections.push(sec("📌", "Notas Aclaratorias") + notasHtml);
     }
 
-    // ═══ 21. EVOLUCIONES ═══
-    const evols = data.evoluciones || [];
+    // ═══ 25. EVOLUCIONES ═══
+    var evols = data.evoluciones || [];
     if (evols.length > 0) {
-      sections.push(sec("📜", "Evoluciones Clínicas") + evols.map(ev => `<div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:4px;padding:8px;margin:4px 0;font-size:8.5pt;"><strong>${_e(ev.fecha||"")} — ${_e(ev.medico||"")} · Código: ${_e(ev.codigoEvolucion||"")}</strong><br/>${_e(ev.motivoConsulta||"")}${ev.texto ? "<br/>"+_e(ev.texto) : ""}${ev.nuevoConcept ? "<br/><strong>Concepto:</strong> "+_e(ev.nuevoConcept) : ""}</div>`).join(""));
+      var evolsHtml = evols.map(function(ev) {
+        var h = '<div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:4px;padding:8px;margin:4px 0;font-size:8.5pt;">';
+        h += '<strong>' + _e(ev.fecha||"") + ' — ' + _e(ev.medico||"") + ' · Código: ' + _e(ev.codigoEvolucion||"") + '</strong><br/>';
+        if (ev.motivoConsulta) h += _e(ev.motivoConsulta);
+        if (ev.texto) h += '<br/>' + _nl(ev.texto);
+        if (ev.nuevoConcept) h += '<br/><strong>Concepto:</strong> ' + _e(ev.nuevoConcept);
+        h += '</div>';
+        return h;
+      }).join("");
+      sections.push(sec("📜", "Evoluciones Clínicas") + evolsHtml);
     }
 
-    // ═══ FIRMA ═══
-    sections.push(`<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:30px;padding-top:10px;border-top:2px solid #d1d5db;">
-    <div style="text-align:center;width:40%;"><div style="height:50px;"></div><div style="border-top:1.5px solid #333;padding-top:4px;font-size:8pt;font-weight:700;">Firma del Trabajador<br/>${_e(data.docTipo||"CC")}: ${_e(data.docNumero||"")}</div></div>
-    <div style="text-align:center;width:40%;">${sigHtml}<div style="border-top:1.5px solid #333;padding-top:4px;font-size:8pt;font-weight:700;">${_e(doc.nombre||"")}<br/>${_e(doc.titulo||"")}<br/>C.C. ${_e(doc.cedula||"")}<br/>RM: ${_e(doc.licencia||"")}<br/>${_e(doc.ciudad||"")}</div></div></div>`);
+    // ═══ 26. FIRMA ═══
+    sections.push('<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:30px;padding-top:10px;border-top:2px solid #d1d5db;">' +
+      '<div style="text-align:center;width:40%;"><div style="height:50px;"></div><div style="border-top:1.5px solid #333;padding-top:4px;font-size:8pt;font-weight:700;">Firma del Trabajador<br/>' + _e(data.docTipo||"CC") + ': ' + _e(data.docNumero||"") + '</div></div>' +
+      '<div style="text-align:center;width:40%;">' + sigHtml + '<div style="border-top:1.5px solid #333;padding-top:4px;font-size:8pt;font-weight:700;">' + _e(doc.nombre||"") + '<br/>' + _e(doc.titulo||"") + '<br/>C.C. ' + _e(doc.cedula||"") + '<br/>RM: ' + _e(doc.licencia||"") + '<br/>' + _e(doc.ciudad||"") + '</div></div></div>');
 
     // ═══ CÓDIGO VERIFICACIÓN ═══
     if (data.codigoVerificacion) {
-      sections.push(`<div style="text-align:center;margin-top:12px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:6px;padding:8px;"><p style="font-size:7.5pt;font-weight:900;color:#6b7280;text-transform:uppercase;">Historia Clínica Firmada y Cerrada</p><p style="font-size:11pt;font-family:monospace;font-weight:900;color:#065f46;letter-spacing:2px;">${_e(data.codigoVerificacion)}</p></div>`);
-    }
-
-    // ═══ EXÁMENES SOLICITADOS (HOJA APARTE) ═══
-    const examList = data.solicitudExamenes || [];
-    if (examList.length > 0) {
-      sections.push(`<div style="page-break-before:always;">${sec("🔬", "Paraclínicos y Exámenes Solicitados")}<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="background:#0d9488;color:white;padding:6px 10px;font-size:8.5pt;text-align:left;">N°</th><th style="background:#0d9488;color:white;padding:6px 10px;font-size:8.5pt;text-align:left;">Examen / Procedimiento</th><th style="background:#0d9488;color:white;padding:6px 10px;font-size:8.5pt;text-align:center;">Urgente</th></tr></thead><tbody>${examList.map((ex,i)=>`<tr style="background:${i%2===0?"#f0fdfa":"white"}"><td style="padding:5px 8px;font-size:8.5pt;border:1px solid #ccc;">${i+1}</td><td style="padding:5px 8px;font-size:8.5pt;border:1px solid #ccc;">${_e(ex.nombre)}</td><td style="padding:5px 8px;font-size:8.5pt;border:1px solid #ccc;text-align:center;">${ex.urgente?"⚡ SÍ":""}</td></tr>`).join("")}</tbody></table></div>`);
+      sections.push('<div style="text-align:center;margin-top:12px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:6px;padding:8px;"><p style="font-size:7.5pt;font-weight:900;color:#6b7280;text-transform:uppercase;">Historia Clínica Firmada y Cerrada</p><p style="font-size:11pt;font-family:monospace;font-weight:900;color:#065f46;letter-spacing:2px;">' + _e(data.codigoVerificacion) + '</p></div>');
     }
 
     // ═══ ENSAMBLAR DOCUMENTO ═══
-    const w = window.open("", "_blank", "width=870,height=1100");
+    var w = window.open("", "_blank", "width=870,height=1100");
     if (!w) { showAlert("Permita las ventanas emergentes para imprimir."); return; }
-    w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>[OCUPASALUD] ${_e(data.nombres||"HC")}</title>
-    <style>@page{size:letter portrait;margin:1.1cm 1.4cm 1.3cm 1.4cm;}*{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{font-family:'Segoe UI',Arial,sans-serif;font-size:9.5pt;color:#111;margin:0;padding:14mm 16mm;line-height:1.4;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:4px 8px;font-size:8.5pt;}th{font-weight:700;text-align:left;background:#d1fae5;}p{margin:3px 0;}ul{margin:4px 0;padding-left:16px;}li{margin-bottom:2px;font-size:9pt;}.np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:9999;}.np-bar button{border:none;padding:6px 16px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;background:#10b981;color:#fff;}@media print{.np-bar{display:none!important;}body{padding:0;}}</style></head><body>
-    <div class="np-bar"><span style="flex:1;font-weight:700;">📋 HC ${_e(data.nombres||"")} — ${_e(data.codigoVerificacion||"")}</span><button onclick="window.print()">📥 Guardar / Imprimir PDF</button><button onclick="window.close()" style="background:#ef4444;">✕ Cerrar</button></div>
-    <div style="margin-top:50px;">${sections.join("")}</div></body></html>`);
+    w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>[OCUPASALUD] ' + _e(data.nombres||"HC") + '</title>' +
+    '<style>@page{size:letter portrait;margin:1.1cm 1.4cm 1.3cm 1.4cm;}*{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{font-family:"Segoe UI",Arial,sans-serif;font-size:9.5pt;color:#111;margin:0;padding:14mm 16mm;line-height:1.4;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:4px 8px;font-size:8.5pt;}th{font-weight:700;text-align:left;background:#d1fae5;}p{margin:3px 0;}ul{margin:4px 0;padding-left:16px;}li{margin-bottom:2px;font-size:9pt;}.np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:9999;}.np-bar button{border:none;padding:6px 16px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;background:#10b981;color:#fff;}@media print{.np-bar{display:none!important;}body{padding:0;}}</style></head><body>' +
+    '<div class="np-bar"><span style="flex:1;font-weight:700;">\uD83D\uDCCB HC ' + _e(data.nombres||"") + ' \u2014 ' + _e(data.codigoVerificacion||"") + '</span><button onclick="window.print()">\uD83D\uDCE5 Guardar / Imprimir PDF</button><button onclick="window.close()" style="background:#ef4444;">\u2715 Cerrar</button></div>' +
+    '<div style="margin-top:50px;">' + sections.join("") + '</div></body></html>');
     w.document.close();
     w.focus();
   };
