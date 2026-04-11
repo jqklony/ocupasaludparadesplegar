@@ -13189,6 +13189,7 @@ function AppInner() {
   const [teleForm, setTeleForm] = useState({
     paciente: "",
     documento: "",
+    celular: "",
     fecha: new Date().toISOString().split("T")[0],
     hora: "",
     motivo: "",
@@ -13197,6 +13198,7 @@ function AppInner() {
   });
   const [teleSalaActiva, setTeleSalaActiva] = useState(null); // {roomName, paciente, fecha, hora}
   const [teleTab, setTeleTab] = useState("nueva"); // 'nueva' | 'historial'
+  const [teleEspera, setTeleEspera] = useState([]); // sala de espera telemedicina
   const [mensajeRespuesta, setMensajeRespuesta] = useState(""); // texto de respuesta libre
   // ── AGENDA / SALA DE ESPERA ─────────────────────────────────────
   const [agendados, setAgendados] = useState([]); // [{id,nombre,doc,tipo,medicoId,hora,estado:'espera'|'atendiendo'|'atendido',horaInicio,horaFin}]
@@ -13247,7 +13249,11 @@ function AppInner() {
     _showSuggs: false,
   });
   const [agendaSuggs, setAgendaSuggs] = useState([]);
-  const [agendaTab, setAgendaTab] = useState("hoy"); // 'hoy' | 'proximas' | 'nueva'
+  const [agendaTab, setAgendaTab] = useState("hoy"); // 'hoy' | 'proximas' | 'nueva' | 'semanal' | 'mensual'
+  const [agendaRecurrente, setAgendaRecurrente] = useState(false);
+  const [agendaRecurrenciaPeriodo, setAgendaRecurrenciaPeriodo] = useState("3m");
+  const [agendaSemanaOffset, setAgendaSemanaOffset] = useState(0); // semana actual = 0
+  const [agendaMesOffset, setAgendaMesOffset] = useState(0); // mes actual = 0
   const [showComposeMensaje, setShowComposeMensaje] = useState(false);
   const [composeMensaje, setComposeMensaje] = useState({
     destinatarios: [],
@@ -30139,10 +30145,11 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
         teleForm.hora
       );
       const nuevaTele = {
-        id: `tele_${Date.now()}`,
+        id: "tele_" + Date.now(),
         roomName,
         paciente: teleForm.paciente,
         documento: teleForm.documento,
+        celular: teleForm.celular,
         fecha: teleForm.fecha,
         hora: teleForm.hora,
         motivo: teleForm.motivo,
@@ -30150,14 +30157,19 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
         consentimientoTele: true,
         consentimientoTs: new Date().toISOString(),
         medico: currentUser?.name || currentUser?.user,
-        estado: "activa",
+        estado: "esperando",
+        horaInicio: null,
+        horaFin: null,
       };
       const lista = [nuevaTele, ...teleconsultas];
       _syncTele(lista);
+      // Agregar a sala de espera
+      setTeleEspera(function (prev) { return prev.concat([{ id: nuevaTele.id, paciente: nuevaTele.paciente, documento: nuevaTele.documento, hora: nuevaTele.hora, roomName: roomName }]); });
       setTeleSalaActiva({
         roomName,
         paciente: teleForm.paciente,
         documento: teleForm.documento,
+        celular: teleForm.celular,
         fecha: teleForm.fecha,
         hora: teleForm.hora,
       });
@@ -30165,14 +30177,58 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
 
     const handleCerrarSala = () => {
       if (teleSalaActiva) {
-        const lista = teleconsultas.map((t) =>
-          t.roomName === teleSalaActiva.roomName
-            ? { ...t, estado: "completada", finTs: new Date().toISOString() }
-            : t
-        );
+        var horaFinTele = new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", hour12: false }).replace(".", ":");
+        const lista = teleconsultas.map(function (t) {
+          if (t.roomName === teleSalaActiva.roomName) {
+            return Object.assign({}, t, { estado: "completada", finTs: new Date().toISOString(), horaFin: horaFinTele });
+          }
+          return t;
+        });
         _syncTele(lista);
+        // Remover de sala de espera
+        setTeleEspera(function (prev) { return prev.filter(function (e) { return e.roomName !== teleSalaActiva.roomName; }); });
       }
       setTeleSalaActiva(null);
+    };
+    // Iniciar consulta (cambiar de esperando a en_consulta)
+    const handleIniciarConsulta = (teleId) => {
+      var horaInicioTele = new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", hour12: false }).replace(".", ":");
+      const lista = teleconsultas.map(function (t) {
+        if (t.id === teleId) {
+          return Object.assign({}, t, { estado: "activa", horaInicio: horaInicioTele });
+        }
+        return t;
+      });
+      _syncTele(lista);
+      var found = teleconsultas.find(function (t) { return t.id === teleId; });
+      if (found) {
+        setTeleSalaActiva({
+          roomName: found.roomName,
+          paciente: found.paciente,
+          documento: found.documento,
+          celular: found.celular || "",
+          fecha: found.fecha,
+          hora: found.hora,
+        });
+      }
+      // Remover de espera visual
+      setTeleEspera(function (prev) { return prev.filter(function (e) { return e.id !== teleId; }); });
+    };
+    // Crear HC desde teleconsulta finalizada
+    const crearHCDesdeTele = (tele) => {
+      var newId = "pac_" + Date.now();
+      setData(Object.assign({}, initialGeneralPatientState, {
+        id: newId,
+        _medicoId: currentUser?.user,
+        nombres: tele.paciente,
+        docNumero: tele.documento,
+        celular: tele.celular || "",
+        motivoConsulta: "Teleconsulta \u2014 " + (tele.motivo || "Sin motivo registrado"),
+        _teleId: tele.id,
+      }));
+      setDataType("general");
+      setActiveTab("formGeneral");
+      setView("historia");
     };
 
     const jitsiUrl = teleSalaActiva
@@ -30206,7 +30262,12 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
                   </p>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                {teleconsultas.filter(function (t) { return t.estado === "esperando"; }).length > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded-full animate-pulse">
+                    {"🔴 " + teleconsultas.filter(function (t) { return t.estado === "esperando"; }).length + " en espera"}
+                  </span>
+                )}
                 <button
                   onClick={() => setTeleTab("nueva")}
                   className={`px-3 py-1.5 text-xs font-bold rounded-lg ${
@@ -30215,7 +30276,7 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
                       : "bg-blue-800 text-blue-200 hover:bg-blue-600"
                   }`}
                 >
-                  ➕ Nueva consulta
+                  {"➕ Nueva consulta"}
                 </button>
                 <button
                   onClick={() => setTeleTab("historial")}
@@ -30235,16 +30296,22 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
           {teleSalaActiva && (
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden border-2 border-blue-500">
               <div className="bg-blue-600 px-4 py-2 flex items-center justify-between">
-                <div className="text-white text-xs font-bold">
-                  🔴 CONSULTA EN CURSO - {teleSalaActiva.paciente} ·{" "}
-                  {teleSalaActiva.fecha} {teleSalaActiva.hora}
+                <div className="text-white text-xs font-bold flex items-center gap-2">
+                  {"🔴 CONSULTA EN CURSO - " + teleSalaActiva.paciente + " · " + teleSalaActiva.fecha + " " + teleSalaActiva.hora}
+                  {teleEspera.length > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">
+                      {"🔴 " + teleEspera.length + " paciente" + (teleEspera.length !== 1 ? "s" : "") + " esperando"}
+                    </span>
+                  )}
                 </div>
-                <button
-                  onClick={handleCerrarSala}
-                  className="bg-red-500 hover:bg-red-600 text-white text-xs font-black px-3 py-1 rounded-lg"
-                >
-                  ⏹ Finalizar consulta
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCerrarSala}
+                    className="bg-red-500 hover:bg-red-600 text-white text-xs font-black px-3 py-1 rounded-lg"
+                  >
+                    ⏹ Finalizar consulta
+                  </button>
+                </div>
               </div>
               <div className="bg-gray-50 flex flex-col items-center justify-center gap-5 py-12">
                 <div className="text-center">
@@ -30276,8 +30343,23 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
                   >
                     📋 Copiar enlace para el paciente
                   </button>
+                  {teleSalaActiva.celular && (
+                    <a
+                      href={"https://wa.me/" + (teleSalaActiva.celular || "").replace(/\D/g, "") + "?text=" + encodeURIComponent("Hola " + teleSalaActiva.paciente + ", su teleconsulta esta lista. Ingrese al siguiente enlace: " + jitsiUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition"
+                    >
+                      {"📱 Enviar enlace por WhatsApp"}
+                    </a>
+                  )}
+                  {!teleSalaActiva.celular && (
+                    <p className="text-[10px] text-amber-600 text-center font-bold">
+                      {"⚠️ Sin celular registrado - No se puede enviar por WhatsApp"}
+                    </p>
+                  )}
                   <p className="text-[10px] text-gray-400 text-center">
-                    Enlace único: {jitsiUrl}
+                    {"Enlace \u00FAnico: " + jitsiUrl}
                   </p>
                 </div>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[10px] text-blue-700 max-w-sm">
@@ -30333,6 +30415,19 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
                     }
                     className="w-full p-2 border rounded-lg text-sm"
                     placeholder="CC / CE / PP"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">
+                    {"📱 Celular del paciente (WhatsApp)"}
+                  </label>
+                  <input
+                    value={teleForm.celular}
+                    onChange={(e) =>
+                      setTeleForm((p) => ({ ...p, celular: e.target.value }))
+                    }
+                    className="w-full p-2 border rounded-lg text-sm"
+                    placeholder="Ej: +573001234567"
                   />
                 </div>
                 <div>
@@ -30439,6 +30534,39 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
             </div>
           )}
 
+          {/* Sala de espera telemedicina */}
+          {teleEspera.length > 0 && !teleSalaActiva && (
+            <div className="bg-white rounded-2xl shadow-sm border-2 border-amber-300 overflow-hidden">
+              <div className="bg-amber-50 px-4 py-3 border-b border-amber-200">
+                <p className="text-sm font-black text-amber-800">
+                  {"🔴 Sala de Espera (" + teleEspera.length + " paciente" + (teleEspera.length !== 1 ? "s" : "") + ")"}
+                </p>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {teleconsultas.filter(function (t) { return t.estado === "esperando"; }).map(function (t) {
+                  return (
+                    <div key={t.id} className="flex items-center justify-between p-4 hover:bg-amber-50">
+                      <div>
+                        <p className="text-xs font-bold text-gray-800">
+                          {t.paciente + " · " + t.documento}
+                        </p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          {"📅 " + t.fecha + " " + t.hora + " · " + (t.motivo || "Sin motivo")}
+                        </p>
+                      </div>
+                      <button
+                        onClick={function () { handleIniciarConsulta(t.id); }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-black px-4 py-2 rounded-xl"
+                      >
+                        {"▶ Iniciar consulta"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Historial de teleconsultas */}
           {teleTab === "historial" && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -30449,46 +30577,79 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
               </div>
               {teleconsultas.length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
-                  <p className="text-3xl mb-2">📹</p>
+                  <p className="text-3xl mb-2">{"📹"}</p>
                   <p className="text-sm font-bold">
                     Sin teleconsultas registradas
                   </p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {teleconsultas.map((t) => (
-                    <div
-                      key={t.id}
-                      className="flex items-center justify-between p-4 hover:bg-gray-50"
-                    >
-                      <div>
-                        <p className="text-xs font-bold text-gray-800">
-                          {t.paciente}{" "}
-                          <span className="font-normal text-gray-400">
-                            · {t.documento}
+                  {teleconsultas.map(function (t) {
+                    var estadoLabel = t.estado === "activa" ? "🔵 En curso" : t.estado === "esperando" ? "🟡 Programada" : "✅ Finalizada";
+                    var estadoClass = t.estado === "activa" ? "bg-blue-100 text-blue-700" : t.estado === "esperando" ? "bg-yellow-100 text-yellow-700" : "bg-emerald-100 text-emerald-700";
+                    var duracionStr = "";
+                    if (t.horaInicio && t.horaFin) {
+                      var partsI = t.horaInicio.split(":");
+                      var partsF = t.horaFin.split(":");
+                      if (partsI.length === 2 && partsF.length === 2) {
+                        var minI = parseInt(partsI[0], 10) * 60 + parseInt(partsI[1], 10);
+                        var minF = parseInt(partsF[0], 10) * 60 + parseInt(partsF[1], 10);
+                        var diff = minF - minI;
+                        if (diff > 0) duracionStr = diff + " min";
+                      }
+                    }
+                    return (
+                      <div key={t.id} className="flex items-center justify-between p-4 hover:bg-gray-50">
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">
+                            {t.paciente + " "}
+                            <span className="font-normal text-gray-400">
+                              {" · " + t.documento}
+                            </span>
+                          </p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">
+                            {"📅 " + t.fecha + " " + t.hora + " · " + (t.motivo || "Sin motivo registrado")}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-[10px] text-gray-400">
+                              {"👤 " + t.medico}
+                            </p>
+                            {duracionStr && (
+                              <p className="text-[10px] text-blue-600 font-bold">
+                                {"⏱ Duración: " + duracionStr}
+                              </p>
+                            )}
+                            {t.horaInicio && (
+                              <p className="text-[10px] text-gray-400">
+                                {"🕐 " + t.horaInicio + (t.horaFin ? " → " + t.horaFin : "")}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5">
+                          <span className={"text-[10px] font-black px-2 py-1 rounded-full " + estadoClass}>
+                            {estadoLabel}
                           </span>
-                        </p>
-                        <p className="text-[10px] text-gray-500 mt-0.5">
-                          📅 {t.fecha} {t.hora} ·{" "}
-                          {t.motivo || "Sin motivo registrado"}
-                        </p>
-                        <p className="text-[10px] text-gray-400">
-                          👤 {t.medico}
-                        </p>
+                          {t.estado === "completada" && (
+                            <button
+                              onClick={function () { crearHCDesdeTele(t); }}
+                              className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg transition"
+                            >
+                              {"📋 Crear HC de esta teleconsulta"}
+                            </button>
+                          )}
+                          {t.estado === "esperando" && (
+                            <button
+                              onClick={function () { handleIniciarConsulta(t.id); }}
+                              className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-lg transition"
+                            >
+                              {"▶ Iniciar consulta"}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <span
-                        className={`text-[10px] font-black px-2 py-1 rounded-full ${
-                          t.estado === "activa"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {t.estado === "activa"
-                          ? "🟢 En curso"
-                          : "✅ Completada"}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -36943,6 +37104,14 @@ th{background:#fee2e2;font-weight:900;text-align:left;color:#7f1d1d;}
       const horaCita = agendaForm.horaCita || horaActual();
       const duracion = DURACION[agendaForm.tipoConsulta] || 20;
       const horaFin = addMins(horaCita, duracion);
+      // ── Bloqueo de horarios superpuestos ──
+      const overlap = agendados.some(function (a) {
+        return a.medicoId === agendaForm.medicoId && a.fecha === fechaCita && a.horaCita === horaCita && a.estado !== "atendido";
+      });
+      if (overlap) {
+        showAlert("⚠️ Ya existe una cita para este médico a las " + horaCita + ". Elija otro horario.");
+        return;
+      }
       const esHoy = fechaCita === today;
       const nuevo = {
         id: "ag_" + Date.now(),
@@ -37003,7 +37172,25 @@ th{background:#fee2e2;font-weight:900;text-align:left;color:#7f1d1d;}
             }
           : {}),
       };
-      saveAgendados([...agendados, nuevo]);
+      // ── Citas recurrentes ──
+      var allNew = [nuevo];
+      if (agendaRecurrente) {
+        var mesesAdd = agendaRecurrenciaPeriodo === "3m" ? 3 : agendaRecurrenciaPeriodo === "6m" ? 6 : 12;
+        var fechaFutura = new Date(fechaCita + "T12:00:00");
+        fechaFutura.setMonth(fechaFutura.getMonth() + mesesAdd);
+        var fechaFuturaStr = fechaFutura.toISOString().split("T")[0];
+        var recurrenteNuevo = Object.assign({}, nuevo, {
+          id: "ag_" + (Date.now() + 1),
+          fecha: fechaFuturaStr,
+          estado: "programado",
+          observacion: (nuevo.observacion ? nuevo.observacion + " | " : "") + "Control periodico (" + (mesesAdd === 3 ? "3 meses" : mesesAdd === 6 ? "6 meses" : "1 año") + ")",
+          registradoEn: nowISO(),
+        });
+        allNew.push(recurrenteNuevo);
+      }
+      saveAgendados(agendados.concat(allNew));
+      setAgendaRecurrente(false);
+      setAgendaRecurrenciaPeriodo("3m");
       setAgendaForm((p) => ({
         ...p,
         nombre: "",
@@ -37042,13 +37229,13 @@ th{background:#fee2e2;font-weight:900;text-align:left;color:#7f1d1d;}
       }));
       setAgendaSuggs([]);
       setAgendaTab("hoy");
-      showAlert(
-        `✅ ${
-          esHoy
-            ? "Paciente en sala de espera"
-            : "Cita programada para " + fechaCita + " a las " + horaCita
-        }.\nMédico: ${nuevo.medicoNombre} · Duración: ${duracion} min`
-      );
+      var alertMsg = esHoy ? "Paciente en sala de espera" : "Cita programada para " + fechaCita + " a las " + horaCita;
+      alertMsg += ".\nMédico: " + nuevo.medicoNombre + " · Duración: " + duracion + " min";
+      if (agendaRecurrente) {
+        var mesesLabel = agendaRecurrenciaPeriodo === "3m" ? "3 meses" : agendaRecurrenciaPeriodo === "6m" ? "6 meses" : "1 año";
+        alertMsg += "\n🔄 Control periódico programado en " + mesesLabel;
+      }
+      showAlert("✅ " + alertMsg);
     };
     // ── Iniciar atención ───────────────────────────────────────────
     const iniciarAtencion = (ag) => {
@@ -37297,8 +37484,18 @@ th{background:#fee2e2;font-weight:900;text-align:left;color:#7f1d1d;}
               onClick={() => eliminarCita(ag.id)}
               className="bg-red-50 text-red-600 px-2 py-1 rounded-lg text-[10px] font-bold hover:bg-red-100"
             >
-              🗑
+              {"🗑"}
             </button>
+          )}
+          {(ag.estado === "programado" || ag.estado === "espera") && ag.celular && (
+            <a
+              href={"https://wa.me/" + (ag.celular || "").replace(/\D/g, "") + "?text=" + encodeURIComponent("Recordatorio: Tiene cita medica ocupacional el " + ag.fecha + " a las " + ag.horaCita + " con el Dr. " + ag.medicoNombre + ". Por favor llegue 10 minutos antes.")}
+              target="_blank"
+              rel="noreferrer"
+              className="text-green-600 hover:text-green-700 text-[10px] font-bold bg-green-50 hover:bg-green-100 px-2 py-1 rounded-lg transition"
+            >
+              {"📱 WhatsApp"}
+            </a>
           )}
           <EstadoBadge ag={ag} />
         </div>
@@ -37350,24 +37547,23 @@ th{background:#fee2e2;font-weight:900;text-align:left;color:#7f1d1d;}
             ))}
           </div>
           {/* Tabs */}
-          <div className="flex gap-1 mb-4 bg-white rounded-xl shadow-sm border border-gray-100 p-1 w-fit">
+          <div className="flex gap-1 mb-4 bg-white rounded-xl shadow-sm border border-gray-100 p-1 w-fit flex-wrap">
             {[
-              { k: "hoy", l: `📋 Hoy (${miAgendaHoy.length})` },
-              { k: "proximas", l: `📅 Próximas (${proximas.length})` },
-              ...(isAdminOrSec ? [{ k: "nueva", l: "➕ Nueva Cita" }] : []),
-            ].map((t) => (
-              <button
-                key={t.k}
-                onClick={() => setAgendaTab(t.k)}
-                className={`px-4 py-2 rounded-lg text-xs font-black transition ${
-                  agendaTab === t.k
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-500 hover:bg-gray-100"
-                }`}
-              >
-                {t.l}
-              </button>
-            ))}
+              { k: "hoy", l: "📋 Hoy (" + miAgendaHoy.length + ")" },
+              { k: "proximas", l: "📅 Próximas (" + proximas.length + ")" },
+              { k: "semanal", l: "📅 Semanal" },
+              { k: "mensual", l: "📊 Mensual" },
+            ].concat(isAdminOrSec ? [{ k: "nueva", l: "➕ Nueva Cita" }] : []).map(function (t) {
+              return (
+                <button
+                  key={t.k}
+                  onClick={function () { setAgendaTab(t.k); }}
+                  className={"px-4 py-2 rounded-lg text-xs font-black transition " + (agendaTab === t.k ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100")}
+                >
+                  {t.l}
+                </button>
+              );
+            })}
           </div>
           <div
             className={`grid gap-6 ${
@@ -38096,13 +38292,43 @@ th{background:#fee2e2;font-weight:900;text-align:left;color:#7f1d1d;}
                       />
                     </div>
                   </div>
+                  {/* Citas recurrentes */}
+                  <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 mb-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={agendaRecurrente}
+                        onChange={function (e) { setAgendaRecurrente(e.target.checked); }}
+                        className="w-4 h-4 accent-purple-600"
+                      />
+                      <span className="text-xs font-bold text-purple-700">
+                        {"🔄 Programar control periódico"}
+                      </span>
+                    </label>
+                    {agendaRecurrente && (
+                      <div className="mt-2">
+                        <select
+                          value={agendaRecurrenciaPeriodo}
+                          onChange={function (e) { setAgendaRecurrenciaPeriodo(e.target.value); }}
+                          className="p-2 border border-purple-300 rounded-lg text-sm w-full"
+                        >
+                          <option value="3m">{"Cada 3 meses"}</option>
+                          <option value="6m">{"Cada 6 meses"}</option>
+                          <option value="1y">{"Cada 1 año"}</option>
+                        </select>
+                        <p className="text-[10px] text-purple-600 mt-1 font-bold">
+                          {"Se creará automáticamente una cita futura de control"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={registrarPaciente}
                     className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-black hover:bg-blue-700 flex items-center justify-center gap-2 shadow"
                   >
                     <UserCheck className="w-5 h-5" />
                     {agendaForm.fechaCita && agendaForm.fechaCita > today
-                      ? `📅 Programar cita para ${agendaForm.fechaCita}`
+                      ? "📅 Programar cita para " + agendaForm.fechaCita
                       : "✅ Registrar en sala de espera"}
                   </button>
                 </div>
@@ -38147,7 +38373,195 @@ th{background:#fee2e2;font-weight:900;text-align:left;color:#7f1d1d;}
                 </div>
               </div>
             )}
+            {/* ─── TAB: SEMANAL ─────────────────────────────────── */}
+            {agendaTab === "semanal" && (function () {
+              var hoy = new Date();
+              var diaSemana = hoy.getDay();
+              var diffLunes = diaSemana === 0 ? -6 : 1 - diaSemana;
+              var lunes = new Date(hoy);
+              lunes.setDate(hoy.getDate() + diffLunes + (agendaSemanaOffset * 7));
+              var diasSemana = [];
+              var nombresDia = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+              for (var i = 0; i < 7; i++) {
+                var d = new Date(lunes);
+                d.setDate(lunes.getDate() + i);
+                diasSemana.push({
+                  fecha: d.toISOString().split("T")[0],
+                  nombre: nombresDia[i],
+                  dia: d.getDate(),
+                  mes: d.toLocaleDateString("es-CO", { month: "short" }),
+                });
+              }
+              var lunesStr = diasSemana[0].fecha;
+              var domStr = diasSemana[6].fecha;
+              return (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="bg-blue-50 px-5 py-3 border-b border-blue-100 flex items-center justify-between">
+                    <button
+                      onClick={function () { setAgendaSemanaOffset(agendaSemanaOffset - 1); }}
+                      className="text-blue-600 hover:text-blue-800 font-black text-sm px-2 py-1 rounded hover:bg-blue-100"
+                    >{"← Anterior"}</button>
+                    <p className="text-sm font-black text-blue-800">
+                      {"📅 Semana: " + lunesStr + " al " + domStr}
+                    </p>
+                    <button
+                      onClick={function () { setAgendaSemanaOffset(agendaSemanaOffset + 1); }}
+                      className="text-blue-600 hover:text-blue-800 font-black text-sm px-2 py-1 rounded hover:bg-blue-100"
+                    >{"Siguiente →"}</button>
+                  </div>
+                  <div className="grid grid-cols-7 divide-x divide-gray-100">
+                    {diasSemana.map(function (ds) {
+                      var citasDia = agendados.filter(function (a) {
+                        if (a.fecha !== ds.fecha) return false;
+                        if (_agendaEmpresaId) return a.empresaId === _agendaEmpresaId || a.medicoEmpresaId === _agendaEmpresaId;
+                        if (isAdminOrSec) return true;
+                        return a.medicoId === (currentUser && currentUser.user);
+                      }).sort(function (a, b) { return (a.horaCita || "").localeCompare(b.horaCita || ""); });
+                      var esHoyFlag = ds.fecha === today;
+                      return (
+                        <div key={ds.fecha} className={"min-h-[200px] " + (esHoyFlag ? "bg-blue-50/50" : "")}>
+                          <div className={"text-center py-2 border-b " + (esHoyFlag ? "bg-blue-100 border-blue-200" : "bg-gray-50 border-gray-100")}>
+                            <p className={"text-[10px] font-black " + (esHoyFlag ? "text-blue-700" : "text-gray-500")}>{ds.nombre}</p>
+                            <p className={"text-sm font-black " + (esHoyFlag ? "text-blue-800" : "text-gray-700")}>{ds.dia}</p>
+                            <p className="text-[9px] text-gray-400">{ds.mes}</p>
+                          </div>
+                          <div className="p-1 space-y-1">
+                            {citasDia.length === 0 && (
+                              <p className="text-[9px] text-gray-300 text-center py-4">{"-"}</p>
+                            )}
+                            {citasDia.map(function (ag) {
+                              var colorMap = { espera: "bg-yellow-100 border-yellow-300 text-yellow-800", atendiendo: "bg-blue-100 border-blue-300 text-blue-800", atendido: "bg-emerald-100 border-emerald-300 text-emerald-800", programado: "bg-purple-100 border-purple-300 text-purple-800" };
+                              var colorClass = colorMap[ag.estado] || colorMap.espera;
+                              return (
+                                <div key={ag.id} className={"p-1.5 rounded-lg border text-[9px] " + colorClass}>
+                                  <p className="font-black truncate">{ag.nombre}</p>
+                                  <p>{(ag.horaCita || ag.hora || "") + " · " + (ag.tipoConsulta || "").replace("_", " ")}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+            {/* ─── TAB: MENSUAL ─────────────────────────────────── */}
+            {agendaTab === "mensual" && (function () {
+              var hoy2 = new Date();
+              var mesActual = new Date(hoy2.getFullYear(), hoy2.getMonth() + agendaMesOffset, 1);
+              var anio = mesActual.getFullYear();
+              var mes = mesActual.getMonth();
+              var nombreMes = mesActual.toLocaleDateString("es-CO", { month: "long", year: "numeric" });
+              var primerDia = new Date(anio, mes, 1).getDay();
+              var offsetDia = primerDia === 0 ? 6 : primerDia - 1;
+              var diasEnMes = new Date(anio, mes + 1, 0).getDate();
+              var celdas = [];
+              for (var i2 = 0; i2 < offsetDia; i2++) celdas.push(null);
+              for (var d2 = 1; d2 <= diasEnMes; d2++) {
+                var fechaStr = anio + "-" + String(mes + 1).padStart(2, "0") + "-" + String(d2).padStart(2, "0");
+                var citasDia2 = agendados.filter(function (a) {
+                  if (a.fecha !== fechaStr) return false;
+                  if (_agendaEmpresaId) return a.empresaId === _agendaEmpresaId || a.medicoEmpresaId === _agendaEmpresaId;
+                  if (isAdminOrSec) return true;
+                  return a.medicoId === (currentUser && currentUser.user);
+                });
+                var totalDia = citasDia2.length;
+                var atendidasDia = citasDia2.filter(function (a) { return a.estado === "atendido"; }).length;
+                var pendientesDia = citasDia2.filter(function (a) { return a.estado === "espera" || a.estado === "programado"; }).length;
+                var ausentesDia = citasDia2.filter(function (a) { return a.estado === "ausente"; }).length;
+                var colorDia = totalDia === 0 ? "" : ausentesDia > 0 ? "bg-red-100 border-red-300" : pendientesDia > 0 ? "bg-yellow-100 border-yellow-300" : "bg-emerald-100 border-emerald-300";
+                celdas.push({ dia: d2, fecha: fechaStr, total: totalDia, color: colorDia, esHoy: fechaStr === today });
+              }
+              return (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="bg-purple-50 px-5 py-3 border-b border-purple-100 flex items-center justify-between">
+                    <button
+                      onClick={function () { setAgendaMesOffset(agendaMesOffset - 1); }}
+                      className="text-purple-600 hover:text-purple-800 font-black text-sm px-2 py-1 rounded hover:bg-purple-100"
+                    >{"← Anterior"}</button>
+                    <p className="text-sm font-black text-purple-800">
+                      {"📊 " + nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}
+                    </p>
+                    <button
+                      onClick={function () { setAgendaMesOffset(agendaMesOffset + 1); }}
+                      className="text-purple-600 hover:text-purple-800 font-black text-sm px-2 py-1 rounded hover:bg-purple-100"
+                    >{"Siguiente →"}</button>
+                  </div>
+                  <div className="grid grid-cols-7">
+                    {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map(function (dn) {
+                      return <div key={dn} className="text-center text-[9px] font-black text-gray-500 py-2 bg-gray-50 border-b border-gray-100">{dn}</div>;
+                    })}
+                    {celdas.map(function (celda, idx) {
+                      if (!celda) return <div key={"empty_" + idx} className="min-h-[60px] border-b border-r border-gray-50" />;
+                      return (
+                        <div key={celda.fecha} className={"min-h-[60px] border-b border-r border-gray-100 p-1 " + (celda.esHoy ? "ring-2 ring-blue-400 ring-inset" : "") + " " + celda.color}>
+                          <p className={"text-xs font-black " + (celda.esHoy ? "text-blue-700" : "text-gray-700")}>{celda.dia}</p>
+                          {celda.total > 0 && (
+                            <p className="text-[10px] font-bold text-gray-600 mt-1">
+                              {celda.total + " cita" + (celda.total !== 1 ? "s" : "")}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 flex gap-4 text-[10px]">
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-200 border border-emerald-400 inline-block" /> {"Todas atendidas"}</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-yellow-200 border border-yellow-400 inline-block" /> {"Pendientes"}</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-200 border border-red-400 inline-block" /> {"Ausencias"}</span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
+          {/* ─── ESTADÍSTICAS DE AGENDA ─────────────────────────── */}
+          {(function () {
+            var hoyStats = miAgendaHoy;
+            var progHoy = hoyStats.filter(function (a) { return a.estado === "espera" || a.estado === "programado"; }).length;
+            var atendidosHoy = hoyStats.filter(function (a) { return a.estado === "atendido"; }).length;
+            var enEsperaHoy = hoyStats.filter(function (a) { return a.estado === "espera"; }).length;
+            var ausentesHoy = hoyStats.length - atendidosHoy - enEsperaHoy - hoyStats.filter(function (a) { return a.estado === "atendiendo"; }).length;
+            if (ausentesHoy < 0) ausentesHoy = 0;
+            // Semana
+            var hoyDate = new Date();
+            var diaSem = hoyDate.getDay();
+            var diffL = diaSem === 0 ? -6 : 1 - diaSem;
+            var lunesSem = new Date(hoyDate);
+            lunesSem.setDate(hoyDate.getDate() + diffL);
+            var domSem = new Date(lunesSem);
+            domSem.setDate(lunesSem.getDate() + 6);
+            var lunesStr2 = lunesSem.toISOString().split("T")[0];
+            var domStr2 = domSem.toISOString().split("T")[0];
+            var citasSemana = agendados.filter(function (a) {
+              if (a.fecha < lunesStr2 || a.fecha > domStr2) return false;
+              if (_agendaEmpresaId) return a.empresaId === _agendaEmpresaId || a.medicoEmpresaId === _agendaEmpresaId;
+              if (isAdminOrSec) return true;
+              return a.medicoId === (currentUser && currentUser.user);
+            });
+            var atendidosSemana = citasSemana.filter(function (a) { return a.estado === "atendido"; }).length;
+            var pendientesSemana = citasSemana.length - atendidosSemana;
+            return (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mt-4">
+                <p className="text-sm font-black text-gray-800 mb-2">{"📊 Resumen de Agenda"}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                    <p className="text-[10px] font-black text-blue-700 uppercase mb-1">{"Hoy"}</p>
+                    <p className="text-xs text-gray-700">
+                      {miAgendaHoy.length + " programadas | " + atendidosHoy + " atendidas | " + enEsperaHoy + " en espera" + (ausentesHoy > 0 ? " | " + ausentesHoy + " ausente" + (ausentesHoy !== 1 ? "s" : "") : "")}
+                    </p>
+                  </div>
+                  <div className="bg-purple-50 rounded-xl p-3 border border-purple-100">
+                    <p className="text-[10px] font-black text-purple-700 uppercase mb-1">{"Semana"}</p>
+                    <p className="text-xs text-gray-700">
+                      {citasSemana.length + " citas | " + atendidosSemana + " atendidas | " + pendientesSemana + " pendientes"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
