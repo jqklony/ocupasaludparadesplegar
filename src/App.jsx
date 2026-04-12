@@ -13743,7 +13743,11 @@ function AppInner() {
     const savedProvider = sp("siso_ai_config_provider", {
       activeProvider: "gemini",
     });
-    const savedKeys = sps("siso_ai_keys", emptyKeys);
+    // Cargar keys: 1) localStorage por usuario, 2) localStorage genérico, 3) sessionStorage, 4) vacío
+    const _initUser = (() => { try { const s = JSON.parse(_ls.getItem("siso_session") || "null"); return s?.user; } catch { return null; } })();
+    const savedKeysLS = _initUser ? sp("siso_ai_keys_" + _initUser, null) : null;
+    const savedKeysSS = sps("siso_ai_keys", emptyKeys);
+    const savedKeys = savedKeysLS || savedKeysSS;
     const mergedKeys = { ...emptyKeys, ...savedKeys };
     _ls.setItem("siso_ai_config_version", AI_CONFIG_VERSION);
     setAiConfig({
@@ -14709,19 +14713,22 @@ JSON REQUERIDO (sin markdown, sin texto adicional):
   };
   const handleSaveAIConfig = (cfg) => {
     setAiConfig(cfg);
-    // Keys en sessionStorage (seguridad) + Supabase (persistencia por usuario)
+    const uid = currentUser?.user || "default";
     const keysJson = JSON.stringify(cfg.keys || {});
+    // Guardar en sessionStorage (sesión actual)
     _ss.setItem("siso_ai_keys", keysJson);
-    _sync(
-      "siso_ai_config_provider",
-      JSON.stringify({ activeProvider: cfg.activeProvider })
-    );
-    // Guardar keys en Supabase bajo clave específica del usuario
-    const userKey = `siso_ai_keys_${currentUser?.user || "default"}`;
+    _ss.setItem("siso_ai_keys_" + uid, keysJson);
+    // Guardar en localStorage (PERSISTENTE — sobrevive al cerrar navegador)
+    _ls.setItem("siso_ai_keys_" + uid, keysJson);
+    _ls.setItem("siso_ai_keys", keysJson);
+    // Guardar proveedor activo
+    _sync("siso_ai_config_provider", JSON.stringify({ activeProvider: cfg.activeProvider }));
+    _ls.setItem("siso_ai_config_provider_" + uid, JSON.stringify({ activeProvider: cfg.activeProvider }));
+    // Guardar en Supabase (persistencia en la nube — cualquier dispositivo)
+    const userKey = "siso_ai_keys_" + uid;
     _sbSet(userKey, cfg.keys || {}).then(() => {});
-    // También guardar en localStorage para fallback offline
     _ls.setItem("siso_ai_config_version", "v3");
-    showAlert("✅ Configuración de IA guardada en la nube.");
+    showAlert("✅ API Keys guardadas. Estarán disponibles en cualquier dispositivo y sesión.");
   };
   
 const handleLogin = (u, p) => {
@@ -15025,9 +15032,14 @@ const handleLogin = (u, p) => {
           // ══ FIX DEFINITIVO: Restaurar TODOS los datos del usuario desde Supabase ══
           // 1. API keys del usuario
           const aiKeyCloud = cloud?.[`siso_ai_keys_${found.user}`]?.value;
-          if (aiKeyCloud && typeof aiKeyCloud === "object") {
-            _ss.setItem("siso_ai_keys", JSON.stringify(aiKeyCloud));
-            setAiConfig((prev) => ({ ...prev, keys: aiKeyCloud }));
+          if (aiKeyCloud && typeof aiKeyCloud === "object" && Object.values(aiKeyCloud).some(v => v)) {
+            const aiKeysStr = JSON.stringify(aiKeyCloud);
+            _ss.setItem("siso_ai_keys", aiKeysStr);
+            _ss.setItem("siso_ai_keys_" + found.user, aiKeysStr);
+            // PERSISTIR en localStorage para futuras sesiones
+            _ls.setItem("siso_ai_keys_" + found.user, aiKeysStr);
+            _ls.setItem("siso_ai_keys", aiKeysStr);
+            setAiConfig((prev) => ({ ...prev, keys: { groq:"", gemini:"", openrouter:"", together:"", ...aiKeyCloud } }));
           }
           // 2. DoctorData desde clave DEDICADA (siempre la más actualizada)
           const doctorDataCloud = cloud?.[`siso_doctor_data_${found.user}`]?.value;
@@ -17066,7 +17078,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
     var w = window.open("", "_blank", "width=870,height=1100");
     if (!w) { showAlert("Permita las ventanas emergentes para imprimir."); return; }
     w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>[OCUPASALUD] ' + _e(data.nombres||"HC") + '</title>' +
-    '<style>@page{size:letter portrait;margin:1.1cm 1.4cm 1.3cm 1.4cm;}*{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{font-family:"Segoe UI",Arial,sans-serif;font-size:9.5pt;color:#111;margin:0;padding:14mm 16mm;line-height:1.4;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:4px 8px;font-size:8.5pt;}th{font-weight:700;text-align:left;background:#d1fae5;}p{margin:3px 0;}ul{margin:4px 0;padding-left:16px;}li{margin-bottom:2px;font-size:9pt;}.np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:9999;}.np-bar button{border:none;padding:6px 16px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;background:#10b981;color:#fff;}@media print{.np-bar{display:none!important;}body{padding:0;}}</style></head><body>' +
+    '<style>@page{size:letter portrait;margin:1.1cm 1.4cm 1.3cm 1.4cm;}*{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}body{font-family:"Segoe UI",Arial,Helvetica,sans-serif;font-size:9.5pt;color:#111;margin:0;padding:14mm 16mm;line-height:1.45;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #b7e3c9;padding:5px 8px;font-size:8.5pt;}th{font-weight:700;text-align:left;background-color:#d1fae5!important;color:#065f46;}p{margin:3px 0;}ul{margin:4px 0;padding-left:16px;}li{margin-bottom:2px;font-size:9pt;}.sec-hdr{background-color:#065f46!important;color:#fff!important;padding:6px 12px;margin:14px 0 6px;font-weight:900;font-size:9.5pt;text-transform:uppercase;border-radius:4px;}.np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:9999;}.np-bar button{border:none;padding:6px 16px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;background:#10b981;color:#fff;}tr:nth-child(even){background-color:#f0fdf4!important;}@media print{.np-bar{display:none!important;}body{padding:0;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}table{page-break-inside:auto;}tr{page-break-inside:avoid;}th{background-color:#d1fae5!important;}}</style></head><body>' +
     '<div class="np-bar"><span style="flex:1;font-weight:700;">\uD83D\uDCCB HC ' + _e(data.nombres||"") + ' \u2014 ' + _e(data.codigoVerificacion||"") + '</span><button onclick="window.print()">\uD83D\uDCE5 Guardar / Imprimir PDF</button><button onclick="window.close()" style="background:#ef4444;">\u2715 Cerrar</button></div>' +
     '<div style="margin-top:50px;">' + sections.join("") + '</div></body></html>');
     w.document.close();
