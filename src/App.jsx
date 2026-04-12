@@ -16655,8 +16655,24 @@ Esta historia clínica debe conservarse mínimo 20 años.
         [class*="max-w-"] { max-width: none !important; }
         /* Scrollables: mostrar todo al imprimir */
         [class*="overflow-y-auto"] { overflow: visible !important; height: auto !important; }
-        /* Ancho completo */
-        .max-w-5xl, .max-w-4xl, .max-w-3xl, .max-w-2xl { max-width: 100% !important; }
+        /* Ancho completo — todos los contenedores se expanden */
+        .max-w-5xl, .max-w-4xl, .max-w-3xl, .max-w-2xl, .max-w-xl, .max-w-lg, .max-w-md,
+        .container, [class*="max-w-"] { max-width: 100% !important; width: 100% !important; }
+        /* Padding lateral reducido para aprovechar el papel */
+        .px-4, .px-5, .px-6, .px-8 { padding-left: 0.3rem !important; padding-right: 0.3rem !important; }
+        .p-4, .p-5, .p-6, .p-8 { padding: 0.3rem !important; }
+        /* Grids: adaptarse al ancho del papel */
+        .grid { display: block !important; }
+        .grid > * { margin-bottom: 0.5rem !important; }
+        /* Flexbox: no envolver para tablas */
+        .flex-wrap { flex-wrap: nowrap !important; }
+        /* Charts/barras de progreso: mantener proporciones */
+        [class*="h-2"], [class*="h-3"], [class*="h-4"] { height: auto !important; min-height: 8px !important; }
+        /* Gap reducido */
+        .gap-4, .gap-6, .gap-8 { gap: 0.3rem !important; }
+        /* Asegurar que el contenido principal ocupa todo */
+        #root { width: 100% !important; }
+        main, [role="main"] { width: 100% !important; padding: 0 !important; margin: 0 !important; }
       }
     `;
     document.head.appendChild(printStyle);
