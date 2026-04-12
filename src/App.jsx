@@ -23582,7 +23582,39 @@ Esta historia clínica debe conservarse mínimo 20 años.
               )}
             </div>
             <button
-              onClick={() => handlePrint(`Reporte-${compName}`)}
+              onClick={() => {
+                // Capturar el contenido del reporte y abrirlo en ventana nueva para impresión limpia
+                const reportContent = document.querySelector('[data-report-content]');
+                if (!reportContent) { handlePrint("Reporte-" + compName); return; }
+                const html = reportContent.innerHTML;
+                const w = window.open("", "_blank", "width=1000,height=800");
+                if (!w) { showAlert("Permita ventanas emergentes para imprimir."); return; }
+                w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>'
+                  + '<title>[OCUPASALUD] Reporte - ' + (compName || "Empresa") + '</title>'
+                  + '<script src="https://cdn.tailwindcss.com"><\/script>'
+                  + '<style>'
+                  + '* { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }'
+                  + 'body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10pt; color: #111; margin: 0; padding: 10mm 12mm; }'
+                  + 'table { width: 100%; border-collapse: collapse; margin: 6px 0; page-break-inside: auto; }'
+                  + 'thead { display: table-header-group; }'
+                  + 'tr { page-break-inside: avoid; }'
+                  + 'th { font-size: 8.5pt; font-weight: 700; padding: 5px 8px; border: 1px solid #d1d5db; }'
+                  + 'td { font-size: 8.5pt; padding: 4px 8px; border: 1px solid #d1d5db; }'
+                  + '.no-print, nav, button { display: none !important; }'
+                  + '.print-bar { position: fixed; top: 0; left: 0; right: 0; background: #1e293b; color: #fff; padding: 8px 16px; display: flex !important; align-items: center; gap: 10px; z-index: 9999; }'
+                  + '.print-bar button { display: inline-flex !important; border: none; padding: 6px 16px; border-radius: 6px; font-weight: 900; cursor: pointer; font-size: 9pt; background: #10b981; color: #fff; }'
+                  + '.print-bar .btn-close { background: #ef4444; }'
+                  + '@media print { .print-bar { display: none !important; } body { padding: 5mm 8mm; } }'
+                  + '@page { size: letter landscape; margin: 0.8cm 1cm; }'
+                  + '</style></head><body>'
+                  + '<div class="print-bar"><span style="flex:1;font-weight:700;">📊 Reporte — ' + (compName || "") + '</span>'
+                  + '<button onclick="window.print()">📥 Imprimir / PDF</button>'
+                  + '<button class="btn-close" onclick="window.close()">✕ Cerrar</button></div>'
+                  + '<div style="margin-top:50px;">' + html + '</div>'
+                  + '</body></html>');
+                w.document.close();
+                w.focus();
+              }}
               className="bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2"
             >
               <Printer className="w-4 h-4" /> Imprimir
@@ -23615,7 +23647,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
           )}
 
           {reporteActiveTab === "estadisticas" && (
-            <>
+            <div data-report-content>
               <div className="text-center mb-6">
                 <div className="flex justify-center mb-2">
                   <BrandLogo data={activeDoctorData} />
@@ -24741,7 +24773,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                   <p>Seleccione una empresa para ver su informe.</p>
                 </div>
               )}
-            </>
+            </div>
           )}
           {/* ══ TAB: CERTIFICADOS POR EMPRESA ══ */}
           {reporteActiveTab === "certificados" &&
