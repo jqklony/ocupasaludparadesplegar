@@ -16615,15 +16615,58 @@ Esta historia clínica debe conservarse mínimo 20 años.
   };
   const handlePrint = (title) => {
     const printStyle = document.createElement('style');
-    printStyle.textContent = `@media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } table { border-collapse: collapse !important; } th { background-color: #1e293b !important; color: white !important; } td { border: 1px solid #d1d5db !important; } tr:nth-child(even) { background-color: #f8fafc !important; } .no-print { display: none !important; } @page { size: letter portrait; margin: 1.1cm 1.3cm; } }`;
+    printStyle.textContent = `
+      @media print {
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+        @page { size: letter portrait; margin: 0.8cm 1cm; }
+        body { font-size: 9pt !important; line-height: 1.3 !important; }
+        /* Ocultar elementos de navegación */
+        nav, .no-print, button:not(.print-keep), [class*="no-print"] { display: none !important; }
+        /* Tablas: colores exactos como en pantalla */
+        table { border-collapse: collapse !important; width: 100% !important; page-break-inside: auto !important; font-size: 8pt !important; }
+        thead { display: table-header-group !important; }
+        tr { page-break-inside: avoid !important; }
+        th { background-color: #1e293b !important; color: white !important; padding: 4px 6px !important; font-size: 8pt !important; border: 1px solid #374151 !important; }
+        td { border: 1px solid #d1d5db !important; padding: 3px 6px !important; font-size: 8pt !important; }
+        tr:nth-child(even) { background-color: #f8fafc !important; }
+        /* Gráficos y barras de estadísticas */
+        [class*="bg-emerald"], [class*="bg-green"] { background-color: #059669 !important; }
+        [class*="bg-blue"] { background-color: #2563eb !important; }
+        [class*="bg-red"] { background-color: #dc2626 !important; }
+        [class*="bg-amber"], [class*="bg-yellow"] { background-color: #d97706 !important; }
+        [class*="bg-purple"] { background-color: #7c3aed !important; }
+        [class*="bg-teal"] { background-color: #0d9488 !important; }
+        /* Texto de colores */
+        [class*="text-emerald"], [class*="text-green"] { color: #059669 !important; }
+        [class*="text-blue"] { color: #2563eb !important; }
+        [class*="text-red"] { color: #dc2626 !important; }
+        /* Bordes y shadows */
+        [class*="border"] { border-color: #d1d5db !important; }
+        [class*="shadow"] { box-shadow: none !important; }
+        [class*="rounded"] { border-radius: 4px !important; }
+        /* Badges y pills */
+        [class*="rounded-full"] { border-radius: 999px !important; }
+        /* Evitar cortes en secciones */
+        .print-section, [class*="rounded-xl"], [class*="rounded-2xl"] { page-break-inside: avoid !important; }
+        /* Matriz Legal: tabla completa sin cortar */
+        [class*="overflow-x-auto"] { overflow: visible !important; }
+        [class*="overflow-auto"] { overflow: visible !important; }
+        [class*="max-h-"] { max-height: none !important; }
+        [class*="max-w-"] { max-width: none !important; }
+        /* Scrollables: mostrar todo al imprimir */
+        [class*="overflow-y-auto"] { overflow: visible !important; height: auto !important; }
+        /* Ancho completo */
+        .max-w-5xl, .max-w-4xl, .max-w-3xl, .max-w-2xl { max-width: 100% !important; }
+      }
+    `;
     document.head.appendChild(printStyle);
     const orig = document.title;
-    document.title = `[OCUPASALUD] ${title || "Documento"}`;
+    document.title = "[OCUPASALUD] " + (title || "Documento");
     setTimeout(() => {
       window.print();
       document.title = orig;
       document.head.removeChild(printStyle);
-    }, 100);
+    }, 200);
   };
   // ══ FIX: Imprimir HC como documento HTML limpio (sin sobreposición) ══
   const _printHCClean = () => {
