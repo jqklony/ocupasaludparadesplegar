@@ -23862,7 +23862,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                 </div>
                 <table>
                   <thead><tr>
-                    <th>#</th><th>Nombre / Trabajador</th><th>Documento</th><th>Sexo</th><th>Edad</th>
+                    <th>#</th><th>Nombre / Trabajador</th><th>Documento</th><th>Edad</th>
                     <th>Cargo</th><th>Empresa</th><th>EPS</th><th>ARL</th><th>Tipo Examen</th><th>Énfasis</th><th>Fecha</th>
                   </tr></thead>
                   <tbody>${filtered
@@ -23871,13 +23871,6 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     <td>${String(i + 1).padStart(3, "0")}</td>
                     <td><b>${p.nombres || "--"}</b></td>
                     <td>${p.docTipo || "CC"} ${p.docNumero || "--"}</td>
-                    <td style="text-align:center">${
-                      p.genero === "Masculino"
-                        ? "M"
-                        : p.genero === "Femenino"
-                        ? "F"
-                        : p.genero || "--"
-                    }</td>
                     <td style="text-align:center">${p.edad || "--"}</td>
                     <td>${p.cargo || "--"}</td>
                     <td>${p.empresaNombre || "--"}</td>
@@ -23935,7 +23928,6 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                 "ID",
                                 "Nombre / Trabajador",
                                 "Documento",
-                                "Sexo",
                                 "Edad",
                                 "Cargo",
                                 "Empresa",
@@ -24500,13 +24492,9 @@ Esta historia clínica debe conservarse mínimo 20 años.
                             <th className="p-2 text-left font-bold">
                               ID / Trabajador
                             </th>
-                            <th className="p-2 font-bold">Sexo</th>
                             <th className="p-2 font-bold">Edad</th>
                             <th className="p-2 font-bold text-left">
                               Riesgos Ocupacionales
-                            </th>
-                            <th className="p-2 font-bold text-left">
-                              Sintomatología / Motivo
                             </th>
                             <th className="p-2 font-bold text-left">
                               Diagnóstico (CIE-10)
@@ -24515,7 +24503,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                               className="p-2 font-bold text-left"
                               style={{ minWidth: "220px" }}
                             >
-                              Recomendaciones y Restricciones
+                              Restricciones Laborales
                             </th>
                           </tr>
                         </thead>
@@ -24547,13 +24535,6 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                     {p.nombres?.length > 28 ? "..." : ""}
                                   </p>
                                 </td>
-                                <td className="p-2 text-center font-bold">
-                                  {p.genero === "Masculino"
-                                    ? "M"
-                                    : p.genero === "Femenino"
-                                    ? "F"
-                                    : p.genero || "--"}
-                                </td>
                                 <td className="p-2 text-center">
                                   {p.edad || "--"}
                                 </td>
@@ -24569,40 +24550,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                     )}
                                   </p>
                                 </td>
-                                <td
-                                  className="p-2"
-                                  style={{ maxWidth: "110px" }}
-                                >
-                                  <p>
-                                    {p.motivoConsulta ||
-                                      p.tipoExamen ||
-                                      "Examen de rutina"}
-                                  </p>
-                                  {p.ta && (
-                                    <p className="text-[10px] mt-0.5">
-                                      TA: {p.ta}{" "}
-                                      {bpInfo && (
-                                        <span
-                                          className={`px-1 rounded ${bpInfo.color}`}
-                                        >
-                                          {bpInfo.text}
-                                        </span>
-                                      )}
-                                    </p>
-                                  )}
-                                  {p.imc && (
-                                    <p className="text-[10px]">
-                                      IMC: {p.imc}{" "}
-                                      {bmiInfo && (
-                                        <span
-                                          className={`px-1 rounded ${bmiInfo.color}`}
-                                        >
-                                          {bmiInfo.text}
-                                        </span>
-                                      )}
-                                    </p>
-                                  )}
-                                </td>
+                                {/* Sintomatología eliminada — dato confidencial */}
                                 <td
                                   className="p-2"
                                   style={{ maxWidth: "140px" }}
@@ -24620,32 +24568,20 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                   className="p-2"
                                   style={{ minWidth: "220px" }}
                                 >
-                                  {p.recomendaciones && (
-                                    <div className="mb-2">
-                                      <p className="text-[9px] font-black text-emerald-700 uppercase mb-0.5">
-                                        ✓ Recomendaciones:
-                                      </p>
-                                      <p className="text-gray-700 leading-relaxed text-[10px] whitespace-pre-wrap">
-                                        {p.recomendaciones}
-                                      </p>
-                                    </div>
-                                  )}
-                                  {p.analisisRestricciones && (
+                                  {p.analisisRestricciones ? (
                                     <div>
                                       <p className="text-[9px] font-black text-red-700 uppercase mb-0.5">
                                         ⚠ Restricciones:
                                       </p>
                                       <p className="text-red-800 leading-relaxed text-[10px] whitespace-pre-wrap">
-                                        {p.analisisRestricciones}
+                                        {Array.isArray(p.analisisRestricciones) ? p.analisisRestricciones.join("\n") : p.analisisRestricciones}
                                       </p>
                                     </div>
+                                  ) : (
+                                    <span className="text-gray-400 italic text-[10px]">
+                                      Sin restricciones
+                                    </span>
                                   )}
-                                  {!p.recomendaciones &&
-                                    !p.analisisRestricciones && (
-                                      <span className="text-gray-400 italic text-[10px]">
-                                        Sin restricciones registradas
-                                      </span>
-                                    )}
                                 </td>
                               </tr>
                             );
@@ -24653,7 +24589,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                           {filtered.length === 0 && (
                             <tr>
                               <td
-                                colSpan="7"
+                                colSpan="5"
                                 className="p-8 text-center text-gray-400 italic"
                               >
                                 No hay registros para esta empresa en el período
