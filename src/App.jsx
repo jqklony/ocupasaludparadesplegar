@@ -13060,7 +13060,8 @@ function AppInner() {
     "Examen Ocupacional", "Consulta General", "Exámenes Paraclínicos",
     "Informe/Reporte", "PVE/Capacitación", "Telemedicina", "Otro Ingreso"
   ];
-  const [cajaTab, setCajaTab] = useState("hoy");
+  const [cajaTab, setCajaTab] = useState("dashboard");
+  const [cajaSubTab, setCajaSubTab] = useState("dia"); // sub-tab dentro de Caja & Historial
   // PASO 4: filtros de periodo en caja
   const [cajaFiltroPeriodo, setCajaFiltroPeriodo] = useState("hoy");
   const [cajaFiltroDesde, setCajaFiltroDesde] = useState("");
@@ -19156,7 +19157,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                         .toLocaleString("es-CO")}`,
                       accion: () => {
                         goTo("caja");
-                        setTimeout(() => setCajaTab("cuentas"), 100);
+                        setTimeout(() => setCajaTab("facturacion"), 100);
                       },
                     },
                   ]
@@ -19241,7 +19242,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                   <button
                     onClick={() => {
                       goTo("caja");
-                      setTimeout(() => setCajaTab("por_medico"), 100);
+                      setTimeout(() => setCajaTab("liquidacion"), 100);
                     }}
                     className="text-[10px] text-gray-300 hover:text-white font-black"
                   >
@@ -27466,7 +27467,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                 <button
                   onClick={() => {
                     goTo("caja");
-                    setTimeout(() => setCajaTab("cuentas"), 100);
+                    setTimeout(() => setCajaTab("facturacion"), 100);
                   }}
                   className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 hover:bg-blue-800"
                 >
@@ -41562,20 +41563,13 @@ ${
           {/* Tabs */}
           <div className="flex flex-wrap gap-1 mb-4 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
             {[
-              { k: "hoy", l: "💵 Caja del Día" },
-              { k: "historial", l: "📜 Historial" },
-              { k: "comprobantes", l: "📋 Comprobantes" },
-              {
-                k: "cuentas",
-                l: `💳 Cuentas (${cuentasPendientes.length} pend.)`,
-              },
-              {
-                k: "pacientes_vistos",
-                l: `👁️ Pacientes Vistos (${pacientesVistosCount})`,
-              },
+              { k: "dashboard", l: "📊 Dashboard" },
+              { k: "pacientes_vistos", l: `👁️ Pacientes & Cobro (${pacientesVistosCount})` },
+              { k: "facturacion", l: `📄 Facturación (${cuentasPendientes.length} pend.)` },
+              { k: "caja", l: "💵 Caja & Historial" },
               { k: "contabilidad", l: "📊 Contabilidad" },
               ...(_isAdmin(currentUser?.role)
-                ? [{ k: "por_medico", l: "👨‍⚕️ Por Médico" }]
+                ? [{ k: "liquidacion", l: "👨‍⚕️ Liquidación" }]
                 : []),
             ].map((t) => (
               <button
@@ -41591,8 +41585,118 @@ ${
               </button>
             ))}
           </div>
-          {/* TAB: CAJA DEL DÍA */}
-          {cajaTab === "hoy" && (
+          {/* ═══ TAB: DASHBOARD ═══ */}
+          {cajaTab === "dashboard" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+                  <div className="text-[10px] font-black text-emerald-700 uppercase mb-1">Ingresos</div>
+                  <div className="text-lg font-black text-emerald-800">$ {ingresosTot.toLocaleString("es-CO")}</div>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
+                  <div className="text-[10px] font-black text-red-700 uppercase mb-1">Egresos</div>
+                  <div className="text-lg font-black text-red-800">$ {egresosTot.toLocaleString("es-CO")}</div>
+                </div>
+                <div className={`${saldoHoy >= 0 ? "bg-blue-50 border-blue-200" : "bg-orange-50 border-orange-200"} border rounded-xl p-3 text-center`}>
+                  <div className="text-xs font-black text-gray-700 uppercase mb-1">Utilidad</div>
+                  <div className={`text-lg font-black ${saldoHoy >= 0 ? "text-blue-800" : "text-orange-800"}`}>$ {saldoHoy.toLocaleString("es-CO")}</div>
+                </div>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-center">
+                  <div className="text-[10px] font-black text-yellow-700 uppercase mb-1">Cartera</div>
+                  <div className="text-lg font-black text-yellow-800">$ {porCobrarTot.toLocaleString("es-CO")}</div>
+                </div>
+                <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-center">
+                  <div className="text-[10px] font-black text-purple-700 uppercase mb-1">Pacientes</div>
+                  <div className="text-lg font-black text-purple-800">{pacientesVistosCount}</div>
+                </div>
+              </div>
+              {(() => {
+                const hoyD2 = new Date();
+                const meses6 = [];
+                for (let i = 5; i >= 0; i--) {
+                  const d = new Date(hoyD2.getFullYear(), hoyD2.getMonth() - i, 1);
+                  const key = d.toISOString().slice(0, 7);
+                  const label = d.toLocaleDateString("es-CO", { month: "short", year: "2-digit" });
+                  const movsMes = _scopedCaja.filter(mv => mv.fecha && mv.fecha.startsWith(key));
+                  const ing = movsMes.filter(mv => mv.tipo === "ingreso").reduce((s, mv) => s + Number(mv.monto || 0), 0);
+                  const egr = movsMes.filter(mv => mv.tipo === "egreso").reduce((s, mv) => s + Number(mv.monto || 0), 0);
+                  meses6.push({ key, label, ing, egr });
+                }
+                const maxV = Math.max(...meses6.map(m => Math.max(m.ing, m.egr)), 1);
+                return (
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                    <p className="text-xs font-black text-gray-700 uppercase mb-3">📈 Evolución Financiera — Últimos 6 Meses</p>
+                    <div className="flex items-end gap-2" style={{ height: "110px" }}>
+                      {meses6.map(m => (
+                        <div key={m.key} className="flex-1 flex flex-col items-center gap-0.5">
+                          <div className="w-full flex gap-0.5" style={{ height: "90px", alignItems: "flex-end" }}>
+                            <div className="flex-1 bg-emerald-400 rounded-t" style={{ height: `${maxV > 0 ? (m.ing / maxV) * 100 : 0}%`, minHeight: m.ing > 0 ? "4px" : "0" }} title={`Ingresos: $${m.ing.toLocaleString("es-CO")}`} />
+                            <div className="flex-1 bg-red-400 rounded-t" style={{ height: `${maxV > 0 ? (m.egr / maxV) * 100 : 0}%`, minHeight: m.egr > 0 ? "4px" : "0" }} title={`Egresos: $${m.egr.toLocaleString("es-CO")}`} />
+                          </div>
+                          <p className="text-[8px] text-gray-500 text-center">{m.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-4 mt-2 justify-center">
+                      <span className="flex items-center gap-1 text-[10px] text-gray-600"><span className="w-3 h-2 bg-emerald-400 rounded inline-block" /> Ingresos</span>
+                      <span className="flex items-center gap-1 text-[10px] text-gray-600"><span className="w-3 h-2 bg-red-400 rounded inline-block" /> Egresos</span>
+                    </div>
+                  </div>
+                );
+              })()}
+              {(() => {
+                const vencidas90 = savedBillsList.filter(b => !b.pagada && (new Date() - new Date(b.savedAt || b.date || new Date())) / 86400000 > 90);
+                const pendHoy = pacientesHoy.filter(p => !movHoy.find(m => m.tipo === "ingreso" && m.pacienteId === p.id));
+                return (vencidas90.length > 0 || pendHoy.length > 0) ? (
+                  <div className="space-y-2">
+                    {vencidas90.length > 0 && (
+                      <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2"><span className="text-lg">🚨</span>
+                          <div><p className="text-xs font-black text-red-800">{vencidas90.length} cuenta(s) vencida(s) (+90 días)</p>
+                          <p className="text-[10px] text-red-600">Total: $ {vencidas90.reduce((s, b) => s + Number(b.amount || 0), 0).toLocaleString("es-CO")}</p></div>
+                        </div>
+                        <button onClick={() => setCajaTab("facturacion")} className="px-3 py-1 bg-red-600 text-white text-[10px] font-black rounded-lg hover:bg-red-700">Ver →</button>
+                      </div>
+                    )}
+                    {pendHoy.length > 0 && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2"><span className="text-lg">⏳</span>
+                          <p className="text-xs font-black text-amber-800">{pendHoy.length} paciente(s) de hoy sin cobrar</p></div>
+                        <button onClick={() => setCajaTab("caja")} className="px-3 py-1 bg-amber-600 text-white text-[10px] font-black rounded-lg hover:bg-amber-700">Cobrar →</button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+                    <p className="text-xs font-bold text-emerald-700">✅ Sin alertas — Todo al día</p>
+                  </div>
+                );
+              })()}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { l: "👁️ Pacientes Vistos", t: "pacientes_vistos", c: "blue" },
+                  { l: "📄 Nueva Cuenta", t: "facturacion", c: "orange" },
+                  { l: "💵 Registrar Pago", t: "caja", c: "emerald" },
+                  { l: "📊 Ver Contabilidad", t: "contabilidad", c: "purple" },
+                ].map(q => (
+                  <button key={q.t} onClick={() => setCajaTab(q.t)} className={`bg-${q.c}-50 border border-${q.c}-200 rounded-xl p-3 text-center hover:bg-${q.c}-100 transition`}>
+                    <p className={`text-xs font-black text-${q.c}-800`}>{q.l}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* ═══ TAB: CAJA & HISTORIAL ═══ */}
+          {cajaTab === "caja" && (
+            <div className="space-y-4">
+              {/* Sub-tabs */}
+              <div className="flex gap-1 bg-gray-50 rounded-lg p-1">
+                {[{ k: "dia", l: "💵 Caja del Día" }, { k: "historial", l: "📜 Historial" }, { k: "comprobantes", l: "📋 Comprobantes" }].map(st => (
+                  <button key={st.k} onClick={() => setCajaSubTab(st.k)} className={`flex-1 py-1.5 text-[10px] font-black rounded-md transition ${cajaSubTab === st.k ? "bg-white shadow text-blue-700" : "text-gray-500 hover:text-gray-700"}`}>{st.l}</button>
+                ))}
+              </div>
+              {/* Sub-tab: Caja del Día */}
+              {cajaSubTab === "dia" && (
             <div className="space-y-4">
               {/* Formulario nuevo movimiento */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
@@ -41879,10 +41983,9 @@ ${
                   </div>
                 )}
               </div>
-            </div>
-          )}
-          {/* TAB: HISTORIAL */}
-          {cajaTab === "historial" && (
+              )}
+              {/* Sub-tab: Historial */}
+              {cajaSubTab === "historial" && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
               <div className="flex justify-between items-center mb-3">
                 <p className="text-xs font-black text-gray-700 uppercase">
@@ -42015,10 +42118,9 @@ ${
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
-          {/* TAB: COMPROBANTES */}
-          {cajaTab === "comprobantes" && (
+              )}
+              {/* Sub-tab: Comprobantes */}
+              {cajaSubTab === "comprobantes" && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
               <p className="text-xs font-black text-gray-700 uppercase mb-3">
                 📋 Comprobantes de Contabilidad
@@ -42089,10 +42191,11 @@ ${
                 💡 Para generar comprobantes de movimientos ya registrados, vaya
                 a <strong>📜 Historial</strong> y pulse el ícono 🖨️
               </div>
+              )}
             </div>
           )}
-          {/* TAB: CUENTAS POR COBRAR */}
-          {cajaTab === "cuentas" && (
+          {/* ═══ TAB: FACTURACIÓN ═══ */}
+          {cajaTab === "facturacion" && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
@@ -42398,8 +42501,8 @@ ${
               );
             })()}
 
-          {/* TAB: INGRESOS POR MÉDICO - solo admin */}
-          {cajaTab === "por_medico" &&
+          {/* ═══ TAB: LIQUIDACIÓN - solo admin ═══ */}
+          {cajaTab === "liquidacion" &&
             _isAdmin(currentUser?.role) &&
             (() => {
               const medicos = usersList.filter(
