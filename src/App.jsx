@@ -41697,7 +41697,7 @@ ${
               </div>
               {/* Sub-tab: Caja del Día */}
               {cajaSubTab === "dia" && (
-            <div className="space-y-4">
+              <div className="space-y-4">
               {/* Formulario nuevo movimiento */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
                 <p className="text-xs font-black text-gray-700 uppercase mb-3">
@@ -41983,10 +41983,11 @@ ${
                   </div>
                 )}
               </div>
+              </div>
               )}
               {/* Sub-tab: Historial */}
               {cajaSubTab === "historial" && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
               <div className="flex justify-between items-center mb-3">
                 <p className="text-xs font-black text-gray-700 uppercase">
                   Historial completo ({cajaMovimientos.length} movimientos)
@@ -42122,7 +42123,7 @@ ${
               )}
               {/* Sub-tab: Comprobantes */}
               {cajaSubTab === "comprobantes" && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
               <p className="text-xs font-black text-gray-700 uppercase mb-3">
                 📋 Comprobantes de Contabilidad
               </p>
