@@ -7895,7 +7895,11 @@ const PrintStyles = () => (
       /* Textarea: mostrar todo el texto sin recortar */
       textarea, [contenteditable], .text-libre { height: auto !important; max-height: none !important; overflow: visible !important; resize: none !important; white-space: pre-wrap !important; word-wrap: break-word !important; break-inside: avoid !important; page-break-inside: avoid !important; }
       /* Contenedores de texto libre - sin truncar */
-      .overflow-y-auto, .overflow-auto, .overflow-hidden { overflow: visible !important; max-height: none !important; }
+      .overflow-y-auto, .overflow-auto, .overflow-hidden, .overflow-x-auto { overflow: visible !important; max-height: none !important; }
+      /* PRINT-FIX: forzar overflow visible en TODOS los elementos para evitar cortes */
+      [data-report-content] * { overflow: visible !important; border-radius: 0 !important; }
+      [data-report-content] { overflow: visible !important; }
+      [data-report-content] div { page-break-inside: auto !important; break-inside: auto !important; overflow: visible !important; }
       /* Ocultar etiquetas "sugerido por IA" y "generado por IA" al imprimir */
       .ai-label-print-hide, [data-ai-label] { display: none !important; }
       /* Reportes IA: permitir flujo entre páginas para secciones largas */
@@ -7913,9 +7917,13 @@ const PrintStyles = () => (
       .flex { display: flex !important; }
       .flex-col { flex-direction: column !important; }
       /* Bordes y sombras */
-      .rounded-xl, .rounded-2xl, .rounded-lg { border-radius: 3px !important; }
+      .rounded-xl, .rounded-2xl, .rounded-lg { border-radius: 0 !important; }
       .rounded-full { border-radius: 50% !important; }
       .shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl { box-shadow: none !important; }
+      /* ═══ PRINT-NUCLEAR: evitar cortes en reportes — máxima prioridad ═══ */
+      *, *::before, *::after { overflow: visible !important; }
+      div, section, article, main, aside, header, footer { page-break-inside: auto !important; break-inside: auto !important; overflow: visible !important; max-height: none !important; height: auto !important; }
+      .overflow-x-auto, .overflow-y-auto, .overflow-auto, .overflow-hidden { overflow: visible !important; max-height: none !important; height: auto !important; }
     }
     /* Animaciones pantalla */
     @keyframes fade-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
@@ -13543,6 +13551,16 @@ function AppInner() {
           page-break-inside: auto !important;
           break-inside: auto !important;
         }
+        /* PRINT-FIX: overflow visible en reportes para evitar cortes */
+        [data-report-content] *, [data-report-content] {
+          overflow: visible !important;
+          border-radius: 0 !important;
+        }
+        [data-report-content] div {
+          page-break-inside: auto !important;
+          break-inside: auto !important;
+        }
+        .overflow-x-auto { overflow: visible !important; }
 
         /* Grids: mantener layout en reportes, columna única solo en HC */
         .carta-visual .grid, .carta-visual .grid-cols-2, .carta-visual .grid-cols-3, .carta-visual .grid-cols-4 {
@@ -16654,19 +16672,18 @@ Esta historia clínica debe conservarse mínimo 20 años.
         /* Bordes y shadows */
         [class*="border"] { border-color: #d1d5db !important; }
         [class*="shadow"] { box-shadow: none !important; }
-        [class*="rounded"] { border-radius: 4px !important; }
-        /* Badges y pills */
-        [class*="rounded-full"] { border-radius: 999px !important; }
+        [class*="rounded"] { border-radius: 0 !important; }
         /* Evitar cortes solo en bloques pequeños */
         .print-section { page-break-inside: avoid !important; }
-        [class*="rounded-xl"], [class*="rounded-2xl"] { page-break-inside: auto !important; }
-        /* Matriz Legal: tabla completa sin cortar */
-        [class*="overflow-x-auto"] { overflow: visible !important; }
-        [class*="overflow-auto"] { overflow: visible !important; }
+        [class*="rounded-xl"], [class*="rounded-2xl"] { page-break-inside: auto !important; border-radius: 0 !important; }
+        /* PRINT-FIX: overflow visible globalmente para evitar cortes */
+        * { overflow: visible !important; }
+        [class*="overflow-x-auto"], [class*="overflow-auto"], [class*="overflow-y-auto"], [class*="overflow-hidden"] { overflow: visible !important; height: auto !important; }
         [class*="max-h-"] { max-height: none !important; }
         [class*="max-w-"] { max-width: none !important; }
-        /* Scrollables: mostrar todo al imprimir */
-        [class*="overflow-y-auto"] { overflow: visible !important; height: auto !important; }
+        div { page-break-inside: auto !important; break-inside: auto !important; }
+        [data-report-content] * { overflow: visible !important; border-radius: 0 !important; }
+        [data-report-content] div { page-break-inside: auto !important; break-inside: auto !important; }
         /* Ancho completo — todos los contenedores se expanden */
         .max-w-5xl, .max-w-4xl, .max-w-3xl, .max-w-2xl, .max-w-xl, .max-w-lg, .max-w-md,
         .container, [class*="max-w-"] { max-width: 100% !important; width: 100% !important; }
