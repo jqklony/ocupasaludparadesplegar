@@ -42118,6 +42118,7 @@ ${
                   </tbody>
                 </table>
               </div>
+            </div>
               )}
               {/* Sub-tab: Comprobantes */}
               {cajaSubTab === "comprobantes" && (
@@ -42191,6 +42192,7 @@ ${
                 💡 Para generar comprobantes de movimientos ya registrados, vaya
                 a <strong>📜 Historial</strong> y pulse el ícono 🖨️
               </div>
+            </div>
               )}
             </div>
           )}
