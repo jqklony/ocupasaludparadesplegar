@@ -7830,7 +7830,9 @@ const PrintStyles = () => (
       /* Secciones con fondo: flujo continuo, permitir cortes naturales */
       .bg-emerald-50, .bg-blue-50, .bg-orange-50, .bg-red-50, .bg-teal-50, .bg-yellow-50, .bg-purple-50, .bg-gray-50, .bg-gray-100 { page-break-inside: auto !important; break-inside: auto !important; }
       /* Bloques individuales: no cortar */
-      .print-break-avoid, .signature-block, table { page-break-inside: avoid !important; break-inside: avoid !important; }
+      .print-break-avoid, .signature-block { page-break-inside: avoid !important; break-inside: avoid !important; }
+      table { page-break-inside: auto !important; break-inside: auto !important; }
+      thead { display: table-header-group !important; }
       tr { page-break-inside: avoid !important; break-inside: avoid !important; }
       /* Títulos no solos al final */
       h1, h2, h3, h4 { page-break-after: avoid !important; break-after: avoid !important; orphans: 3 !important; widows: 3 !important; }
@@ -7896,8 +7898,8 @@ const PrintStyles = () => (
       .overflow-y-auto, .overflow-auto, .overflow-hidden { overflow: visible !important; max-height: none !important; }
       /* Ocultar etiquetas "sugerido por IA" y "generado por IA" al imprimir */
       .ai-label-print-hide, [data-ai-label] { display: none !important; }
-      /* Reportes IA: ajustar cuadros al contenido, no estirar */
-      .bg-amber-50, .bg-emerald-50, .bg-indigo-50, .bg-blue-50 { page-break-inside: avoid !important; break-inside: avoid !important; }
+      /* Reportes IA: permitir flujo entre páginas para secciones largas */
+      .bg-amber-50, .bg-emerald-50, .bg-indigo-50, .bg-blue-50 { page-break-inside: auto !important; break-inside: auto !important; }
       .whitespace-pre-wrap { white-space: pre-wrap !important; word-wrap: break-word !important; }
       /* Reportes: ocultar botones y etiquetas de IA */
       [class*="BrainCircuit"], .no-print, button { display: none !important; }
@@ -13531,16 +13533,25 @@ function AppInner() {
         table { width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; }
         td, th { word-break: break-word !important; overflow-wrap: break-word !important; vertical-align: top !important; padding: 3px 5px !important; }
 
-        /* Secciones que NO deben cortarse entre páginas */
-        .no-break-inside, section, article, .rounded-2xl, .rounded-xl, .bg-white {
+        /* Secciones que NO deben cortarse entre páginas (solo bloques pequeños) */
+        .no-break-inside {
           page-break-inside: avoid !important;
           break-inside: avoid !important;
         }
+        /* Contenedores grandes (reportes, cartas): permitir flujo entre páginas */
+        section, article, .rounded-2xl, .rounded-xl, .bg-white {
+          page-break-inside: auto !important;
+          break-inside: auto !important;
+        }
 
-        /* Grids y flex en columna única para impresión */
-        .grid, .grid-cols-2, .grid-cols-3, .grid-cols-4 {
+        /* Grids: mantener layout en reportes, columna única solo en HC */
+        .carta-visual .grid, .carta-visual .grid-cols-2, .carta-visual .grid-cols-3, .carta-visual .grid-cols-4 {
           display: block !important;
         }
+        [data-report-content] .grid { display: grid !important; }
+        [data-report-content] .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        [data-report-content] .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+        [data-report-content] .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
 
         /* Ocultar elementos no imprimibles */
         .no-print, button:not(.print-btn), nav, [class*="no-print"] {
@@ -16646,8 +16657,9 @@ Esta historia clínica debe conservarse mínimo 20 años.
         [class*="rounded"] { border-radius: 4px !important; }
         /* Badges y pills */
         [class*="rounded-full"] { border-radius: 999px !important; }
-        /* Evitar cortes en secciones */
-        .print-section, [class*="rounded-xl"], [class*="rounded-2xl"] { page-break-inside: avoid !important; }
+        /* Evitar cortes solo en bloques pequeños */
+        .print-section { page-break-inside: avoid !important; }
+        [class*="rounded-xl"], [class*="rounded-2xl"] { page-break-inside: auto !important; }
         /* Matriz Legal: tabla completa sin cortar */
         [class*="overflow-x-auto"] { overflow: visible !important; }
         [class*="overflow-auto"] { overflow: visible !important; }
@@ -16661,9 +16673,13 @@ Esta historia clínica debe conservarse mínimo 20 años.
         /* Padding lateral reducido para aprovechar el papel */
         .px-4, .px-5, .px-6, .px-8 { padding-left: 0.3rem !important; padding-right: 0.3rem !important; }
         .p-4, .p-5, .p-6, .p-8 { padding: 0.3rem !important; }
-        /* Grids: adaptarse al ancho del papel */
-        .grid { display: block !important; }
-        .grid > * { margin-bottom: 0.5rem !important; }
+        /* Grids: adaptarse al ancho del papel (solo en HC, no en reportes) */
+        .carta-visual .grid { display: block !important; }
+        .carta-visual .grid > * { margin-bottom: 0.5rem !important; }
+        [data-report-content] .grid { display: grid !important; }
+        [data-report-content] .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        [data-report-content] .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+        [data-report-content] .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
         /* Flexbox: no envolver para tablas */
         .flex-wrap { flex-wrap: nowrap !important; }
         /* Charts/barras de progreso: mantener proporciones */
