@@ -42497,6 +42497,76 @@ ${
                       </table>
                     </div>
                   )}
+                  {/* ── RESUMEN POR EMPRESA + GENERAR CUENTA ── */}
+                  {movsPV.length > 0 && (
+                    <div className="border-t border-gray-100 p-4">
+                      <p className="text-xs font-black text-gray-700 uppercase mb-3">🏢 Resumen por Empresa</p>
+                      <div className="space-y-2">
+                        {(() => {
+                          const porEmp = {};
+                          movsPV.forEach(m => {
+                            const emp = m.empresaClienteNombre || "Particular";
+                            if (!porEmp[emp]) porEmp[emp] = { total: 0, cobrado: 0, pendiente: 0, count: 0, empId: m.empresaClienteId || "" };
+                            porEmp[emp].count++;
+                            const monto = Number(m.monto || 0);
+                            porEmp[emp].total += monto;
+                            if (m.estado === "cobrado" || m.formaPago !== "Por cobrar") porEmp[emp].cobrado += monto;
+                            else porEmp[emp].pendiente += monto;
+                          });
+                          return Object.entries(porEmp).sort((a, b) => b[1].total - a[1].total).map(([emp, d]) => (
+                            <div key={emp} className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
+                              <div className="flex-1">
+                                <p className="text-xs font-black text-gray-800">{emp}</p>
+                                <div className="flex gap-3 mt-1 text-[10px]">
+                                  <span className="text-gray-500">{d.count} pac.</span>
+                                  <span className="text-emerald-700 font-bold">Cobrado: $ {d.cobrado.toLocaleString("es-CO")}</span>
+                                  {d.pendiente > 0 && <span className="text-red-600 font-bold">Pend: $ {d.pendiente.toLocaleString("es-CO")}</span>}
+                                  <span className="text-gray-700 font-black">Total: $ {d.total.toLocaleString("es-CO")}</span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const comp = companies.find(c => c.id === d.empId);
+                                  const _maxB = savedBillsList.reduce((mx, b) => { const n = parseInt(b.number || "0", 10); return n > mx ? n : mx; }, 0);
+                                  const nextNum = String(_maxB + 1).padStart(3, "0");
+                                  setBillData(p => ({
+                                    ...p,
+                                    companyId: d.empId || "",
+                                    clientName: comp?.nombre || emp,
+                                    clientNit: comp ? `${comp.nit}${comp.dv ? "-" + comp.dv : ""}` : "",
+                                    amount: String(d.total),
+                                    number: nextNum,
+                                    date: new Date().toISOString().split("T")[0],
+                                    concept: `EXAMENES MEDICOS OCUPACIONALES - ${d.count} trabajador(es) · Periodo ${_pDesde} al ${_pHasta}`,
+                                  }));
+                                  goTo("bill");
+                                }}
+                                className="px-3 py-1.5 bg-orange-600 text-white text-[10px] font-black rounded-lg hover:bg-orange-700 flex items-center gap-1 shrink-0"
+                              >
+                                📄 Generar Cuenta
+                              </button>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                      {/* Totales generales */}
+                      <div className="mt-3 bg-blue-50 border border-blue-200 rounded-xl p-3 flex justify-between items-center">
+                        <div className="text-xs">
+                          <span className="font-black text-blue-800">Total periodo: </span>
+                          <span className="font-black text-blue-900">$ {movsPV.reduce((s, m) => s + Number(m.monto || 0), 0).toLocaleString("es-CO")}</span>
+                          <span className="text-gray-500 ml-3">{movsPV.length} pacientes</span>
+                        </div>
+                        <div className="flex gap-2 text-[10px]">
+                          <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-black">
+                            ✅ {movsPV.filter(m => m.estado === "cobrado" || m.formaPago !== "Por cobrar").length} cobrados
+                          </span>
+                          <span className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-black">
+                            ⏳ {movsPV.filter(m => m.estado === "pendiente" && m.formaPago === "Por cobrar").length} pendientes
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -42723,35 +42793,63 @@ ${
                       </span>
                     </div>
                     <div className="p-4 space-y-4">
-                      {/* Configuración del porcentaje */}
-                      <div className="flex items-center gap-4 bg-indigo-50 rounded-xl p-3">
-                        <div className="flex-1">
-                          <p className="text-xs font-black text-indigo-800 mb-1">
-                            % Honorarios médico:{" "}
-                            <span className="text-indigo-600">
-                              {porcentajeMedico}%
-                            </span>
-                          </p>
-                          <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            value={porcentajeMedico}
-                            onChange={(e) =>
-                              setPorcentajeMedico(Number(e.target.value))
-                            }
-                            className="w-full accent-indigo-600"
-                          />
-                          <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
-                            <span>0% médico</span>
-                            <span>100% médico</span>
+                      {/* Configuración del porcentaje — global + individual */}
+                      <div className="bg-indigo-50 rounded-xl p-3 space-y-3">
+                        <div className="flex items-center gap-4">
+                          <div className="flex-1">
+                            <p className="text-xs font-black text-indigo-800 mb-1">
+                              % Honorarios por defecto:{" "}
+                              <span className="text-indigo-600">
+                                {porcentajeMedico}% médico / {100 - porcentajeMedico}% clínica
+                              </span>
+                            </p>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              value={porcentajeMedico}
+                              onChange={(e) =>
+                                setPorcentajeMedico(Number(e.target.value))
+                              }
+                              className="w-full accent-indigo-600"
+                            />
+                            <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+                              <span>0% médico</span>
+                              <span>100% médico</span>
+                            </div>
+                          </div>
+                          <div className="text-center min-w-[90px]">
+                            <p className="text-[10px] text-gray-500">Clínica</p>
+                            <p className="text-lg font-black text-purple-700">
+                              {100 - porcentajeMedico}%
+                            </p>
                           </div>
                         </div>
-                        <div className="text-center min-w-[90px]">
-                          <p className="text-[10px] text-gray-500">Clínica</p>
-                          <p className="text-lg font-black text-purple-700">
-                            {100 - porcentajeMedico}%
-                          </p>
+                        <div className="bg-white rounded-lg p-2 border border-indigo-100">
+                          <p className="text-[10px] font-black text-indigo-700 mb-1.5">⚙️ % Individual por Médico (sobreescribe el valor global)</p>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            {medicos.map(med => {
+                              const pctInd = med.porcentajeHonorarios ?? null;
+                              return (
+                                <div key={med.user} className="flex items-center gap-2 bg-indigo-50 rounded-lg px-2 py-1.5">
+                                  <span className="text-[10px] font-bold text-gray-700 truncate flex-1">{med.name || med.user}</span>
+                                  <input
+                                    type="number" min="0" max="100"
+                                    placeholder={`${porcentajeMedico}`}
+                                    value={pctInd ?? ""}
+                                    onChange={(e) => {
+                                      const val = e.target.value === "" ? null : Math.min(100, Math.max(0, Number(e.target.value)));
+                                      const updated = usersList.map(u => u.user === med.user ? { ...u, porcentajeHonorarios: val } : u);
+                                      // Save to state (no persistent save here - just in-session)
+                                      setUsersList && setUsersList(updated);
+                                    }}
+                                    className="w-14 p-1 text-xs text-center border border-indigo-200 rounded font-bold"
+                                  />
+                                  <span className="text-[9px] text-gray-400">%</span>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
                       {/* Tabla por médico con liquidación */}
@@ -42761,9 +42859,11 @@ ${
                             <tr>
                               {[
                                 "Médico",
+                                "Pacientes",
                                 "Cobrado",
-                                `Médico (${porcentajeMedico}%)`,
-                                `Clínica (${100 - porcentajeMedico}%)`,
+                                "% Ind.",
+                                "Honorario Médico",
+                                "Ingreso Clínica",
                               ].map((h) => (
                                 <th
                                   key={h}
@@ -42776,17 +42876,19 @@ ${
                           </thead>
                           <tbody>
                             {medicos.map((med, i) => {
+                              const pctMed = med.porcentajeHonorarios ?? porcentajeMedico;
                               const movsMed = movsFiltro.filter(
                                 (m) =>
                                   m.medicoId === med.user ||
                                   (!m.medicoId && _isAdmin(med.role))
                               );
+                              const atenMed = movsMed.filter(m => m.pacienteId).length;
                               const cobradoMed = movsMed.reduce(
                                 (s, m) => s + Number(m.monto || 0),
                                 0
                               );
                               const valorMedico = Math.round(
-                                cobradoMed * (porcentajeMedico / 100)
+                                cobradoMed * (pctMed / 100)
                               );
                               const valorClinica = cobradoMed - valorMedico;
                               return (
@@ -42799,8 +42901,14 @@ ${
                                   <td className="p-2 font-bold">
                                     {med.name || med.user}
                                   </td>
+                                  <td className="p-2 text-center text-gray-500">{atenMed}</td>
                                   <td className="p-2 font-black text-gray-700">
                                     $ {cobradoMed.toLocaleString("es-CO")}
+                                  </td>
+                                  <td className="p-2 text-center">
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${pctMed !== porcentajeMedico ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"}`}>
+                                      {pctMed}%
+                                    </span>
                                   </td>
                                   <td className="p-2 font-black text-indigo-700">
                                     $ {valorMedico.toLocaleString("es-CO")}
@@ -42814,20 +42922,35 @@ ${
                             {/* Fila de totales */}
                             <tr className="bg-indigo-700 text-white font-black">
                               <td className="p-2">TOTAL</td>
+                              <td className="p-2 text-center">{movsFiltro.filter(m => m.pacienteId).length}</td>
                               <td className="p-2">
                                 $ {totalGlobal.toLocaleString("es-CO")}
                               </td>
+                              <td className="p-2 text-center">—</td>
                               <td className="p-2">
                                 ${" "}
-                                {Math.round(
-                                  totalGlobal * (porcentajeMedico / 100)
-                                ).toLocaleString("es-CO")}
+                                {(() => {
+                                  let totMed = 0;
+                                  medicos.forEach(med => {
+                                    const pct = med.porcentajeHonorarios ?? porcentajeMedico;
+                                    const movsMed = movsFiltro.filter(m => m.medicoId === med.user || (!m.medicoId && _isAdmin(med.role)));
+                                    totMed += Math.round(movsMed.reduce((s, m) => s + Number(m.monto || 0), 0) * (pct / 100));
+                                  });
+                                  return totMed.toLocaleString("es-CO");
+                                })()}
                               </td>
                               <td className="p-2">
                                 ${" "}
-                                {Math.round(
-                                  totalGlobal * ((100 - porcentajeMedico) / 100)
-                                ).toLocaleString("es-CO")}
+                                {(() => {
+                                  let totCli = 0;
+                                  medicos.forEach(med => {
+                                    const pct = med.porcentajeHonorarios ?? porcentajeMedico;
+                                    const movsMed = movsFiltro.filter(m => m.medicoId === med.user || (!m.medicoId && _isAdmin(med.role)));
+                                    const cobMed = movsMed.reduce((s, m) => s + Number(m.monto || 0), 0);
+                                    totCli += cobMed - Math.round(cobMed * (pct / 100));
+                                  });
+                                  return totCli.toLocaleString("es-CO");
+                                })()}
                               </td>
                             </tr>
                           </tbody>
