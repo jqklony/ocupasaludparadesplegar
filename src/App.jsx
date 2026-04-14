@@ -26750,149 +26750,139 @@ Esta historia clínica debe conservarse mínimo 20 años.
                             {enc.estado === "activa" ? "🟢 Activa" : enc.estado === "importada" ? "✅ Importada" : "⬜ Cerrada"}
                           </span>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() => {
-                              const url = window.location.origin + window.location.pathname + "#encuesta?token=" + enc.token;
-                              navigator.clipboard?.writeText(url);
-                              showAlert("📋 Link copiado:\n" + url);
-                            }}
-                            className="px-3 py-1 bg-blue-50 text-blue-700 text-[10px] font-black rounded-lg hover:bg-blue-100"
-                          >
-                            📋 Copiar Link
-                          </button>
-                          <button
-                            onClick={async () => {
-                              try {
-                                const r = await fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_encuesta_resp_${enc.token}&select=value`, {
-                                  headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` }
-                                });
-                                const d = await r.json();
-                                const resps = d[0]?.value || [];
-                                if (resps.length === 0) { showAlert("Sin respuestas aún."); return; }
-                                // Mostrar respuestas
-                                const detalle = resps.map((r, i) => `${i+1}. ${r.nombres} | ${r.docTipo} ${r.docNumero} | ${r.cargo} | ${r.eps} | ${r.estado === "completa" ? "✅" : "⚠️"}`).join("\n");
-                                showAlert(`📊 ${resps.length} respuesta(s):\n\n${detalle}`);
-                              } catch { showAlert("Error al cargar respuestas."); }
-                            }}
-                            className="px-3 py-1 bg-purple-50 text-purple-700 text-[10px] font-black rounded-lg hover:bg-purple-100"
-                          >
-                            👁️ Ver Respuestas
-                          </button>
-                          <button
-                            onClick={async () => {
-                              try {
-                                const r = await fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_encuesta_resp_${enc.token}&select=value`, {
-                                  headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` }
-                                });
-                                const d = await r.json();
-                                const resps = (d[0]?.value || []).filter(r => !r.importado);
-                                if (resps.length === 0) { showAlert("No hay respuestas pendientes de importar."); return; }
-                                showConfirm(`¿Importar ${resps.length} trabajador(es) como pacientes de "${enc.empresaNombre}"?`, () => {
-                                  const comp = companies.find(c => c.id === enc.empresaId);
-                                  const nuevos = resps.map(r => ({
-                                    id: "pac_enc_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
-                                    nombres: r.nombres,
-                                    docTipo: r.docTipo || "CC",
-                                    docNumero: r.docNumero,
-                                    fechaNacimiento: r.fechaNacimiento,
-                                    genero: r.genero,
-                                    estadoCivil: r.estadoCivil,
-                                    escolaridad: r.escolaridad,
-                                    celular: r.celular,
-                                    email: r.email,
-                                    direccion: r.direccion,
-                                    ciudad: r.ciudad,
-                                    eps: r.eps,
-                                    arl: r.arl || comp?.arl || "",
-                                    afp: r.afp,
-                                    estrato: r.estrato,
-                                    zonaResidencia: r.zonaResidencia,
-                                    cargo: r.cargo,
-                                    area: r.area,
-                                    antiguedadEmpresa: r.antiguedad,
-                                    tipoContrato: r.tipoContrato,
-                                    turnoTrabajo: r.turnoTrabajo,
-                                    contactoEmergencia: r.contactoEmergencia,
-                                    parentescoEmergencia: r.parentesco,
-                                    telEmergencia: r.telEmergencia,
-                                    empresaId: enc.empresaId,
-                                    empresaNombre: enc.empresaNombre,
-                                    empresaNit: comp?.nit || "",
-                                    tipoExamen: enc.tipoExamen,
-                                    fechaRegistro: new Date().toISOString(),
-                                    estadoHistoria: "Pre-registrado",
-                                    _medicoId: currentUser?.user,
-                                    _fromEncuesta: enc.token,
-                                  }));
-                                  // Agregar a patientsList
-                                  const updatedPats = [...patientsList, ...nuevos];
-                                  setPatientsList(updatedPats);
-                                  const patSuf = currentUser?.user || "shared";
-                                  _sync(`siso_db_patients_${patSuf}`, JSON.stringify(updatedPats));
-                                  _sync(`siso_patients_${patSuf}`, JSON.stringify(updatedPats));
-                                  // Marcar como importados en Supabase
-                                  const allResps = (d[0]?.value || []).map(r => ({...r, importado: true}));
-                                  _sbSet(`siso_encuesta_resp_${enc.token}`, allResps);
-                                  // Actualizar estado de encuesta
-                                  const updEnc = encuestas.map(e => e.id === enc.id ? {...e, estado: "importada"} : e);
-                                  setEncuestas(updEnc);
-                                  localStorage.setItem("siso_encuestas", JSON.stringify(updEnc));
-                                  _sbSet("siso_encuestas_" + (currentUser?.user || "shared"), updEnc);
-                                  showAlert(`✅ ${nuevos.length} trabajador(es) importados como pacientes.\n\nAhora puede agendar sus citas desde el módulo de Agenda.`);
-                                });
-                              } catch { showAlert("Error al importar."); }
-                            }}
-                            className="px-3 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-lg hover:bg-emerald-100"
-                          >
-                            ⬆️ Importar como Pacientes
-                          </button>
-                          <button
-                            onClick={async () => {
-                              try {
-                                const r = await fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_encuesta_resp_${enc.token}&select=value`, {
-                                  headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` }
-                                });
-                                const d = await r.json();
-                                const resps = d[0]?.value || [];
-                                if (resps.length === 0) { showAlert("Sin respuestas para agendar."); return; }
-                                showPrompt("Fecha para agendar todas las citas (YYYY-MM-DD):", (fecha) => {
-                                  if (!fecha) return;
-                                  showPrompt("Hora de inicio (ej: 07:00):", (horaInicio) => {
-                                    if (!horaInicio) return;
-                                    const [h, m] = horaInicio.split(":").map(Number);
-                                    const nuevasCitas = resps.map((r, i) => {
-                                      const minutos = h * 60 + m + (i * 20); // 20 min por paciente
-                                      const hh = String(Math.floor(minutos / 60)).padStart(2, "0");
-                                      const mm = String(minutos % 60).padStart(2, "0");
-                                      return {
-                                        id: "cita_enc_" + Date.now() + "_" + i,
-                                        fecha,
-                                        hora: `${hh}:${mm}`,
-                                        pacienteNombre: r.nombres,
-                                        pacienteDoc: r.docNumero,
-                                        empresa: enc.empresaNombre,
-                                        empresaId: enc.empresaId,
-                                        tipoConsulta: enc.tipoExamen,
-                                        medicoId: currentUser?.user || "",
-                                        medicoNombre: activeDoctorData?.nombre || currentUser?.name || "",
-                                        estado: "pendiente",
-                                        _fromEncuesta: enc.token,
-                                      };
-                                    });
-                                    const updAgenda = [...(agendados || []), ...nuevasCitas];
-                                    setAgendados(updAgenda);
-                                    _sync("siso_agendados", JSON.stringify(updAgenda));
-                                    showAlert(`✅ ${nuevasCitas.length} citas agendadas para el ${fecha}\nDesde las ${horaInicio} (cada 20 min)\n\nVea la agenda para confirmar.`);
+                        {/* Botones de acción */}
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          <button onClick={() => { const url = window.location.origin + window.location.pathname + "#encuesta?token=" + enc.token; navigator.clipboard?.writeText(url); showAlert("📋 Link copiado al portapapeles:\n\n" + url + "\n\nEnvíelo por WhatsApp o email al encargado de la empresa."); }} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-[10px] font-black rounded-lg hover:bg-blue-100">📋 Copiar Link</button>
+                          <button onClick={async () => {
+                            try {
+                              const r = await fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_encuesta_resp_${enc.token}&select=value`, { headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` } });
+                              const d = await r.json();
+                              const resps = d[0]?.value || [];
+                              if (resps.length === 0) { showAlert("Sin respuestas aún. Comparta el link con los trabajadores."); return; }
+                              // Guardar en estado temporal para mostrar tabla
+                              const updEnc2 = encuestas.map(e => e.id === enc.id ? {...e, _respuestas: resps, _showResps: !e._showResps} : {...e, _showResps: false});
+                              setEncuestas(updEnc2);
+                            } catch { showAlert("Error al cargar respuestas."); }
+                          }} className="px-3 py-1.5 bg-purple-50 text-purple-700 text-[10px] font-black rounded-lg hover:bg-purple-100">👁️ Ver Respuestas</button>
+                          <button onClick={async () => {
+                            try {
+                              const r = await fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_encuesta_resp_${enc.token}&select=value`, { headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` } });
+                              const d = await r.json();
+                              const resps = (d[0]?.value || []).filter(r2 => !r2.importado);
+                              if (resps.length === 0) { showAlert("No hay respuestas pendientes de importar."); return; }
+                              showConfirm(`¿Importar ${resps.length} trabajador(es) como pacientes de "${enc.empresaNombre}"?\n\nDespués será redirigido a la lista de pacientes.`, () => {
+                                const comp = companies.find(c => c.id === enc.empresaId);
+                                const nuevos = resps.map(r2 => ({
+                                  id: "pac_enc_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+                                  nombres: r2.nombres, docTipo: r2.docTipo || "CC", docNumero: r2.docNumero,
+                                  fechaNacimiento: r2.fechaNacimiento, genero: r2.genero, estadoCivil: r2.estadoCivil,
+                                  escolaridad: r2.escolaridad, celular: r2.celular, email: r2.email,
+                                  direccion: r2.direccion, ciudad: r2.ciudad, eps: r2.eps,
+                                  arl: r2.arl || comp?.arl || "", afp: r2.afp, estrato: r2.estrato,
+                                  zonaResidencia: r2.zonaResidencia, cargo: r2.cargo, area: r2.area,
+                                  antiguedadEmpresa: r2.antiguedad, tipoContrato: r2.tipoContrato,
+                                  turnoTrabajo: r2.turnoTrabajo, contactoEmergencia: r2.contactoEmergencia,
+                                  parentescoEmergencia: r2.parentesco, telEmergencia: r2.telEmergencia,
+                                  empresaId: enc.empresaId, empresaNombre: enc.empresaNombre,
+                                  empresaNit: comp?.nit || "", tipoExamen: enc.tipoExamen,
+                                  fechaRegistro: new Date().toISOString(), estadoHistoria: "Pre-registrado",
+                                  _medicoId: currentUser?.user, _fromEncuesta: enc.token,
+                                }));
+                                const updatedPats = [...patientsList, ...nuevos];
+                                setPatientsList(updatedPats);
+                                const patSuf = currentUser?.user || "shared";
+                                _sync(`siso_db_patients_${patSuf}`, JSON.stringify(updatedPats));
+                                _sync(`siso_patients_${patSuf}`, JSON.stringify(updatedPats));
+                                const allResps = (d[0]?.value || []).map(r2 => ({...r2, importado: true}));
+                                _sbSet(`siso_encuesta_resp_${enc.token}`, allResps);
+                                const updEnc3 = encuestas.map(e => e.id === enc.id ? {...e, estado: "importada"} : e);
+                                setEncuestas(updEnc3);
+                                localStorage.setItem("siso_encuestas", JSON.stringify(updEnc3));
+                                _sbSet("siso_encuestas_" + (currentUser?.user || "shared"), updEnc3);
+                                showAlert(`✅ ${nuevos.length} trabajador(es) importados como pacientes.\n\n→ Redirigiendo a Historia Clínica...`);
+                                setTimeout(() => goTo("historia"), 1500);
+                              });
+                            } catch { showAlert("Error al importar."); }
+                          }} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-lg hover:bg-emerald-100">⬆️ Importar Pacientes</button>
+                          {/* BOTÓN PDF */}
+                          <button onClick={async () => {
+                            try {
+                              const r = await fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_encuesta_resp_${enc.token}&select=value`, { headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` } });
+                              const d = await r.json();
+                              const resps = d[0]?.value || [];
+                              if (resps.length === 0) { showAlert("Sin respuestas para exportar."); return; }
+                              const filas = resps.map((r2, i) => `<tr class="${i%2===0?'':'bg-gray-50'}"><td>${i+1}</td><td><b>${r2.nombres||''}</b></td><td>${r2.docTipo||'CC'} ${r2.docNumero||''}</td><td>${r2.genero||'--'}</td><td>${r2.cargo||'--'}</td><td>${r2.eps||'--'}</td><td>${r2.arl||'--'}</td><td>${r2.celular||'--'}</td><td>${r2.email||'--'}</td><td>${r2.direccion||'--'}</td><td>${r2.contactoEmergencia||'--'}<br/><small>${r2.telEmergencia||''}</small></td></tr>`).join('');
+                              const w = window.open('','_blank');
+                              if(!w){showAlert("Permita ventanas emergentes.");return;}
+                              w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Encuesta - ${enc.empresaNombre}</title><style>body{font-family:Arial,sans-serif;font-size:10px;margin:20px;color:#111}h1{font-size:16px;color:#065f46;margin:0}h2{font-size:11px;color:#555;margin:4px 0 12px 0}table{width:100%;border-collapse:collapse}th{background:#065f46;color:white;padding:5px 6px;text-align:left;font-size:8px;white-space:nowrap}td{padding:4px 6px;border-bottom:1px solid #e5e7eb;font-size:9px;vertical-align:top}.bg-gray-50{background:#f9fafb}tr:hover{background:#f0fdf4}.footer{margin-top:12px;font-size:8px;color:#888;text-align:center}.np{text-align:center;padding:12px}@media print{.np{display:none}@page{size:landscape;margin:8mm}}</style></head><body><h1>📋 ENCUESTA SOCIODEMOGRÁFICA</h1><h2>${enc.empresaNombre} · ${enc.tipoExamen} · ${resps.length} trabajador(es) · Creada: ${enc.fechaCreacion}</h2><table><thead><tr><th>#</th><th>Nombre</th><th>Documento</th><th>Género</th><th>Cargo</th><th>EPS</th><th>ARL</th><th>Celular</th><th>Email</th><th>Dirección</th><th>Emergencia</th></tr></thead><tbody>${filas}</tbody></table><div class="footer">OcupaSalud · Generado: ${new Date().toLocaleString("es-CO")} · Res. 1843/2025</div><div class="np"><button onclick="window.print()" style="background:#065f46;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:900">🖨️ Imprimir / Guardar PDF</button></div></body></html>`);
+                              w.document.close();
+                            } catch { showAlert("Error al generar PDF."); }
+                          }} className="px-3 py-1.5 bg-slate-50 text-slate-700 text-[10px] font-black rounded-lg hover:bg-slate-100">📄 Descargar PDF</button>
+                          <button onClick={async () => {
+                            try {
+                              const r = await fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_encuesta_resp_${enc.token}&select=value`, { headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` } });
+                              const d = await r.json();
+                              const resps = d[0]?.value || [];
+                              if (resps.length === 0) { showAlert("Sin respuestas para agendar. Primero importe los pacientes."); return; }
+                              showPrompt("📅 Fecha para agendar las citas (YYYY-MM-DD):", (fecha) => {
+                                if (!fecha) return;
+                                showPrompt("⏰ Hora de inicio (ej: 07:00):", (horaInicio) => {
+                                  if (!horaInicio) return;
+                                  const [h2, m2] = horaInicio.split(":").map(Number);
+                                  const nuevasCitas = resps.map((r2, i) => {
+                                    const minutos = h2 * 60 + m2 + (i * 20);
+                                    const hh = String(Math.floor(minutos / 60)).padStart(2, "0");
+                                    const mm = String(minutos % 60).padStart(2, "0");
+                                    return { id: "cita_enc_" + Date.now() + "_" + i, fecha, hora: `${hh}:${mm}`, pacienteNombre: r2.nombres, pacienteDoc: r2.docNumero, empresa: enc.empresaNombre, empresaId: enc.empresaId, tipoConsulta: enc.tipoExamen, medicoId: currentUser?.user || "", medicoNombre: activeDoctorData?.nombre || currentUser?.name || "", estado: "pendiente", _fromEncuesta: enc.token };
                                   });
+                                  const updAgenda = [...(agendados || []), ...nuevasCitas];
+                                  setAgendados(updAgenda);
+                                  _sync("siso_agendados", JSON.stringify(updAgenda));
+                                  showAlert(`✅ ${nuevasCitas.length} citas agendadas para el ${fecha}\nDesde las ${horaInicio} (cada 20 min)\n\n→ Redirigiendo a la Agenda...`);
+                                  setTimeout(() => goTo("agenda"), 1500);
                                 });
-                              } catch { showAlert("Error al agendar."); }
-                            }}
-                            className="px-3 py-1 bg-orange-50 text-orange-700 text-[10px] font-black rounded-lg hover:bg-orange-100"
-                          >
-                            📅 Agendar Todos
-                          </button>
+                              });
+                            } catch { showAlert("Error al agendar."); }
+                          }} className="px-3 py-1.5 bg-orange-50 text-orange-700 text-[10px] font-black rounded-lg hover:bg-orange-100">📅 Agendar Todos</button>
                         </div>
+                        {/* TABLA DE RESPUESTAS (expandible) */}
+                        {enc._showResps && enc._respuestas && enc._respuestas.length > 0 && (
+                          <div className="mt-2 border border-purple-200 rounded-xl overflow-hidden">
+                            <div className="bg-purple-700 px-3 py-1.5 flex justify-between items-center">
+                              <span className="text-white text-[10px] font-black">📊 {enc._respuestas.length} respuesta(s) de {enc.empresaNombre}</span>
+                              <span className="text-purple-200 text-[9px]">{enc._respuestas.filter(r2 => r2.importado).length} importados</span>
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-[9px]">
+                                <thead className="bg-purple-50">
+                                  <tr>
+                                    {["#","Nombre","Documento","Género","Cargo","EPS","Celular","Estado"].map(h2 => (
+                                      <th key={h2} className="px-2 py-1.5 text-left font-black text-purple-700 whitespace-nowrap">{h2}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {enc._respuestas.map((r2, ri) => (
+                                    <tr key={r2.id || ri} className={`${ri % 2 === 0 ? "bg-white" : "bg-purple-50/30"} hover:bg-purple-50`}>
+                                      <td className="px-2 py-1 font-mono text-gray-400">{ri + 1}</td>
+                                      <td className="px-2 py-1 font-bold text-gray-800">{r2.nombres}</td>
+                                      <td className="px-2 py-1 font-mono">{r2.docTipo} {r2.docNumero}</td>
+                                      <td className="px-2 py-1">{r2.genero || "—"}</td>
+                                      <td className="px-2 py-1">{r2.cargo || "—"}</td>
+                                      <td className="px-2 py-1">{r2.eps || "—"}</td>
+                                      <td className="px-2 py-1">{r2.celular || "—"}</td>
+                                      <td className="px-2 py-1">
+                                        <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${r2.importado ? "bg-blue-100 text-blue-700" : r2.estado === "completa" ? "bg-emerald-100 text-emerald-700" : "bg-yellow-100 text-yellow-700"}`}>
+                                          {r2.importado ? "Importado" : r2.estado === "completa" ? "Completa" : "Incompleta"}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
