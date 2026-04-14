@@ -23700,20 +23700,71 @@ Esta historia clínica debe conservarse mínimo 20 años.
         </div>
       )}
       {data.estadoHistoria === "Cerrada" && (
-        <div className="mx-4 mb-3 bg-emerald-50 border-2 border-emerald-400 rounded-xl px-4 py-3 flex items-center gap-3 no-print">
-          <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
-            <Lock className="w-4 h-4 text-white" />
+        <div className="mx-4 mb-3 bg-emerald-50 border-2 border-emerald-400 rounded-xl px-4 py-3 no-print">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
+              <Lock className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-black text-emerald-800">
+                Historia Clínica Firmada y Cerrada
+              </p>
+              <p className="text-[10px] text-emerald-600">
+                Código: <span className="font-mono font-bold">{data.codigoVerificacion || "--"}</span>
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-black text-emerald-800">
-              Historia Clínica Firmada y Cerrada
-            </p>
-            <p className="text-[10px] text-emerald-600">
-              Código de verificación:{" "}
-              <span className="font-mono font-bold">
-                {data.codigoVerificacion || "--"}
-              </span>
-            </p>
+          <div className="flex flex-wrap gap-2 ml-11">
+            <button
+              onClick={() => {
+                const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
+                const w = window.open("", "_blank", "width=920,height=1150");
+                if (!w) { showAlert("Permita ventanas emergentes."); return; }
+                w.document.write(html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Guardar / Imprimir PDF</button></div></body>'));
+                w.document.close();
+              }}
+              className="px-3 py-1 bg-emerald-600 text-white text-[10px] font-black rounded-lg hover:bg-emerald-700 flex items-center gap-1"
+            >
+              <Printer className="w-3 h-3" /> Certificado PDF
+            </button>
+            <button
+              onClick={() => {
+                const nombre = data.nombres || "";
+                const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
+                const subject = encodeURIComponent(`Certificado Médico Ocupacional - ${nombre}`);
+                const body = encodeURIComponent(`Estimado/a ${nombre},\n\nSu certificado de aptitud médica ocupacional ha sido emitido.\n\n━━━ DESCARGUE SU CERTIFICADO ━━━\n\n📥 Portal de Certificados:\n${portalLink}\n\n→ Seleccione "🪪 Cédula"\n→ Ingrese: ${data.docNumero || ""}\n→ Descargue su certificado en PDF\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCordialmente,\n${emailConfig?.nombre || activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional`);
+                const destino = data.email || data.celular || "";
+                if (destino && destino.includes("@")) {
+                  window.open(`mailto:${destino}?subject=${subject}&body=${body}`, "_blank");
+                } else {
+                  showPrompt("Email del paciente (no registrado):", (em) => {
+                    if (em) window.open(`mailto:${em}?subject=${subject}&body=${body}`, "_blank");
+                  });
+                }
+              }}
+              className="px-3 py-1 bg-amber-500 text-white text-[10px] font-black rounded-lg hover:bg-amber-600 flex items-center gap-1"
+            >
+              📧 Enviar Email
+            </button>
+            <button
+              onClick={() => {
+                const nombre = data.nombres || "";
+                const tel = (data.celular || data.telefono || "").replace(/\D/g, "");
+                const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
+                const msg = encodeURIComponent(`Estimado/a ${nombre}, su certificado médico ocupacional está listo.\n\n📥 Descárguelo:\n${portalLink}\n→ Seleccione "Cédula" → Ingrese: ${data.docNumero || ""}\n\n${emailConfig?.nombre || activeDoctorData?.nombre || "OcupaSalud"}`);
+                if (tel.length >= 10) {
+                  const telFull = tel.startsWith("57") ? tel : "57" + tel;
+                  window.open(`https://wa.me/${telFull}?text=${msg}`, "_blank");
+                } else {
+                  showPrompt("Celular del paciente:", (num) => {
+                    if (num) { const n = num.replace(/\D/g, ""); window.open(`https://wa.me/57${n}?text=${msg}`, "_blank"); }
+                  });
+                }
+              }}
+              className="px-3 py-1 bg-green-500 text-white text-[10px] font-black rounded-lg hover:bg-green-600 flex items-center gap-1"
+            >
+              📱 WhatsApp
+            </button>
           </div>
         </div>
       )}
@@ -28179,20 +28230,34 @@ Esta historia clínica debe conservarse mínimo 20 años.
                 </div>
               )}
               {found.estadoHistoria === "Cerrada" && (
-                <div className="mx-4 mb-3 bg-emerald-50 border-2 border-emerald-400 rounded-xl px-4 py-3 flex items-center gap-3 no-print">
-                  <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Lock className="w-4 h-4 text-white" />
+                <div className="mx-4 mb-3 bg-emerald-50 border-2 border-emerald-400 rounded-xl px-4 py-3 no-print">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Lock className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-black text-emerald-800">Historia Clínica Firmada y Cerrada</p>
+                      <p className="text-[10px] text-emerald-600">Código: <span className="font-mono font-bold">{found.codigoVerificacion || "--"}</span></p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-black text-emerald-800">
-                      Historia Clínica Firmada y Cerrada
-                    </p>
-                    <p className="text-[10px] text-emerald-600">
-                      Código de verificación:{" "}
-                      <span className="font-mono font-bold">
-                        {found.codigoVerificacion || "--"}
-                      </span>
-                    </p>
+                  <div className="flex flex-wrap gap-2 ml-11">
+                    <button onClick={() => {
+                      const nombre = found.nombres || "";
+                      const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
+                      const subject = encodeURIComponent(`Certificado Médico - ${nombre}`);
+                      const body = encodeURIComponent(`Estimado/a ${nombre},\n\nSu certificado médico ha sido emitido.\n\n📥 Portal de Certificados:\n${portalLink}\n→ Seleccione "🪪 Cédula" → Ingrese: ${found.docNumero || ""}\n\nCordialmente,\n${emailConfig?.nombre || activeDoctorData?.nombre || "OcupaSalud"}`);
+                      const em = found.email || "";
+                      if (em && em.includes("@")) { window.open(`mailto:${em}?subject=${subject}&body=${body}`, "_blank"); }
+                      else { showPrompt("Email del paciente:", (e2) => { if (e2) window.open(`mailto:${e2}?subject=${subject}&body=${body}`, "_blank"); }); }
+                    }} className="px-3 py-1 bg-amber-500 text-white text-[10px] font-black rounded-lg hover:bg-amber-600">📧 Email</button>
+                    <button onClick={() => {
+                      const nombre = found.nombres || "";
+                      const tel = (found.celular || found.telefono || "").replace(/\D/g, "");
+                      const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
+                      const msg = encodeURIComponent(`Estimado/a ${nombre}, su certificado médico está listo.\n\n📥 ${portalLink}\n→ Cédula: ${found.docNumero || ""}\n\n${emailConfig?.nombre || activeDoctorData?.nombre || "OcupaSalud"}`);
+                      if (tel.length >= 10) { window.open(`https://wa.me/${tel.startsWith("57") ? tel : "57" + tel}?text=${msg}`, "_blank"); }
+                      else { showPrompt("Celular:", (n) => { if (n) window.open(`https://wa.me/57${n.replace(/\D/g,"")}?text=${msg}`, "_blank"); }); }
+                    }} className="px-3 py-1 bg-green-500 text-white text-[10px] font-black rounded-lg hover:bg-green-600">📱 WhatsApp</button>
                   </div>
                 </div>
               )}
