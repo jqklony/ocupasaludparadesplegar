@@ -13323,31 +13323,45 @@ function AppInner() {
   };
   // ═══ ENVIAR EMAIL: EmailJS (automático) o mailto (manual) ═══
   // Genera HTML profesional para emails de certificados
-  const _generarEmailHTML = (nombre, docNumero, portalUrl, remitente, emailRemitente, extra) => {
+  const _generarEmailHTML = (nombre, docNumero, portalUrl, extra, modoEmpresa) => {
+    const doc = activeDoctorData || {};
+    const docNombre = doc.nombre || emailConfig.nombre || "Médico Ocupacional";
+    const docTitulo = doc.titulo || "Médico Especialista en Salud Ocupacional";
+    const docLicencia = doc.licencia || "";
+    const docCiudad = doc.ciudad || "";
+    const docCelular = doc.celular || "";
+    const docEmailAddr = doc.email || emailConfig.email || "";
+    const instrBusqueda = modoEmpresa
+      ? `Seleccione "🏢 Empresa" e ingrese el NIT: <strong>${docNumero || ""}</strong>`
+      : `Seleccione "🪪 Cédula" e ingrese: <strong>${docNumero || ""}</strong>`;
+    const instrPasos = modoEmpresa
+      ? `1. Haga clic en el botón verde<br/>2. Seleccione "🏢 Empresa"<br/>3. Ingrese el NIT: <strong>${docNumero || ""}</strong><br/>4. Seleccione los certificados y descárguelos en PDF`
+      : `1. Haga clic en el botón verde<br/>2. Seleccione "🪪 Cédula"<br/>3. Ingrese: <strong>${docNumero || ""}</strong><br/>4. Descargue su certificado en PDF`;
     return `<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;">` +
       `<div style="background:linear-gradient(135deg,#065f46,#0d9488);padding:24px 30px;border-radius:12px 12px 0 0;">` +
-      `<h1 style="color:#ffffff;margin:0;font-size:18px;font-weight:900;letter-spacing:0.5px;">📋 Certificado Médico Ocupacional</h1>` +
-      `<p style="color:#a7f3d0;margin:4px 0 0;font-size:12px;">Servicio de Salud Ocupacional · OcupaSalud</p></div>` +
+      `<h1 style="color:#ffffff;margin:0;font-size:18px;font-weight:900;">📋 Certificado Médico Ocupacional</h1>` +
+      `<p style="color:#a7f3d0;margin:4px 0 0;font-size:12px;">Servicio de Salud Ocupacional</p></div>` +
       `<div style="padding:24px 30px;border:1px solid #e5e7eb;border-top:none;">` +
       `<p style="font-size:14px;color:#111;margin:0 0 16px;">Estimado/a <strong>${nombre || "trabajador/a"}</strong>,</p>` +
-      `<p style="font-size:13px;color:#374151;line-height:1.6;margin:0 0 20px;">Su certificado de aptitud médica ocupacional ha sido emitido exitosamente.</p>` +
+      `<p style="font-size:13px;color:#374151;line-height:1.6;margin:0 0 20px;">Le informamos que su certificado de aptitud médica ocupacional ha sido emitido. Puede descargarlo a través de nuestro portal.</p>` +
       (extra ? `<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 16px;margin:0 0 20px;">${extra}</div>` : "") +
       `<div style="background:#065f46;border-radius:10px;padding:20px;text-align:center;margin:0 0 20px;">` +
       `<p style="color:#a7f3d0;font-size:11px;margin:0 0 8px;text-transform:uppercase;letter-spacing:2px;font-weight:700;">Descargue su certificado</p>` +
-      `<a href="${portalUrl}" style="display:inline-block;background:#10b981;color:#ffffff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:900;font-size:14px;letter-spacing:0.5px;">📥 Abrir Portal de Certificados</a>` +
-      `<p style="color:#d1fae5;font-size:11px;margin:10px 0 0;">Seleccione "🪪 Cédula" e ingrese: <strong>${docNumero || ""}</strong></p></div>` +
-      `<div style="background:#f9fafb;border-radius:8px;padding:14px;margin:0 0 16px;">` +
-      `<p style="font-size:11px;color:#6b7280;margin:0;line-height:1.5;">` +
-      `<strong>¿Cómo descargar?</strong><br/>` +
-      `1. Haga clic en el botón verde "Abrir Portal"<br/>` +
-      `2. Seleccione la opción "🪪 Cédula"<br/>` +
-      `3. Ingrese su número de documento: <strong>${docNumero || ""}</strong><br/>` +
-      `4. Haga clic en "Buscar" y descargue su certificado en PDF</p></div>` +
-      `<p style="font-size:13px;color:#374151;margin:0 0 4px;">Cordialmente,</p>` +
-      `<p style="font-size:14px;color:#065f46;font-weight:900;margin:0;">${remitente}</p>` +
-      `<p style="font-size:12px;color:#6b7280;margin:2px 0 0;">Médico Ocupacional · ${emailRemitente || ""}</p></div>` +
+      `<a href="${portalUrl}" style="display:inline-block;background:#10b981;color:#ffffff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:900;font-size:14px;">📥 Abrir Portal de Certificados</a>` +
+      `<p style="color:#d1fae5;font-size:11px;margin:10px 0 0;">${instrBusqueda}</p></div>` +
+      `<div style="background:#f9fafb;border-radius:8px;padding:14px;margin:0 0 20px;">` +
+      `<p style="font-size:11px;color:#6b7280;margin:0;line-height:1.6;"><strong>¿Cómo descargar?</strong><br/>${instrPasos}</p></div>` +
+      `<p style="font-size:13px;color:#374151;margin:0 0 12px;">Cordialmente,</p>` +
+      `<div style="background:#f0fdf4;border:1px solid #d1fae5;border-radius:8px;padding:14px;">` +
+      `<p style="font-size:15px;color:#065f46;font-weight:900;margin:0;text-transform:uppercase;">${docNombre}</p>` +
+      `<p style="font-size:12px;color:#374151;margin:3px 0 0;">${docTitulo}</p>` +
+      (docLicencia ? `<p style="font-size:11px;color:#6b7280;margin:2px 0 0;">Licencia S.O.: ${docLicencia}</p>` : "") +
+      (docCiudad ? `<p style="font-size:11px;color:#6b7280;margin:2px 0 0;">📍 ${docCiudad}</p>` : "") +
+      (docCelular ? `<p style="font-size:11px;color:#6b7280;margin:2px 0 0;">📱 ${docCelular}</p>` : "") +
+      (docEmailAddr ? `<p style="font-size:11px;color:#6b7280;margin:2px 0 0;">✉️ ${docEmailAddr}</p>` : "") +
+      `</div></div>` +
       `<div style="background:#f3f4f6;padding:12px 30px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none;">` +
-      `<p style="font-size:9px;color:#9ca3af;margin:0;text-align:center;">Este correo fue generado por OcupaSalud · Res. 1843/2025 · Ley 1581/2012<br/>La información contenida es confidencial y de uso exclusivo del destinatario.</p></div></div>`;
+      `<p style="font-size:9px;color:#9ca3af;margin:0;text-align:center;">Res. 1843/2025 · Ley 1581/2012 · La información es confidencial y de uso exclusivo del destinatario.</p></div></div>`;
   };
   const _enviarEmailJS = async (to, subject, body, htmlBody) => {
     if (!emailConfig.emailjsConfigurado || !window.emailjs) return false;
@@ -13395,12 +13409,12 @@ function AppInner() {
       const empNombre = pacientes[0]?.empresaNombre || "Empresa";
       const empNit = pacientes[0]?.empresaNit || "";
       const subject = `Certificados Médicos Ocupacionales — ${empNombre} — ${pacientes.length} trabajador(es)`;
-      const listaTexto = pacientes.map((p, i) => `  ${i + 1}. ${p.nombres} — ${p.docTipo || "CC"} ${p.docNumero} — ${p.conceptoAptitud || "Pendiente"}`).join("\n");
-      const body = `Estimado/a encargado de SST,\n\n${empNombre}\n\nSe han emitido ${pacientes.length} certificados de aptitud médica ocupacional:\n\n${listaTexto}\n\n\nDESCARGAR CERTIFICADOS\n\nPortal de Certificados:\n${portalUrl}\n\n  1. Abra el link\n  2. Seleccione "Empresa"\n  3. Ingrese el NIT: ${empNit}\n  4. Descargue todos los certificados en PDF\n\nCada trabajador también puede consultar individualmente con su cédula.\n\n\nCordialmente,\n${remitente}\nMédico Ocupacional\n${emailConfig.email}`;
-      // HTML profesional para EmailJS
-      const listaHTML = pacientes.map((p, i) => `<tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:6px 8px;font-size:11px;color:#6b7280;">${i+1}</td><td style="padding:6px 8px;font-size:12px;font-weight:700;color:#111;">${p.nombres || ""}</td><td style="padding:6px 8px;font-size:11px;font-family:monospace;">${p.docTipo||"CC"} ${p.docNumero||""}</td><td style="padding:6px 8px;font-size:11px;color:#065f46;font-weight:700;">${p.conceptoAptitud||"Pendiente"}</td></tr>`).join("");
-      const extraHTML = `<p style="font-size:12px;color:#065f46;font-weight:900;margin:0 0 8px;">🏢 ${empNombre} — ${pacientes.length} certificados</p><table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#f3f4f6;"><th style="padding:6px 8px;font-size:10px;text-align:left;color:#6b7280;">#</th><th style="padding:6px 8px;font-size:10px;text-align:left;color:#6b7280;">Trabajador</th><th style="padding:6px 8px;font-size:10px;text-align:left;color:#6b7280;">Documento</th><th style="padding:6px 8px;font-size:10px;text-align:left;color:#6b7280;">Concepto</th></tr></thead><tbody>${listaHTML}</tbody></table><p style="font-size:10px;color:#6b7280;margin:8px 0 0;">Seleccione "🏢 Empresa" e ingrese NIT: <strong>${empNit}</strong></p>`;
-      const htmlBody = _generarEmailHTML("encargado de SST", empNit, portalUrl, remitente, emailConfig.email, extraHTML);
+      const docData = activeDoctorData || {};
+      const listaTexto = pacientes.map((p, i) => `  ${i + 1}. ${p.nombres} — ${p.docTipo || "CC"} ${p.docNumero}`).join("\n");
+      const body = `Estimado/a encargado de SST,\n\n${empNombre}\n\nSe han emitido ${pacientes.length} certificados de aptitud médica ocupacional:\n\n${listaTexto}\n\n\nDESCARGAR CERTIFICADOS\n\nPortal de Certificados:\n${portalUrl}\n\n  1. Abra el link\n  2. Seleccione "Empresa"\n  3. Ingrese el NIT: ${empNit}\n  4. Descargue todos los certificados en PDF\n\nCada trabajador también puede consultar con su cédula.\n\n\nCordialmente,\n${docData.nombre || remitente}\n${docData.titulo || "Médico Especialista en Salud Ocupacional"}\n${docData.licencia ? "Licencia S.O.: " + docData.licencia : ""}\n${docData.ciudad || ""}\n${docData.celular ? "Cel: " + docData.celular : ""}\n${docData.email || emailConfig.email || ""}`;
+      const listaHTML = pacientes.map((p, i) => `<tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:6px 8px;font-size:11px;color:#6b7280;">${i+1}</td><td style="padding:6px 8px;font-size:12px;font-weight:700;color:#111;">${p.nombres || ""}</td><td style="padding:6px 8px;font-size:11px;font-family:monospace;">${p.docTipo||"CC"} ${p.docNumero||""}</td></tr>`).join("");
+      const extraHTML = `<p style="font-size:12px;color:#065f46;font-weight:900;margin:0 0 8px;">🏢 ${empNombre} — ${pacientes.length} certificados</p><table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#f3f4f6;"><th style="padding:6px 8px;font-size:10px;text-align:left;color:#6b7280;">#</th><th style="padding:6px 8px;font-size:10px;text-align:left;color:#6b7280;">Trabajador</th><th style="padding:6px 8px;font-size:10px;text-align:left;color:#6b7280;">Documento</th></tr></thead><tbody>${listaHTML}</tbody></table>`;
+      const htmlBody = _generarEmailHTML("encargado de SST", empNit, portalUrl, extraHTML, true);
       const r = await _enviarEmail(empresaEmail, subject, body, htmlBody);
       if (r.method === "emailjs") showAlert(`✅ Email enviado automáticamente a ${empresaEmail}\n\n${pacientes.length} certificados notificados.`);
       return { enviados: pacientes.length, fallidos: [], modo: "empresa" };
@@ -13409,8 +13423,9 @@ function AppInner() {
     for (const pac of pacientes) {
       if (!pac.email) { sinEmail.push(pac.nombres || "Sin nombre"); continue; }
       const subject = `Certificado Médico Ocupacional — ${pac.nombres || ""}`;
-      const body = `Estimado/a ${pac.nombres || ""},\n\nSu certificado de aptitud médica ocupacional ha sido emitido.\n\n\nDESCARGUE SU CERTIFICADO\n\nPortal de Certificados:\n${portalUrl}\n\n  1. Abra el link\n  2. Seleccione "Cédula"\n  3. Ingrese: ${pac.docNumero || ""}\n  4. Descargue su certificado en PDF\n\n\nCordialmente,\n${remitente}\nMédico Ocupacional`;
-      const htmlBody = _generarEmailHTML(pac.nombres, pac.docNumero, portalUrl, remitente, emailConfig.email, null);
+      const docData2 = activeDoctorData || {};
+      const body = `Estimado/a ${pac.nombres || ""},\n\nSu certificado de aptitud médica ocupacional ha sido emitido.\n\n\nDESCARGUE SU CERTIFICADO\n\nPortal de Certificados:\n${portalUrl}\n\n  1. Abra el link\n  2. Seleccione "Cédula"\n  3. Ingrese: ${pac.docNumero || ""}\n  4. Descargue su certificado en PDF\n\n\nCordialmente,\n${docData2.nombre || remitente}\n${docData2.titulo || "Médico Especialista en Salud Ocupacional"}\n${docData2.licencia ? "Licencia S.O.: " + docData2.licencia : ""}\n${docData2.ciudad || ""}\n${docData2.celular ? "Cel: " + docData2.celular : ""}\n${docData2.email || emailConfig.email || ""}`;
+      const htmlBody = _generarEmailHTML(pac.nombres, pac.docNumero, portalUrl, null, false);
       const r = await _enviarEmail(pac.email, subject, body, htmlBody);
       enviados.push(pac.nombres);
       if (usaEmailJS) await new Promise(resolve => setTimeout(resolve, 1100));
