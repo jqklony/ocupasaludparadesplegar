@@ -13162,6 +13162,56 @@ function AppInner() {
   const [historyRecords, setHistoryRecords] = useState([]);
   const [patientSearchTerm, setPatientSearchTerm] = useState("");
   const [patFiltroEmpresa, setPatFiltroEmpresa] = useState("");
+  // ═══ EMAIL CONFIG — persiste en Supabase ═══
+  const [emailConfig, setEmailConfig] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("siso_email_config") || "null") || { email: "", nombre: "", configurado: false }; } catch { return { email: "", nombre: "", configurado: false }; }
+  });
+  const [showEmailConfig, setShowEmailConfig] = useState(false);
+  const saveEmailConfig = (cfg) => {
+    setEmailConfig(cfg);
+    localStorage.setItem("siso_email_config", JSON.stringify(cfg));
+    _sbSet("siso_email_config_" + (currentUser?.user || "shared"), cfg);
+  };
+  // Función de envío masivo de certificados por email
+  const enviarCertificadosMasivo = async (pacientes, empresaEmail, modo) => {
+    // modo: "empresa" = todo al email de la empresa | "individual" = a cada trabajador con BCC
+    if (!emailConfig.configurado || !emailConfig.email) {
+      showAlert("⚠️ Configure su cuenta de email primero.\n\nVaya a la configuración de email (botón ✉️) e ingrese su correo.");
+      setShowEmailConfig(true);
+      return { enviados: 0, fallidos: [] };
+    }
+    const enviados = [];
+    const fallidos = [];
+    const sinEmail = [];
+    if (modo === "empresa" && empresaEmail) {
+      // Enviar todos los certificados a un solo email de la empresa
+      const nombres = pacientes.map(p => p.nombres).join(", ");
+      const subject = `Certificados Médicos Ocupacionales - ${pacientes.length} trabajador(es)`;
+      const body = `Estimado/a encargado de SST,\n\nAdjunto encontrará los certificados de aptitud médica ocupacional de los siguientes ${pacientes.length} trabajador(es):\n\n${pacientes.map((p, i) => `${i + 1}. ${p.nombres} - ${p.docTipo || "CC"} ${p.docNumero}`).join("\n")}\n\nPara consultar cada certificado, los trabajadores pueden acceder al portal con su número de documento.\n\nCordialmente,\n${emailConfig.nombre || activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional\n${emailConfig.email}`;
+      const mailtoUrl = `mailto:${empresaEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.open(mailtoUrl, "_self");
+      return { enviados: pacientes.length, fallidos: [], modo: "empresa" };
+    }
+    // Modo individual: enviar a cada trabajador
+    for (const pac of pacientes) {
+      const destino = pac.email;
+      if (!destino) { sinEmail.push(pac.nombres || "Sin nombre"); continue; }
+      const subject = `Certificado Médico Ocupacional - ${pac.nombres || ""}`;
+      const body = `Estimado/a ${pac.nombres || ""},\n\nSu certificado de aptitud médica ocupacional ha sido emitido.\n\nPuede consultarlo en nuestro portal ingresando su número de documento: ${pac.docNumero || ""}\n\nCordialmente,\n${emailConfig.nombre || activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional`;
+      // Usar BCC al email del médico para tener copia
+      const mailtoUrl = `mailto:${destino}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&bcc=${encodeURIComponent(emailConfig.email)}`;
+      enviados.push(pac.nombres);
+      // Abrir con delay para no saturar
+      await new Promise(resolve => setTimeout(resolve, 600));
+      window.open(mailtoUrl, "_blank");
+    }
+    if (sinEmail.length > 0) {
+      showAlert(`⚠️ ${sinEmail.length} trabajador(es) SIN email registrado:\n\n${sinEmail.join("\n")}\n\n✅ ${enviados.length} email(s) abiertos para enviar.`);
+    } else {
+      showAlert(`✅ ${enviados.length} email(s) abiertos para enviar.\n\nRevise cada ventana y presione Enviar.`);
+    }
+    return { enviados: enviados.length, fallidos: sinEmail };
+  };
   const [patFiltroDesde, setPatFiltroDesde] = useState("");
   const [patFiltroHasta, setPatFiltroHasta] = useState("");
   const [genPatSearch, setGenPatSearch] = useState(""); // búsqueda paciente HC General
@@ -14137,6 +14187,11 @@ function AppInner() {
       {
         const _encSuf = currentUser?.user || "shared";
         applyCloud(`siso_encuestas_${_encSuf}`, setEncuestas, [], "siso_encuestas");
+      }
+      // Email config
+      {
+        const _emSuf = currentUser?.user || "shared";
+        applyCloud(`siso_email_config_${_emSuf}`, (cfg) => { if (cfg && cfg.email) { setEmailConfig(cfg); localStorage.setItem("siso_email_config", JSON.stringify(cfg)); } }, null, "siso_email_config");
       }
       applyCloud(
         "siso_saved_reports",
@@ -25320,49 +25375,64 @@ Esta historia clínica debe conservarse mínimo 20 años.
                           <Printer className="w-3.5 h-3.5" />
                           Imprimir ({selectedList.length})
                         </button>
+                        {/* Botón config email */}
+                        <button onClick={() => setShowEmailConfig(true)} className={`px-2 py-2 rounded-xl text-xs font-black flex items-center gap-1 ${emailConfig.configurado ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-gray-100 text-gray-500 border border-gray-200"}`} title="Configurar email">
+                          ✉️ {emailConfig.configurado ? emailConfig.email.split("@")[0] : "Config"}
+                        </button>
+                        {/* Email a empresa */}
                         <button
                           onClick={() => {
                             if (selectedList.length === 0) { showAlert("Seleccione al menos un trabajador."); return; }
+                            const comp = companies.find(c => c.id === selectedCompanyReport);
+                            const emailEmp = comp?.emailContacto || comp?.email || "";
+                            showPrompt(`📧 Email de la empresa para enviar ${selectedList.length} certificado(s):\n\n(Se enviará un solo email con la lista completa)`, (emailDest) => {
+                              if (!emailDest || !emailDest.includes("@")) { showAlert("Email inválido."); return; }
+                              enviarCertificadosMasivo(selectedList, emailDest, "empresa");
+                            }, emailEmp);
+                          }}
+                          disabled={selectedList.length === 0}
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-black rounded-xl flex items-center gap-1.5"
+                        >
+                          🏢 Email Empresa
+                        </button>
+                        {/* Email individual a cada trabajador */}
+                        <button
+                          onClick={() => {
+                            if (selectedList.length === 0) { showAlert("Seleccione al menos un trabajador."); return; }
+                            if (!emailConfig.configurado) { showAlert("⚠️ Configure su email primero (botón ✉️)"); setShowEmailConfig(true); return; }
                             const conEmail = selectedList.filter(p => p.email);
                             const sinEmail = selectedList.filter(p => !p.email);
-                            if (conEmail.length === 0) { showAlert("Ninguno de los seleccionados tiene email registrado.\n\nUse WhatsApp o registre los emails en las historias clínicas."); return; }
-                            showConfirm(`📧 Enviar certificado por email a ${conEmail.length} trabajador(es)?\n${sinEmail.length > 0 ? `⚠️ ${sinEmail.length} sin email registrado (se omitirán)` : ""}`, () => {
-                              conEmail.forEach((pac, i) => {
-                                setTimeout(() => {
-                                  const subject = encodeURIComponent(`Certificado Médico Ocupacional - ${pac.nombres || ""}`);
-                                  const body = encodeURIComponent(`Estimado/a ${pac.nombres || ""},\n\nSu certificado de aptitud médica ocupacional está listo.\n\nPuede consultarlo en nuestro portal con su número de documento: ${pac.docNumero || ""}\n\nCordialmente,\n${activeDoctorData?.nombre || "OcupaSalud"}`);
-                                  window.open(`mailto:${pac.email}?subject=${subject}&body=${body}`, "_blank");
-                                }, i * 800);
-                              });
-                              showAlert(`✅ Abriendo ${conEmail.length} ventanas de email...\nEnvíe cada uno desde su cliente de correo.`);
+                            showConfirm(`📧 Enviar certificado individual a cada trabajador?\n\n✅ Con email: ${conEmail.length}\n⚠️ Sin email: ${sinEmail.length} (se omitirán)\n\nCada trabajador recibirá su certificado SIN ver el de los demás.`, () => {
+                              enviarCertificadosMasivo(selectedList, null, "individual");
                             });
                           }}
                           disabled={selectedList.length === 0}
                           className="px-3 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white text-xs font-black rounded-xl flex items-center gap-1.5"
                         >
-                          📧 Email ({selectedList.length})
+                          📧 Individual ({selectedList.filter(p => p.email).length}/{selectedList.length})
                         </button>
+                        {/* WhatsApp */}
                         <button
                           onClick={() => {
                             if (selectedList.length === 0) { showAlert("Seleccione al menos un trabajador."); return; }
                             const conTel = selectedList.filter(p => (p.celular || p.telefono || "").replace(/\D/g, "").length >= 10);
+                            const sinTel = selectedList.filter(p => (p.celular || p.telefono || "").replace(/\D/g, "").length < 10);
                             if (conTel.length === 0) { showAlert("Ninguno tiene celular registrado."); return; }
-                            // Abrir ventana con lista de links WhatsApp
                             const rows = conTel.map((pac, i) => {
                               const tel = (pac.celular || pac.telefono || "").replace(/\D/g, "");
                               const telFull = tel.startsWith("57") ? tel : "57" + tel;
-                              const msg = encodeURIComponent(`Estimado/a ${pac.nombres || ""}, su certificado de aptitud médica ocupacional está listo. Consulte en nuestro portal con su documento: ${pac.docNumero || ""}. ${activeDoctorData?.nombre || "OcupaSalud"}`);
+                              const msg = encodeURIComponent(`Estimado/a ${pac.nombres || ""}, su certificado de aptitud médica ocupacional está listo. Consulte en nuestro portal con su documento: ${pac.docNumero || ""}. ${emailConfig.nombre || activeDoctorData?.nombre || "OcupaSalud"}`);
                               return `<tr><td style="padding:4px 8px">${i+1}</td><td style="padding:4px 8px;font-weight:bold">${pac.nombres||""}</td><td style="padding:4px 8px">${pac.celular||pac.telefono||""}</td><td style="padding:4px 8px"><a href="https://wa.me/${telFull}?text=${msg}" target="_blank" style="background:#25d366;color:white;padding:4px 12px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:11px">📱 Enviar</a></td></tr>`;
                             }).join("");
                             const w = window.open("","_blank","width=700,height=500");
                             if (!w) { showAlert("Permita ventanas emergentes."); return; }
-                            w.document.write(`<!DOCTYPE html><html><head><title>Envío WhatsApp - ${compName}</title><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}th{background:#25d366;color:white;padding:8px;text-align:left}td{border-bottom:1px solid #eee}h2{color:#075e54}</style></head><body><h2>📱 Enviar Certificados por WhatsApp</h2><p>${conTel.length} trabajadores con celular registrado</p><table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table><p style="color:#888;font-size:11px;margin-top:16px">Haga clic en cada botón "Enviar" para abrir WhatsApp con el mensaje pre-llenado.</p></body></html>`);
+                            w.document.write(`<!DOCTYPE html><html><head><title>Envío WhatsApp</title><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}th{background:#25d366;color:white;padding:8px;text-align:left}td{border-bottom:1px solid #eee}h2{color:#075e54}.warn{background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px;margin:10px 0;font-size:12px}</style></head><body><h2>📱 Enviar Certificados por WhatsApp</h2><p>${conTel.length} trabajadores con celular · ${sinTel.length > 0 ? `<span style="color:red">${sinTel.length} sin celular</span>` : "✅ Todos con celular"}</p>${sinTel.length > 0 ? `<div class="warn">⚠️ Sin celular: ${sinTel.map(p=>p.nombres).join(", ")}</div>` : ""}<table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
                             w.document.close();
                           }}
                           disabled={selectedList.length === 0}
                           className="px-3 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white text-xs font-black rounded-xl flex items-center gap-1.5"
                         >
-                          📱 WhatsApp ({selectedList.length})
+                          📱 WhatsApp ({selectedList.filter(p => (p.celular||p.telefono||"").replace(/\D/g,"").length >= 10).length})
                         </button>
                       </div>
                     </div>
@@ -48810,6 +48880,47 @@ body{padding-top:52px;}
         renderCurrentView()
       )}
       {renderMensajesOverlay()}
+      {/* MODAL: Configuración de Email */}
+      {showEmailConfig && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-black text-gray-800">✉️ Configuración de Email</h3>
+              <button onClick={() => setShowEmailConfig(false)} className="text-gray-400 hover:text-red-500 text-xl font-black">✕</button>
+            </div>
+            {emailConfig.configurado ? (
+              <div className="space-y-3">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+                  <p className="text-xs font-bold text-emerald-600 uppercase">Cuenta configurada</p>
+                  <p className="text-lg font-black text-emerald-800 mt-1">{emailConfig.email}</p>
+                  <p className="text-xs text-gray-500">{emailConfig.nombre}</p>
+                </div>
+                <button onClick={() => { saveEmailConfig({ email: "", nombre: "", configurado: false }); }} className="w-full py-2 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-black hover:bg-red-100">🚪 Cerrar sesión de email / Cambiar cuenta</button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500">Configure su email para enviar certificados directamente desde la plataforma. Esta configuración se guarda en la nube y persiste entre navegadores.</p>
+                <div>
+                  <label className="text-[10px] font-black text-gray-600 uppercase block mb-1">Email del médico / clínica *</label>
+                  <input type="email" id="email-cfg-email" className="w-full p-2 border border-gray-200 rounded-lg text-sm" placeholder="doctor@email.com" defaultValue={emailConfig.email} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-600 uppercase block mb-1">Nombre remitente</label>
+                  <input id="email-cfg-nombre" className="w-full p-2 border border-gray-200 rounded-lg text-sm" placeholder="Dr. Juan Pérez - Médico Ocupacional" defaultValue={emailConfig.nombre || activeDoctorData?.nombre || ""} />
+                </div>
+                <button onClick={() => {
+                  const em = document.getElementById("email-cfg-email")?.value?.trim();
+                  const nm = document.getElementById("email-cfg-nombre")?.value?.trim();
+                  if (!em || !em.includes("@")) { showAlert("Ingrese un email válido."); return; }
+                  saveEmailConfig({ email: em, nombre: nm || activeDoctorData?.nombre || "", configurado: true });
+                  showAlert("✅ Email configurado: " + em + "\n\nAhora puede enviar certificados desde la plataforma.");
+                  setShowEmailConfig(false);
+                }} className="w-full py-2.5 bg-emerald-700 text-white rounded-xl text-sm font-black hover:bg-emerald-800">✅ Guardar Configuración</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {showNotifModal && (
         <NotificacionModal
           data={notifData}
