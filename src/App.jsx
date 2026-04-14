@@ -13161,6 +13161,9 @@ function AppInner() {
   const [hcChoiceAgenda, setHcChoiceAgenda] = useState(null);
   const [historyRecords, setHistoryRecords] = useState([]);
   const [patientSearchTerm, setPatientSearchTerm] = useState("");
+  const [patFiltroEmpresa, setPatFiltroEmpresa] = useState("");
+  const [patFiltroDesde, setPatFiltroDesde] = useState("");
+  const [patFiltroHasta, setPatFiltroHasta] = useState("");
   const [genPatSearch, setGenPatSearch] = useState(""); // búsqueda paciente HC General
   const [examSearch, setExamSearch] = useState(""); // solicitud examenes
   const [examList, setExamList] = useState([]); // lista exámenes solicitados
@@ -25315,7 +25318,51 @@ Esta historia clínica debe conservarse mínimo 20 años.
                           className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl flex items-center gap-1.5 transition"
                         >
                           <Printer className="w-3.5 h-3.5" />
-                          Imprimir seleccionados ({selectedList.length})
+                          Imprimir ({selectedList.length})
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (selectedList.length === 0) { showAlert("Seleccione al menos un trabajador."); return; }
+                            const conEmail = selectedList.filter(p => p.email);
+                            const sinEmail = selectedList.filter(p => !p.email);
+                            if (conEmail.length === 0) { showAlert("Ninguno de los seleccionados tiene email registrado.\n\nUse WhatsApp o registre los emails en las historias clínicas."); return; }
+                            showConfirm(`📧 Enviar certificado por email a ${conEmail.length} trabajador(es)?\n${sinEmail.length > 0 ? `⚠️ ${sinEmail.length} sin email registrado (se omitirán)` : ""}`, () => {
+                              conEmail.forEach((pac, i) => {
+                                setTimeout(() => {
+                                  const subject = encodeURIComponent(`Certificado Médico Ocupacional - ${pac.nombres || ""}`);
+                                  const body = encodeURIComponent(`Estimado/a ${pac.nombres || ""},\n\nSu certificado de aptitud médica ocupacional está listo.\n\nPuede consultarlo en nuestro portal con su número de documento: ${pac.docNumero || ""}\n\nCordialmente,\n${activeDoctorData?.nombre || "OcupaSalud"}`);
+                                  window.open(`mailto:${pac.email}?subject=${subject}&body=${body}`, "_blank");
+                                }, i * 800);
+                              });
+                              showAlert(`✅ Abriendo ${conEmail.length} ventanas de email...\nEnvíe cada uno desde su cliente de correo.`);
+                            });
+                          }}
+                          disabled={selectedList.length === 0}
+                          className="px-3 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white text-xs font-black rounded-xl flex items-center gap-1.5"
+                        >
+                          📧 Email ({selectedList.length})
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (selectedList.length === 0) { showAlert("Seleccione al menos un trabajador."); return; }
+                            const conTel = selectedList.filter(p => (p.celular || p.telefono || "").replace(/\D/g, "").length >= 10);
+                            if (conTel.length === 0) { showAlert("Ninguno tiene celular registrado."); return; }
+                            // Abrir ventana con lista de links WhatsApp
+                            const rows = conTel.map((pac, i) => {
+                              const tel = (pac.celular || pac.telefono || "").replace(/\D/g, "");
+                              const telFull = tel.startsWith("57") ? tel : "57" + tel;
+                              const msg = encodeURIComponent(`Estimado/a ${pac.nombres || ""}, su certificado de aptitud médica ocupacional está listo. Consulte en nuestro portal con su documento: ${pac.docNumero || ""}. ${activeDoctorData?.nombre || "OcupaSalud"}`);
+                              return `<tr><td style="padding:4px 8px">${i+1}</td><td style="padding:4px 8px;font-weight:bold">${pac.nombres||""}</td><td style="padding:4px 8px">${pac.celular||pac.telefono||""}</td><td style="padding:4px 8px"><a href="https://wa.me/${telFull}?text=${msg}" target="_blank" style="background:#25d366;color:white;padding:4px 12px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:11px">📱 Enviar</a></td></tr>`;
+                            }).join("");
+                            const w = window.open("","_blank","width=700,height=500");
+                            if (!w) { showAlert("Permita ventanas emergentes."); return; }
+                            w.document.write(`<!DOCTYPE html><html><head><title>Envío WhatsApp - ${compName}</title><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}th{background:#25d366;color:white;padding:8px;text-align:left}td{border-bottom:1px solid #eee}h2{color:#075e54}</style></head><body><h2>📱 Enviar Certificados por WhatsApp</h2><p>${conTel.length} trabajadores con celular registrado</p><table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table><p style="color:#888;font-size:11px;margin-top:16px">Haga clic en cada botón "Enviar" para abrir WhatsApp con el mensaje pre-llenado.</p></body></html>`);
+                            w.document.close();
+                          }}
+                          disabled={selectedList.length === 0}
+                          className="px-3 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white text-xs font-black rounded-xl flex items-center gap-1.5"
+                        >
+                          📱 WhatsApp ({selectedList.length})
                         </button>
                       </div>
                     </div>
@@ -25531,11 +25578,41 @@ Esta historia clínica debe conservarse mínimo 20 años.
       : _isAdmin(currentUser?.role)
       ? allUnique
       : allUnique.filter((p) => p._medicoId === currentUser?.user);
-    const list = listFiltered.filter(
-      (p) =>
-        p.nombres?.toLowerCase().includes(patientSearchTerm.toLowerCase()) ||
-        p.docNumero?.includes(patientSearchTerm)
-    );
+    const list = listFiltered.filter((p) => {
+      const matchSearch = !patientSearchTerm || p.nombres?.toLowerCase().includes(patientSearchTerm.toLowerCase()) || (p.docNumero || "").includes(patientSearchTerm);
+      const matchEmpresa = !patFiltroEmpresa || p.empresaId === patFiltroEmpresa || (patFiltroEmpresa === "particular" && (!p.empresaId || p.empresaId === "particular"));
+      const fechaP = (p.fechaExamen || p.fechaRegistro || "").split("T")[0];
+      const matchDesde = !patFiltroDesde || fechaP >= patFiltroDesde;
+      const matchHasta = !patFiltroHasta || fechaP <= patFiltroHasta;
+      return matchSearch && matchEmpresa && matchDesde && matchHasta;
+    });
+    // Helper para envío de certificado
+    const _enviarCertEmail = (pac) => {
+      const email = pac.email || pac.celular ? "" : "";
+      const nombre = pac.nombres || "";
+      const subject = encodeURIComponent(`Certificado Médico Ocupacional - ${nombre}`);
+      const body = encodeURIComponent(`Estimado/a ${nombre},\n\nAdjunto encontrará su certificado de aptitud médica ocupacional.\n\nPara consultar su certificado en línea, ingrese a nuestro portal con su número de documento: ${pac.docNumero || ""}\n\nCordialmente,\n${activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional`);
+      if (pac.email) {
+        window.open(`mailto:${pac.email}?subject=${subject}&body=${body}`, "_blank");
+      } else {
+        showPrompt("Este paciente no tiene email registrado.\nIngrese el email:", (em) => {
+          if (em) window.open(`mailto:${em}?subject=${subject}&body=${body}`, "_blank");
+        });
+      }
+    };
+    const _enviarCertWhatsApp = (pac) => {
+      const nombre = pac.nombres || "";
+      const tel = (pac.celular || pac.telefono || "").replace(/\D/g, "");
+      const msg = encodeURIComponent(`Estimado/a ${nombre}, su certificado de aptitud médica ocupacional está listo.\n\nPuede consultarlo en nuestro portal con su número de documento: ${pac.docNumero || ""}\n\n${activeDoctorData?.nombre || "OcupaSalud"} - Médico Ocupacional`);
+      if (tel.length >= 10) {
+        const telFull = tel.startsWith("57") ? tel : "57" + tel;
+        window.open(`https://wa.me/${telFull}?text=${msg}`, "_blank");
+      } else {
+        showPrompt("Este paciente no tiene celular registrado.\nIngrese el número (ej: 3001234567):", (num) => {
+          if (num) { const n = num.replace(/\D/g, ""); window.open(`https://wa.me/57${n}?text=${msg}`, "_blank"); }
+        });
+      }
+    };
     return (
       <div className="min-h-screen bg-gray-50 font-sans p-8">
         <div className="max-w-6xl mx-auto bg-white shadow-lg rounded-2xl p-6">
@@ -25550,14 +25627,34 @@ Esta historia clínica debe conservarse mínimo 20 años.
               <LogOut className="rotate-180 w-4 h-4" /> Volver
             </button>
           </div>
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-            <input
-              className="pl-10 w-full p-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-400 outline-none"
-              placeholder="Buscar por nombre o documento..."
-              value={patientSearchTerm}
-              onChange={(e) => setPatientSearchTerm(e.target.value)}
-            />
+          {/* FILTROS */}
+          <div className="bg-gray-50 rounded-xl p-3 mb-3 flex flex-wrap gap-2 items-end">
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-[10px] font-black text-gray-600 uppercase block mb-0.5">Buscar</label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400" />
+                <input className="pl-8 w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-teal-400 outline-none" placeholder="Nombre o documento..." value={patientSearchTerm} onChange={(e) => setPatientSearchTerm(e.target.value)} />
+              </div>
+            </div>
+            <div className="min-w-[180px]">
+              <label className="text-[10px] font-black text-gray-600 uppercase block mb-0.5">Empresa</label>
+              <select value={patFiltroEmpresa} onChange={(e) => setPatFiltroEmpresa(e.target.value)} className="w-full p-1.5 border border-gray-200 rounded-lg text-xs">
+                <option value="">Todas las empresas</option>
+                <option value="particular">Particular / Independiente</option>
+                {companies.filter(c => c.nombre && !c.nombre.toUpperCase().includes("PARTICULAR")).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-gray-600 uppercase block mb-0.5">Desde</label>
+              <input type="date" value={patFiltroDesde} onChange={(e) => setPatFiltroDesde(e.target.value)} className="p-1.5 border border-gray-200 rounded-lg text-xs" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-gray-600 uppercase block mb-0.5">Hasta</label>
+              <input type="date" value={patFiltroHasta} onChange={(e) => setPatFiltroHasta(e.target.value)} className="p-1.5 border border-gray-200 rounded-lg text-xs" />
+            </div>
+            {(patFiltroEmpresa || patFiltroDesde || patFiltroHasta || patientSearchTerm) && (
+              <button onClick={() => { setPatFiltroEmpresa(""); setPatFiltroDesde(""); setPatFiltroHasta(""); setPatientSearchTerm(""); }} className="px-3 py-1.5 bg-gray-200 text-gray-600 rounded-lg text-[10px] font-black hover:bg-gray-300">✕ Limpiar</button>
+            )}
           </div>
           <div className="overflow-x-auto max-h-[600px] border border-gray-100 rounded-xl">
             <table className="w-full text-xs">
@@ -25662,6 +25759,12 @@ Esta historia clínica debe conservarse mínimo 20 años.
                         >
                           <PlusCircle className="w-3 h-3" /> HC Ocup.
                         </button>
+                        {p.estadoHistoria === "Cerrada" && (
+                          <>
+                            <button onClick={() => _enviarCertEmail(p)} className="text-[9px] bg-amber-50 text-amber-700 px-1.5 py-1 rounded-lg border border-amber-200 font-bold hover:bg-amber-100" title="Enviar certificado por email">📧</button>
+                            <button onClick={() => _enviarCertWhatsApp(p)} className="text-[9px] bg-green-50 text-green-700 px-1.5 py-1 rounded-lg border border-green-200 font-bold hover:bg-green-100" title="Enviar certificado por WhatsApp">📱</button>
+                          </>
+                        )}
                         <button
                           onClick={() => handleDeletePatient(p.id)}
                           className="p-1.5 text-red-400 hover:text-red-600"
