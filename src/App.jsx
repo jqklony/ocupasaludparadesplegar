@@ -13318,6 +13318,19 @@ function AppInner() {
   const [showEmailConfig, setShowEmailConfig] = useState(false);
   const [showEnviarPanel, setShowEnviarPanel] = useState(false);
   const [enviarChecklist, setEnviarChecklist] = useState({ certificado: true, historia: false, formula: false, derivacion: false, examenes: false });
+  // ═══ ENVÍO INTEGRAL POR EMPRESA ═══
+  const [savedInformes, setSavedInformes] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("siso_informes") || "[]"); } catch { return []; }
+  });
+  const [showEnvioIntegral, setShowEnvioIntegral] = useState(false);
+  const [envioIntegralEmpresa, setEnvioIntegralEmpresa] = useState(null);
+  const [volverAEnvioIntegral, setVolverAEnvioIntegral] = useState(null); // { empresaId, from: "reporte" }
+  const saveInforme = (informe) => {
+    const updated = [...savedInformes.filter(i => !(i.empresaId === informe.empresaId && i.periodo === informe.periodo)), informe];
+    setSavedInformes(updated);
+    localStorage.setItem("siso_informes", JSON.stringify(updated));
+    _sbSet("siso_informes_" + (currentUser?.user || "shared"), updated);
+  };
   const saveEmailConfig = (cfg) => {
     setEmailConfig(cfg);
     localStorage.setItem("siso_email_config", JSON.stringify(cfg));
@@ -14414,6 +14427,11 @@ function AppInner() {
       {
         const _encSuf = currentUser?.user || "shared";
         applyCloud(`siso_encuestas_${_encSuf}`, setEncuestas, [], "siso_encuestas");
+      }
+      // Informes guardados
+      {
+        const _infSuf = currentUser?.user || "shared";
+        applyCloud(`siso_informes_${_infSuf}`, setSavedInformes, [], "siso_informes");
       }
       // Email config
       {
@@ -24378,6 +24396,48 @@ Esta historia clínica debe conservarse mínimo 20 años.
             >
               <Printer className="w-4 h-4" /> Imprimir
             </button>
+            {/* Guardar informe */}
+            {reportAIResult && selectedCompanyReport && (
+              <button
+                onClick={() => {
+                  const periodo = (reportStartDate || new Date().toISOString().slice(0, 7)) + " — " + (reportEndDate || new Date().toISOString().slice(0, 10));
+                  const informe = {
+                    id: "inf_" + Date.now(),
+                    empresaId: selectedCompanyReport,
+                    empresaNombre: compName,
+                    periodo,
+                    fecha: new Date().toISOString().split("T")[0],
+                    totalPacientes: total,
+                    resumen: reportAIResult.resumenEjecutivo || "",
+                    savedAt: new Date().toISOString(),
+                  };
+                  saveInforme(informe);
+                  showAlert("✅ Informe guardado para " + compName + "\nPeriodo: " + periodo);
+                }}
+                className="bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" /> Guardar Informe
+              </button>
+            )}
+            {/* Enviar todo a empresa */}
+            {selectedCompanyReport && (
+              <button
+                onClick={() => {
+                  setEnvioIntegralEmpresa({
+                    empresaId: selectedCompanyReport,
+                    empresaNombre: compName,
+                    empresaNit: companies.find(c => c.id === selectedCompanyReport)?.nit || "",
+                    totalPacientes: total,
+                    periodo: (reportStartDate || "") + " — " + (reportEndDate || ""),
+                    precioPaciente: precioPorPaciente || "35000",
+                  });
+                  setShowEnvioIntegral(true);
+                }}
+                className="bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2"
+              >
+                📤 Enviar TODO a Empresa
+              </button>
+            )}
           </div>
 
           {/* ── TABS: Estadísticas | Certificados por empresa ── */}
@@ -28509,9 +28569,17 @@ Esta historia clínica debe conservarse mínimo 20 años.
                         : currentUser?.user || "shared";
                       _sync(`siso_saved_bills_${_bSuf}`, JSON.stringify(upd));
                     }
-                    showAlert(
-                      "✅ Cuenta de cobro guardada.\nPuede verla en Módulo Financiero → 💳 Cuentas"
-                    );
+                    if (volverAEnvioIntegral) {
+                      showAlert("✅ Cuenta de cobro guardada.\n\nVolviendo al panel de envío integral...");
+                      setTimeout(() => {
+                        setEnvioIntegralEmpresa({ empresaId: volverAEnvioIntegral.empresaId, empresaNombre: volverAEnvioIntegral.empresaNombre, totalPacientes: 0, periodo: "", precioPaciente: "35000", empresaNit: "" });
+                        setShowEnvioIntegral(true);
+                        setVolverAEnvioIntegral(null);
+                        goTo("reporte");
+                      }, 1000);
+                    } else {
+                      showAlert("✅ Cuenta de cobro guardada.\nPuede verla en Módulo Financiero → 💳 Cuentas");
+                    }
                   }}
                   className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 hover:bg-emerald-700"
                 >
@@ -49209,6 +49277,129 @@ body{padding-top:52px;}
         renderCurrentView()
       )}
       {renderMensajesOverlay()}
+      {/* MODAL: Envío Integral por Empresa */}
+      {showEnvioIntegral && envioIntegralEmpresa && (() => {
+        const emp = envioIntegralEmpresa;
+        const hasInforme = savedInformes.some(i => i.empresaId === emp.empresaId);
+        const hasCerts = patientsList.filter(p => p.empresaId === emp.empresaId && p.estadoHistoria === "Cerrada").length > 0;
+        const certCount = patientsList.filter(p => p.empresaId === emp.empresaId && p.estadoHistoria === "Cerrada").length;
+        const hasCuenta = savedBillsList.some(b => (b.companyId === emp.empresaId || b.clientName === emp.empresaNombre) && !b._deleted);
+        const cuentaData = savedBillsList.find(b => (b.companyId === emp.empresaId || b.clientName === emp.empresaNombre) && !b._deleted);
+        // Carta de custodia: check in savedInformes with tipo "custodia"
+        const hasCustodia = savedInformes.some(i => i.empresaId === emp.empresaId && i.tipo === "custodia");
+        const todoListo = hasInforme && hasCerts && hasCuenta && hasCustodia;
+        const comp = companies.find(c => c.id === emp.empresaId);
+        return (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 my-4">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="text-lg font-black text-gray-800">📤 Envío Integral</h3>
+                  <p className="text-xs text-gray-500">{emp.empresaNombre}</p>
+                </div>
+                <button onClick={() => setShowEnvioIntegral(false)} className="text-gray-400 hover:text-red-500 text-xl font-black">✕</button>
+              </div>
+              <div className="space-y-2 mb-4">
+                {/* Informe */}
+                <div className={`flex items-center justify-between p-3 rounded-xl border ${hasInforme ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+                  <div className="flex items-center gap-2">
+                    <span>{hasInforme ? "✅" : "❌"}</span>
+                    <div><p className="text-xs font-black text-gray-800">Informe Epidemiológico</p>
+                    <p className="text-[10px] text-gray-500">{hasInforme ? "Guardado" : "No guardado — use 'Guardar Informe' primero"}</p></div>
+                  </div>
+                  {!hasInforme && <span className="text-[9px] text-red-600 font-bold">Guarde el informe ↑</span>}
+                </div>
+                {/* Certificados */}
+                <div className="flex items-center justify-between p-3 rounded-xl border bg-emerald-50 border-emerald-200">
+                  <div className="flex items-center gap-2">
+                    <span>✅</span>
+                    <div><p className="text-xs font-black text-gray-800">Certificados de Aptitud</p>
+                    <p className="text-[10px] text-gray-500">{certCount} trabajador(es) con HC cerrada</p></div>
+                  </div>
+                </div>
+                {/* Cuenta de cobro */}
+                <div className={`flex items-center justify-between p-3 rounded-xl border ${hasCuenta ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
+                  <div className="flex items-center gap-2">
+                    <span>{hasCuenta ? "✅" : "❌"}</span>
+                    <div><p className="text-xs font-black text-gray-800">Cuenta de Cobro</p>
+                    <p className="text-[10px] text-gray-500">{hasCuenta ? `No. ${cuentaData?.number || "—"} · $${Number(cuentaData?.amount || 0).toLocaleString("es-CO")}` : "No creada"}</p></div>
+                  </div>
+                  {!hasCuenta && <button onClick={() => {
+                    const _maxB = savedBillsList.reduce((mx, b) => { const n = parseInt(b.number || "0", 10); return n > mx ? n : mx; }, 0);
+                    setBillData(p => ({
+                      ...p,
+                      companyId: emp.empresaId,
+                      clientName: emp.empresaNombre,
+                      clientNit: comp ? `${comp.nit}${comp.dv ? "-" + comp.dv : ""}` : emp.empresaNit,
+                      number: String(_maxB + 1).padStart(3, "0"),
+                      date: new Date().toISOString().split("T")[0],
+                      concept: `EXAMENES MEDICOS OCUPACIONALES — ${emp.totalPacientes} trabajador(es) evaluado(s) · Periodo ${emp.periodo}`,
+                      amount: String(emp.totalPacientes * parseInt(emp.precioPaciente || "35000")),
+                    }));
+                    setVolverAEnvioIntegral({ empresaId: emp.empresaId, empresaNombre: emp.empresaNombre, from: "cuenta" });
+                    setShowEnvioIntegral(false);
+                    goTo("bill");
+                  }} className="px-3 py-1 bg-amber-600 text-white text-[10px] font-black rounded-lg hover:bg-amber-700">Crear ahora →</button>}
+                </div>
+                {/* Carta de custodia */}
+                <div className={`flex items-center justify-between p-3 rounded-xl border ${hasCustodia ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
+                  <div className="flex items-center gap-2">
+                    <span>{hasCustodia ? "✅" : "❌"}</span>
+                    <div><p className="text-xs font-black text-gray-800">Carta de Custodia</p>
+                    <p className="text-[10px] text-gray-500">{hasCustodia ? "Guardada" : "No creada"}</p></div>
+                  </div>
+                  {!hasCustodia && <button onClick={() => {
+                    // Guardar carta de custodia pre-llenada directamente
+                    const custodia = {
+                      id: "inf_cust_" + Date.now(),
+                      empresaId: emp.empresaId,
+                      empresaNombre: emp.empresaNombre,
+                      empresaNit: comp ? `${comp.nit}${comp.dv ? "-" + comp.dv : ""}` : emp.empresaNit,
+                      tipo: "custodia",
+                      periodo: emp.periodo,
+                      totalPacientes: emp.totalPacientes,
+                      medicoNombre: activeDoctorData?.nombre || "",
+                      medicoLicencia: activeDoctorData?.licencia || "",
+                      fecha: new Date().toISOString().split("T")[0],
+                      savedAt: new Date().toISOString(),
+                    };
+                    saveInforme(custodia);
+                    showAlert("✅ Carta de Custodia generada y guardada para " + emp.empresaNombre);
+                  }} className="px-3 py-1 bg-amber-600 text-white text-[10px] font-black rounded-lg hover:bg-amber-700">Crear ahora →</button>}
+                </div>
+              </div>
+              {/* Botón enviar */}
+              {todoListo ? (
+                <button onClick={() => {
+                  const portalUrl = window.location.origin + window.location.pathname + "#portaltrabajador";
+                  const docD = activeDoctorData || {};
+                  const nitEmp = comp ? `${comp.nit}${comp.dv ? "-" + comp.dv : ""}` : emp.empresaNit;
+                  const subject = `Documentación Médica Ocupacional — ${emp.empresaNombre}`;
+                  const body = `Estimado/a encargado de SST,\n\n${emp.empresaNombre}\n\nSe adjunta la documentación completa de las evaluaciones médicas ocupacionales:\n\n  📋 Informe Epidemiológico — ${emp.totalPacientes} trabajadores\n  📄 ${certCount} Certificados de Aptitud Laboral\n  💰 Cuenta de Cobro No. ${cuentaData?.number || "—"} — $${Number(cuentaData?.amount || 0).toLocaleString("es-CO")}\n  📁 Carta de Custodia de Historias Clínicas\n\n\nDESCARGAR DOCUMENTOS\n\nPortal de Certificados:\n${portalUrl}\n\n  1. Abra el link\n  2. Seleccione "Empresa"\n  3. Ingrese NIT: ${nitEmp}\n  4. Descargue certificados e informe en PDF\n\n\nCordialmente,\n${docD.nombre || "Médico Ocupacional"}\n${docD.titulo || ""}\n${docD.licencia ? "Licencia S.O.: " + docD.licencia : ""}\n${docD.ciudad || ""}\n${docD.email || emailConfig?.email || ""}`;
+                  const extraHTML = `<p style="font-size:12px;color:#065f46;font-weight:900;margin:0 0 10px;">📦 Documentación completa — ${emp.empresaNombre}</p><table style="width:100%;border-collapse:collapse;"><tbody><tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px;font-size:12px;">📋 Informe Epidemiológico</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">${emp.totalPacientes} trabajadores</td></tr><tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px;font-size:12px;">📄 Certificados de Aptitud</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">${certCount} certificados</td></tr><tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px;font-size:12px;">💰 Cuenta de Cobro</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">No. ${cuentaData?.number || "—"} · $${Number(cuentaData?.amount || 0).toLocaleString("es-CO")}</td></tr><tr><td style="padding:8px;font-size:12px;">📁 Carta de Custodia</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">✅ Generada</td></tr></tbody></table>`;
+                  const htmlBody = _generarEmailHTML("encargado de SST", nitEmp, portalUrl, extraHTML, true);
+                  const emailEmp = comp?.emailContacto || comp?.email || "";
+                  if (emailEmp) {
+                    _enviarEmail(emailEmp, subject, body, htmlBody);
+                    showAlert("✅ Documentación enviada a " + emailEmp);
+                  } else {
+                    showPrompt("Email de la empresa:", (em) => {
+                      if (em) { _enviarEmail(em, subject, body, htmlBody); showAlert("✅ Documentación enviada a " + em); }
+                    });
+                  }
+                  setShowEnvioIntegral(false);
+                }} className="w-full py-3 bg-emerald-700 text-white font-black text-sm rounded-xl hover:bg-emerald-800 flex items-center justify-center gap-2">
+                  📤 ENVIAR TODA LA DOCUMENTACIÓN
+                </button>
+              ) : (
+                <div className="bg-gray-50 rounded-xl p-3 text-center">
+                  <p className="text-xs text-gray-500">⚠️ Complete los documentos faltantes para enviar.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
       {/* MODAL: Configuración de Email + EmailJS */}
       {showEmailConfig && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
