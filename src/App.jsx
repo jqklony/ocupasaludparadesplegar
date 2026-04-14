@@ -11850,6 +11850,42 @@ const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : n
 };
 
 // ══════════════════════════════════════════════════════════════════════════
+// GENERADOR DE CERTIFICADO PARA PORTAL (usa datos de siso_portal_doc_*)
+// Reutiliza _generarCertificadoHTMLNormalizado con mapeo de campos
+// ══════════════════════════════════════════════════════════════════════════
+const _generarCertificadoDesdePortal = (portalData) => {
+  const mappedData = {
+    nombres: portalData.nombres || "",
+    docTipo: portalData.docTipo || "CC",
+    docNumero: portalData.docNumero || "",
+    edad: portalData.edad || "",
+    cargo: portalData.cargo || "",
+    empresaNombre: portalData.empresaNombre || "PARTICULAR",
+    empresaNit: portalData.empresaNit || "",
+    tipoExamen: portalData.tipoExamen || "",
+    enfasisExamen: portalData.enfasisExamen || "GENERAL",
+    fechaExamen: portalData.fechaExamen || "",
+    fechaCierre: portalData.fechaCierre || portalData.fechaExamen || "",
+    conceptoAptitud: portalData.conceptoAptitud || "",
+    restricciones: portalData.restricciones || "",
+    analisisRestricciones: portalData.restricciones || "",
+    recomendaciones: portalData.recomendaciones || "",
+    recomendacionesOcupacionales: portalData.recomendacionesOcupacionales || "",
+    recomendacionesMedicas: portalData.recomendacionesMedicas || "",
+    restriccionesChecklist: portalData.restriccionesChecklist || {},
+    recomendacionesChecklist: portalData.recomendacionesChecklist || {},
+    vigencia: portalData.vigencia || "1 año",
+    codigoVerificacion: portalData.codigoVerificacion || "",
+    diagnosticoPrincipal: portalData.diagnosticoPrincipal || "",
+    eps: portalData.eps || "",
+    arl: portalData.arl || "",
+    estadoHistoria: portalData.estadoHistoria || "Cerrada",
+  };
+  const doctorData = portalData._doctorData || { nombre: portalData.medicoNombre || "MÉDICO OCUPACIONAL" };
+  const signature = portalData._firma || "";
+  return _generarCertificadoHTMLNormalizado(mappedData, doctorData, signature, null);
+};
+
 // ══════════════════════════════════════════════════════════════════════════
 // FORMULARIO PÚBLICO DE ENCUESTA SOCIODEMOGRÁFICA - Acceso sin login
 // URL: https://ocupasalud.pages.dev/#encuesta?token=xxx
@@ -12534,8 +12570,19 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
                   const pacs = sel.length > 0 ? sel : resultadosEmpresa;
                   const w = window.open("","_blank","width=900,height=700");
                   if (!w) return;
-                  const certs = pacs.map((p, i) => `<div style="${i > 0 ? "page-break-before:always" : ""}"><h2 style="color:#065f46;border-bottom:2px solid #065f46;padding-bottom:8px">Certificado ${i+1} de ${pacs.length}</h2><div style="background:#f0fdf4;padding:12px;border-radius:8px;margin:10px 0"><p><b>Trabajador:</b> ${p.nombres || "--"}</p><p><b>Documento:</b> ${p.docTipo || "CC"} ${p.docNumero || "--"}</p><p><b>Empresa:</b> ${p.empresaNombre || "--"}</p><p><b>Tipo Examen:</b> ${p.tipoExamen || "--"}</p><p><b>Concepto:</b> <span style="font-weight:900;font-size:14px">${p.conceptoAptitud || "--"}</span></p>${p.analisisRestricciones ? `<p><b>Restricciones:</b> ${p.analisisRestricciones}</p>` : ""}<p><b>Fecha:</b> ${p.fechaExamen || "--"}</p><p><b>Código:</b> ${p.codigoVerificacion || "--"}</p></div></div>`).join("");
-                  w.document.write(`<!DOCTYPE html><html><head><title>Certificados - ${pacs[0]?.empresaNombre || "Empresa"}</title><style>body{font-family:Arial;padding:20px;font-size:11px}h2{font-size:14px;margin-top:0}@media print{button{display:none}}</style></head><body><div style="text-align:center;margin-bottom:20px"><button onclick="window.print()" style="background:#065f46;color:white;border:none;padding:10px 24px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:12px">📥 Guardar como PDF / Imprimir (${pacs.length} certificados)</button></div>${certs}</body></html>`);
+                  // Generar certificados completos usando el mismo formato de la plataforma
+                  const certs = pacs.map((p, i) => {
+                    const certHtml = _generarCertificadoDesdePortal(p);
+                    // Extraer solo el body del HTML generado
+                    const bodyMatch = certHtml.match(/<body[^>]*>([\s\S]*)<\/body>/);
+                    const bodyContent = bodyMatch ? bodyMatch[1] : certHtml;
+                    return `<div style="${i > 0 ? "page-break-before:always;" : ""}padding-top:${i > 0 ? "10mm" : "0"};">${bodyContent}</div>`;
+                  }).join("");
+                  // Extraer los estilos del primer certificado
+                  const firstCert = _generarCertificadoDesdePortal(pacs[0]);
+                  const styleMatch = firstCert.match(/<style>([\s\S]*?)<\/style>/);
+                  const styles = styleMatch ? styleMatch[1] : "";
+                  w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Certificados - ${pacs[0]?.empresaNombre || "Empresa"}</title><style>${styles} .np-dl{position:fixed;top:10px;right:10px;z-index:9999;} @media print{.np-dl{display:none!important;}}</style></head><body><div class="np-dl"><button onclick="window.print()" style="background:#065f46;color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:900;cursor:pointer;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.2);">📥 Guardar PDF / Imprimir (${pacs.length} certificados)</button></div>${certs}</body></html>`);
                   w.document.close();
                 }} className="px-3 py-1 bg-emerald-500 text-white text-[10px] font-black rounded-lg hover:bg-emerald-600">
                   📥 Descargar {Object.keys(certSeleccionados).length > 0 ? `(${Object.keys(certSeleccionados).length})` : `todos (${resultadosEmpresa.length})`}
@@ -12646,25 +12693,7 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
                   {/* ── DESCARGAR CERTIFICADO PDF ─────────────────────────── */}
                   <button
                     onClick={() => {
-                      const docData = resultado._doctorData || {
-                        nombre: resultado.medicoNombre || "MÉDICO OCUPACIONAL",
-                        titulo: "Médico Especialista en Salud Ocupacional",
-                        licencia: "--",
-                        ciudad: "Popayán",
-                        email: "",
-                      };
-                      const firma = resultado._firma || "";
-                      const _miIPS0 = currentUser?.empresaId
-                        ? companies.find(
-                            (c) => c.id === currentUser.empresaId
-                          ) || null
-                        : null;
-                      const html = _generarCertificadoHTMLNormalizado(
-                        resultado,
-                        docData,
-                        firma,
-                        _miIPS0
-                      );
+                      const html = _generarCertificadoDesdePortal(resultado);
                       const w = window.open(
                         "",
                         "_blank",
