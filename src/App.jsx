@@ -11850,6 +11850,280 @@ const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : n
 };
 
 // ══════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════
+// FORMULARIO PÚBLICO DE ENCUESTA SOCIODEMOGRÁFICA - Acceso sin login
+// URL: https://ocupasalud.pages.dev/#encuesta?token=xxx
+// Los trabajadores llenan sus datos sociodemográficos antes de la consulta.
+// Los datos se guardan en Supabase: siso_encuesta_resp_{token}
+// ══════════════════════════════════════════════════════════════════════════
+const EncuestaPublicaForm = ({ token, sbUrl, sbKey, onVolver }) => {
+  const { useState: useLocalState } = React;
+  const [form, setForm] = useLocalState({
+    nombres: "", docTipo: "CC", docNumero: "", fechaNacimiento: "", genero: "",
+    estadoCivil: "", escolaridad: "", celular: "", email: "", direccion: "", ciudad: "Popayán",
+    eps: "", arl: "", afp: "", estrato: "", zonaResidencia: "Urbana",
+    cargo: "", area: "", antiguedad: "", tipoContrato: "", turnoTrabajo: "Diurno",
+    contactoEmergencia: "", parentesco: "", telEmergencia: "",
+  });
+  const [enviado, setEnviado] = useLocalState(false);
+  const [error, setError] = useLocalState("");
+  const [loading, setLoading] = useLocalState(false);
+  const [encInfo, setEncInfo] = useLocalState(null);
+
+  // Cargar info de la encuesta (empresa, tipo examen)
+  React.useEffect(() => {
+    if (!token) return;
+    fetch(`${sbUrl}/rest/v1/siso_store?key=eq.siso_encuesta_${token}&select=value`, {
+      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+    }).then(r => r.json()).then(d => {
+      if (d[0]?.value) setEncInfo(d[0].value);
+    }).catch(() => {});
+  }, [token]);
+
+  const handleSubmit = async () => {
+    if (!form.nombres.trim() || form.nombres.trim().length < 5) { setError("Ingrese su nombre completo."); return; }
+    if (!form.docNumero.trim()) { setError("Ingrese su número de documento."); return; }
+    if (!form.celular.trim()) { setError("Ingrese su número de celular."); return; }
+    if (!form.cargo.trim()) { setError("Ingrese su cargo actual."); return; }
+    if (!form.eps.trim()) { setError("Seleccione su EPS."); return; }
+    if (!form.contactoEmergencia.trim()) { setError("Ingrese contacto de emergencia."); return; }
+    if (!form.telEmergencia.trim()) { setError("Ingrese teléfono de emergencia."); return; }
+    setError("");
+    setLoading(true);
+    try {
+      // Leer respuestas existentes
+      const resp = await fetch(`${sbUrl}/rest/v1/siso_store?key=eq.siso_encuesta_resp_${token}&select=value`, {
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+      });
+      const existing = await resp.json();
+      const respuestas = existing[0]?.value || [];
+      // Verificar duplicado por cédula
+      if (respuestas.find(r => r.docNumero === form.docNumero.trim())) {
+        setError("Ya se registraron datos con este número de documento."); setLoading(false); return;
+      }
+      // Agregar respuesta
+      respuestas.push({ ...form, nombres: form.nombres.trim().toUpperCase(), docNumero: form.docNumero.trim(), id: "resp_" + Date.now(), timestamp: new Date().toISOString(), estado: "completa" });
+      // Guardar
+      await fetch(`${sbUrl}/rest/v1/siso_store`, {
+        method: "POST",
+        headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ key: `siso_encuesta_resp_${token}`, value: respuestas, updated_at: new Date().toISOString() }),
+      });
+      setEnviado(true);
+    } catch (e) { setError("Error al enviar. Intente de nuevo."); }
+    setLoading(false);
+  };
+
+  const u = (field, val) => setForm(p => ({ ...p, [field]: val }));
+  const EPS_LIST = ["NUEVA EPS","SANITAS","SALUD TOTAL","MEDIMÁS","COMPENSAR","SURA","COOMEVA","FAMISANAR","COOSALUD","MUTUAL SER","COMFENALCO","CAJACOPI","ASMET SALUD","EMSSANAR","MALLAMAS","AIC","PIJAOS SALUD","CAPITAL SALUD","ALIANSALUD","OTRA"];
+  const ARL_LIST = ["ARL SURA","POSITIVA","AXA COLPATRIA","SEGUROS BOLÍVAR","COLMENA","LA EQUIDAD","MAPFRE","LIBERTY","ALFA"];
+
+  if (enviado) return (
+    <div className="min-h-screen bg-emerald-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
+        <div className="text-5xl mb-4">✅</div>
+        <h2 className="text-xl font-black text-emerald-800 mb-2">¡Datos enviados!</h2>
+        <p className="text-sm text-gray-600 mb-1">Sus datos sociodemográficos fueron registrados correctamente.</p>
+        <p className="text-xs text-gray-400">Su cita para examen médico ocupacional será agendada próximamente.</p>
+        {encInfo && <p className="text-xs text-emerald-600 font-bold mt-3">Empresa: {encInfo.empresaNombre}</p>}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white p-4">
+      <div className="max-w-lg mx-auto">
+        <div className="bg-emerald-700 rounded-t-2xl p-5 text-white text-center">
+          <h1 className="text-lg font-black">📋 Encuesta Sociodemográfica</h1>
+          {encInfo && <p className="text-emerald-200 text-sm mt-1">{encInfo.empresaNombre}</p>}
+          {encInfo && <p className="text-emerald-300 text-xs mt-0.5">Tipo: {encInfo.tipoExamen} · Fecha límite: {encInfo.fechaLimite || "—"}</p>}
+        </div>
+        <div className="bg-white rounded-b-2xl shadow-xl p-5 space-y-4">
+          {error && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 font-bold">{error}</div>}
+          {/* DATOS PERSONALES */}
+          <div>
+            <p className="text-xs font-black text-emerald-800 uppercase mb-2 border-b border-emerald-200 pb-1">👤 Datos Personales</p>
+            <div className="space-y-2">
+              <div>
+                <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Nombres y Apellidos *</label>
+                <input value={form.nombres} onChange={e => u("nombres", e.target.value)} className="w-full p-2 border border-gray-200 rounded-lg text-sm" placeholder="NOMBRES Y APELLIDOS COMPLETOS" />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Tipo Doc *</label>
+                  <select value={form.docTipo} onChange={e => u("docTipo", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                    {["CC","CE","TI","PA","RC","NIT"].map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Número Documento *</label>
+                  <input value={form.docNumero} onChange={e => u("docNumero", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="1061234567" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Fecha Nacimiento *</label>
+                  <input type="date" value={form.fechaNacimiento} onChange={e => u("fechaNacimiento", e.target.value)} className="w-full p-2 border rounded-lg text-sm" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Género *</label>
+                  <select value={form.genero} onChange={e => u("genero", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                    <option value="">Seleccione...</option>
+                    <option>Masculino</option><option>Femenino</option><option>Otro</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Estado Civil</label>
+                  <select value={form.estadoCivil} onChange={e => u("estadoCivil", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                    <option value="">Seleccione...</option>
+                    {["Soltero/a","Casado/a","Unión Libre","Divorciado/a","Viudo/a"].map(v => <option key={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Escolaridad</label>
+                  <select value={form.escolaridad} onChange={e => u("escolaridad", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                    <option value="">Seleccione...</option>
+                    {["Primaria","Secundaria","Técnico","Tecnólogo","Universitario","Posgrado","Ninguno"].map(v => <option key={v}>{v}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* CONTACTO */}
+          <div>
+            <p className="text-xs font-black text-blue-800 uppercase mb-2 border-b border-blue-200 pb-1">📱 Contacto</p>
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Celular *</label>
+                  <input type="tel" value={form.celular} onChange={e => u("celular", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="300 123 4567" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Email</label>
+                  <input type="email" value={form.email} onChange={e => u("email", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="correo@email.com" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Dirección *</label>
+                  <input value={form.direccion} onChange={e => u("direccion", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="Cra 5 #10-20" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Ciudad *</label>
+                  <input value={form.ciudad} onChange={e => u("ciudad", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="Popayán" />
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* SEGURIDAD SOCIAL */}
+          <div>
+            <p className="text-xs font-black text-purple-800 uppercase mb-2 border-b border-purple-200 pb-1">🏥 Seguridad Social</p>
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">EPS *</label>
+                  <select value={form.eps} onChange={e => u("eps", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                    <option value="">Seleccione EPS...</option>
+                    {EPS_LIST.map(v => <option key={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">ARL</label>
+                  <select value={form.arl} onChange={e => u("arl", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                    <option value="">Seleccione ARL...</option>
+                    {ARL_LIST.map(v => <option key={v}>{v}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Estrato</label>
+                  <select value={form.estrato} onChange={e => u("estrato", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                    <option value="">--</option>
+                    {[1,2,3,4,5,6].map(v => <option key={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Zona Residencia</label>
+                  <select value={form.zonaResidencia} onChange={e => u("zonaResidencia", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                    <option>Urbana</option><option>Rural</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* DATOS LABORALES */}
+          <div>
+            <p className="text-xs font-black text-orange-800 uppercase mb-2 border-b border-orange-200 pb-1">💼 Datos Laborales</p>
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Cargo *</label>
+                  <input value={form.cargo} onChange={e => u("cargo", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="Operario, Conductor, etc." />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Área / Sección</label>
+                  <input value={form.area} onChange={e => u("area", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="Producción, Admin..." />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Antigüedad</label>
+                  <input value={form.antiguedad} onChange={e => u("antiguedad", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="2 años" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Contrato</label>
+                  <select value={form.tipoContrato} onChange={e => u("tipoContrato", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                    <option value="">Seleccione...</option>
+                    {["Término indefinido","Término fijo","Obra/labor","Prestación de servicios","Temporal"].map(v => <option key={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Turno</label>
+                  <select value={form.turnoTrabajo} onChange={e => u("turnoTrabajo", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                    {["Diurno","Nocturno","Rotativo","Mixto"].map(v => <option key={v}>{v}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* CONTACTO DE EMERGENCIA */}
+          <div>
+            <p className="text-xs font-black text-red-800 uppercase mb-2 border-b border-red-200 pb-1">🚨 Contacto de Emergencia</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Nombre *</label>
+                <input value={form.contactoEmergencia} onChange={e => u("contactoEmergencia", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="Nombre completo" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Parentesco</label>
+                <select value={form.parentesco} onChange={e => u("parentesco", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                  <option value="">--</option>
+                  {["Esposo/a","Padre","Madre","Hijo/a","Hermano/a","Otro"].map(v => <option key={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Teléfono *</label>
+                <input type="tel" value={form.telEmergencia} onChange={e => u("telEmergencia", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="300 987 6543" />
+              </div>
+            </div>
+          </div>
+          {/* BOTÓN ENVIAR */}
+          <button onClick={handleSubmit} disabled={loading} className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-black rounded-xl text-sm flex items-center justify-center gap-2">
+            {loading ? "Enviando..." : "✅ Enviar mis datos"}
+          </button>
+          <p className="text-[9px] text-gray-400 text-center leading-relaxed">
+            Sus datos serán tratados conforme a la Ley 1581/2012 de Protección de Datos Personales.
+            Solo serán utilizados para su examen médico ocupacional (Res. 1843/2025).
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // PORTAL PÚBLICO DEL TRABAJADOR - Acceso sin login
 // Solo requiere: código de verificación de HC O número de cédula
 // Consulta DIRECTA a Supabase (no usa estado del App)
@@ -13173,6 +13447,12 @@ function AppInner() {
   });
   // Portal Público (acceso sin login)
   const [showPortalPublico, setShowPortalPublico] = useState(false);
+  // ═══ MÓDULO ENCUESTAS SOCIODEMOGRÁFICAS ═══
+  const [showEncuestaPublica, setShowEncuestaPublica] = useState(false);
+  const [encuestaToken, setEncuestaToken] = useState("");
+  const [encuestas, setEncuestas] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("siso_encuestas") || "[]"); } catch { return []; }
+  });
   // B-29: IA Resumen
   const [aiResumen, setAiResumen] = React.useState("");
   const [aiCargando, setAiCargando] = React.useState(false);
@@ -13398,6 +13678,16 @@ function AppInner() {
     if (hash === "#portaltrabajador" || hash === "#portal") {
       history.replaceState(null, "", window.location.pathname);
       setShowPortalPublico(true);
+    }
+    // Deep-link: #encuesta?token=xxx — formulario público de encuesta sociodemográfica
+    if (hash.startsWith("#encuesta")) {
+      const params = new URLSearchParams(hash.replace("#encuesta", "").replace("?", ""));
+      const token = params.get("token");
+      if (token) {
+        setEncuestaToken(token);
+        setShowEncuestaPublica(true);
+      }
+      history.replaceState(null, "", window.location.pathname);
     }
     // Deep-link: #portalempresa?code=EMP-XXXX-XXXX
     if (hash.startsWith("#portalempresa")) {
@@ -25582,6 +25872,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
               { k: "lista", l: "🏢 Empresas" },
               { k: "nueva", l: "➕ Nueva Empresa" },
               { k: "convenios", l: "🤝 Convenios" },
+              { k: "encuestas", l: "📋 Encuestas" },
             ].map((t) => (
               <button
                 key={t.k}
@@ -26374,6 +26665,238 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     })}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ TAB: ENCUESTAS SOCIODEMOGRÁFICAS ═══ */}
+          {companiesTab === "encuestas" && (
+            <div className="space-y-4">
+              {/* CREAR NUEVA ENCUESTA */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                <p className="text-xs font-black text-gray-700 uppercase mb-3">📋 Crear Nueva Encuesta</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-bold text-gray-600 block mb-1">Empresa *</label>
+                    <select id="enc-empresa" className="w-full p-2 border rounded-lg text-sm">
+                      <option value="">Seleccione empresa...</option>
+                      {companies.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-600 block mb-1">Tipo Examen</label>
+                    <select id="enc-tipo" className="w-full p-2 border rounded-lg text-sm">
+                      {["PERIODICO","INGRESO","EGRESO","POST-INCAPACIDAD"].map(t => <option key={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-600 block mb-1">Fecha Límite</label>
+                    <input type="date" id="enc-limite" className="w-full p-2 border rounded-lg text-sm" />
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    const empId = document.getElementById("enc-empresa")?.value;
+                    const tipo = document.getElementById("enc-tipo")?.value || "PERIODICO";
+                    const limite = document.getElementById("enc-limite")?.value || "";
+                    if (!empId) { showAlert("Seleccione una empresa."); return; }
+                    const comp = companies.find(c => c.id === empId);
+                    const token = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+                    const newEnc = {
+                      id: "enc_" + Date.now(),
+                      empresaId: empId,
+                      empresaNombre: comp?.nombre || "Empresa",
+                      tipoExamen: tipo,
+                      token,
+                      fechaCreacion: new Date().toISOString().split("T")[0],
+                      fechaLimite: limite,
+                      estado: "activa",
+                    };
+                    // Guardar metadata de la encuesta en Supabase
+                    _sbSet(`siso_encuesta_${token}`, newEnc);
+                    // Guardar array de respuestas vacío
+                    _sbSet(`siso_encuesta_resp_${token}`, []);
+                    // Guardar en estado local
+                    const updated = [...encuestas, newEnc];
+                    setEncuestas(updated);
+                    localStorage.setItem("siso_encuestas", JSON.stringify(updated));
+                    _sbSet("siso_encuestas_" + (currentUser?.user || "shared"), updated);
+                    const url = window.location.origin + window.location.pathname + "#encuesta?token=" + token;
+                    showAlert("✅ Encuesta creada!\n\n📋 Link para compartir:\n" + url + "\n\nEnvíe este link al encargado de la empresa para que los trabajadores llenen sus datos.");
+                    // Copiar al portapapeles
+                    navigator.clipboard?.writeText(url);
+                  }}
+                  className="mt-3 px-4 py-2 bg-emerald-700 text-white text-xs font-black rounded-xl hover:bg-emerald-800"
+                >
+                  🔗 Crear Encuesta y Generar Link
+                </button>
+              </div>
+
+              {/* LISTA DE ENCUESTAS */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                <p className="text-xs font-black text-gray-700 uppercase mb-3">📊 Encuestas Creadas ({encuestas.length})</p>
+                {encuestas.length === 0 ? (
+                  <p className="text-center text-gray-400 text-xs py-4 italic">No hay encuestas creadas. Cree una para comenzar.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {[...encuestas].reverse().map(enc => (
+                      <div key={enc.id} className="border border-gray-200 rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <p className="font-black text-sm text-gray-800">{enc.empresaNombre}</p>
+                            <p className="text-[10px] text-gray-500">{enc.tipoExamen} · Creada: {enc.fechaCreacion} {enc.fechaLimite ? `· Límite: ${enc.fechaLimite}` : ""}</p>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${enc.estado === "activa" ? "bg-emerald-100 text-emerald-700" : enc.estado === "importada" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
+                            {enc.estado === "activa" ? "🟢 Activa" : enc.estado === "importada" ? "✅ Importada" : "⬜ Cerrada"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => {
+                              const url = window.location.origin + window.location.pathname + "#encuesta?token=" + enc.token;
+                              navigator.clipboard?.writeText(url);
+                              showAlert("📋 Link copiado:\n" + url);
+                            }}
+                            className="px-3 py-1 bg-blue-50 text-blue-700 text-[10px] font-black rounded-lg hover:bg-blue-100"
+                          >
+                            📋 Copiar Link
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const r = await fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_encuesta_resp_${enc.token}&select=value`, {
+                                  headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` }
+                                });
+                                const d = await r.json();
+                                const resps = d[0]?.value || [];
+                                if (resps.length === 0) { showAlert("Sin respuestas aún."); return; }
+                                // Mostrar respuestas
+                                const detalle = resps.map((r, i) => `${i+1}. ${r.nombres} | ${r.docTipo} ${r.docNumero} | ${r.cargo} | ${r.eps} | ${r.estado === "completa" ? "✅" : "⚠️"}`).join("\n");
+                                showAlert(`📊 ${resps.length} respuesta(s):\n\n${detalle}`);
+                              } catch { showAlert("Error al cargar respuestas."); }
+                            }}
+                            className="px-3 py-1 bg-purple-50 text-purple-700 text-[10px] font-black rounded-lg hover:bg-purple-100"
+                          >
+                            👁️ Ver Respuestas
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const r = await fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_encuesta_resp_${enc.token}&select=value`, {
+                                  headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` }
+                                });
+                                const d = await r.json();
+                                const resps = (d[0]?.value || []).filter(r => !r.importado);
+                                if (resps.length === 0) { showAlert("No hay respuestas pendientes de importar."); return; }
+                                showConfirm(`¿Importar ${resps.length} trabajador(es) como pacientes de "${enc.empresaNombre}"?`, () => {
+                                  const comp = companies.find(c => c.id === enc.empresaId);
+                                  const nuevos = resps.map(r => ({
+                                    id: "pac_enc_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+                                    nombres: r.nombres,
+                                    docTipo: r.docTipo || "CC",
+                                    docNumero: r.docNumero,
+                                    fechaNacimiento: r.fechaNacimiento,
+                                    genero: r.genero,
+                                    estadoCivil: r.estadoCivil,
+                                    escolaridad: r.escolaridad,
+                                    celular: r.celular,
+                                    email: r.email,
+                                    direccion: r.direccion,
+                                    ciudad: r.ciudad,
+                                    eps: r.eps,
+                                    arl: r.arl || comp?.arl || "",
+                                    afp: r.afp,
+                                    estrato: r.estrato,
+                                    zonaResidencia: r.zonaResidencia,
+                                    cargo: r.cargo,
+                                    area: r.area,
+                                    antiguedadEmpresa: r.antiguedad,
+                                    tipoContrato: r.tipoContrato,
+                                    turnoTrabajo: r.turnoTrabajo,
+                                    contactoEmergencia: r.contactoEmergencia,
+                                    parentescoEmergencia: r.parentesco,
+                                    telEmergencia: r.telEmergencia,
+                                    empresaId: enc.empresaId,
+                                    empresaNombre: enc.empresaNombre,
+                                    empresaNit: comp?.nit || "",
+                                    tipoExamen: enc.tipoExamen,
+                                    fechaRegistro: new Date().toISOString(),
+                                    estadoHistoria: "Pre-registrado",
+                                    _medicoId: currentUser?.user,
+                                    _fromEncuesta: enc.token,
+                                  }));
+                                  // Agregar a patientsList
+                                  const updatedPats = [...patientsList, ...nuevos];
+                                  setPatientsList(updatedPats);
+                                  const patSuf = currentUser?.user || "shared";
+                                  _sync(`siso_db_patients_${patSuf}`, JSON.stringify(updatedPats));
+                                  _sync(`siso_patients_${patSuf}`, JSON.stringify(updatedPats));
+                                  // Marcar como importados en Supabase
+                                  const allResps = (d[0]?.value || []).map(r => ({...r, importado: true}));
+                                  _sbSet(`siso_encuesta_resp_${enc.token}`, allResps);
+                                  // Actualizar estado de encuesta
+                                  const updEnc = encuestas.map(e => e.id === enc.id ? {...e, estado: "importada"} : e);
+                                  setEncuestas(updEnc);
+                                  localStorage.setItem("siso_encuestas", JSON.stringify(updEnc));
+                                  _sbSet("siso_encuestas_" + (currentUser?.user || "shared"), updEnc);
+                                  showAlert(`✅ ${nuevos.length} trabajador(es) importados como pacientes.\n\nAhora puede agendar sus citas desde el módulo de Agenda.`);
+                                });
+                              } catch { showAlert("Error al importar."); }
+                            }}
+                            className="px-3 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-lg hover:bg-emerald-100"
+                          >
+                            ⬆️ Importar como Pacientes
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const r = await fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_encuesta_resp_${enc.token}&select=value`, {
+                                  headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` }
+                                });
+                                const d = await r.json();
+                                const resps = d[0]?.value || [];
+                                if (resps.length === 0) { showAlert("Sin respuestas para agendar."); return; }
+                                showPrompt("Fecha para agendar todas las citas (YYYY-MM-DD):", (fecha) => {
+                                  if (!fecha) return;
+                                  showPrompt("Hora de inicio (ej: 07:00):", (horaInicio) => {
+                                    if (!horaInicio) return;
+                                    const [h, m] = horaInicio.split(":").map(Number);
+                                    const nuevasCitas = resps.map((r, i) => {
+                                      const minutos = h * 60 + m + (i * 20); // 20 min por paciente
+                                      const hh = String(Math.floor(minutos / 60)).padStart(2, "0");
+                                      const mm = String(minutos % 60).padStart(2, "0");
+                                      return {
+                                        id: "cita_enc_" + Date.now() + "_" + i,
+                                        fecha,
+                                        hora: `${hh}:${mm}`,
+                                        pacienteNombre: r.nombres,
+                                        pacienteDoc: r.docNumero,
+                                        empresa: enc.empresaNombre,
+                                        empresaId: enc.empresaId,
+                                        tipoConsulta: enc.tipoExamen,
+                                        medicoId: currentUser?.user || "",
+                                        medicoNombre: activeDoctorData?.nombre || currentUser?.name || "",
+                                        estado: "pendiente",
+                                        _fromEncuesta: enc.token,
+                                      };
+                                    });
+                                    const updAgenda = [...(agendados || []), ...nuevasCitas];
+                                    setAgendados(updAgenda);
+                                    _sync("siso_agendados", JSON.stringify(updAgenda));
+                                    showAlert(`✅ ${nuevasCitas.length} citas agendadas para el ${fecha}\nDesde las ${horaInicio} (cada 20 min)\n\nVea la agenda para confirmar.`);
+                                  });
+                                });
+                              } catch { showAlert("Error al agendar."); }
+                            }}
+                            className="px-3 py-1 bg-orange-50 text-orange-700 text-[10px] font-black rounded-lg hover:bg-orange-100"
+                          >
+                            📅 Agendar Todos
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -48159,7 +48682,14 @@ body{padding-top:52px;}
     <>
       <PrintStyles />
       <SecurityHeaders />
-      {showPortalPublico ? (
+      {showEncuestaPublica ? (
+        <EncuestaPublicaForm
+          token={encuestaToken}
+          sbUrl={_SB_URL}
+          sbKey={_SB_KEY}
+          onVolver={() => setShowEncuestaPublica(false)}
+        />
+      ) : showPortalPublico ? (
         <PortalPublicoTrabajador
           sbUrl={_SB_URL}
           sbKey={_SB_KEY}
