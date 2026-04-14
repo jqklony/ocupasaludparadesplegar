@@ -18626,10 +18626,76 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     w.focus();
                   }}
                   className="bg-cyan-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 no-print hover:bg-cyan-800"
-                  title="Descargar todos los documentos: certificado + incapacidad + fórmula + derivaciones"
+                  title="Descargar o enviar documentos seleccionados"
                 >
-                  <Download className="w-3 h-3" /> Todo
+                  <Download className="w-3 h-3" /> Descargar / Enviar
                 </button>
+              )}
+              {/* Toggle panel al hacer clic en Descargar/Enviar */}
+              {data.estadoHistoria === "Cerrada" && dataType === "ocupacional" && (
+                <button
+                  onClick={() => setShowEnviarPanel(!showEnviarPanel)}
+                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 no-print hover:bg-blue-700 relative"
+                >
+                  📤 {showEnviarPanel ? "Cerrar" : "Enviar"}
+                </button>
+              )}
+              {/* Panel checklist de Descargar/Enviar — HC Ocupacional */}
+              {showEnviarPanel && data.estadoHistoria === "Cerrada" && dataType === "ocupacional" && (
+                <div className="absolute right-0 top-12 z-50 bg-white border border-gray-200 rounded-xl p-3 shadow-2xl w-72">
+                  <p className="text-[10px] font-black text-gray-700 uppercase mb-2">📤 Seleccione documentos:</p>
+                  <div className="space-y-1 mb-2">
+                    {[
+                      { k: "certificado", l: "📋 Certificado de Aptitud" },
+                      { k: "historia", l: "📄 Historia Clínica" },
+                      { k: "formula", l: "💊 Fórmula / Prescripción" },
+                      { k: "derivacion", l: "🔀 Derivación" },
+                      { k: "examenes", l: "🔬 Solicitud Exámenes" },
+                    ].map(item => (
+                      <label key={item.k} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded px-1.5 py-1">
+                        <input type="checkbox" checked={!!enviarChecklist[item.k]} onChange={() => setEnviarChecklist(p => ({...p, [item.k]: !p[item.k]}))} className="w-3.5 h-3.5 accent-blue-600" />
+                        <span className="text-[10px] text-gray-700">{item.l}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5 border-t border-gray-100 pt-2">
+                    <button onClick={() => {
+                      // Imprimir seleccionados
+                      if (enviarChecklist.certificado) {
+                        const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
+                        const w = window.open("", "_blank", "width=920,height=1150");
+                        if (w) { w.document.write(html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Guardar PDF</button></div></body>')); w.document.close(); }
+                      }
+                      if (enviarChecklist.historia) { setTimeout(() => handlePrint(data.nombres), 300); }
+                      if (enviarChecklist.formula) { setTimeout(() => { if (typeof openPrintWindow === "function") openPrintWindow("formula", "Fórmula Médica"); }, 600); }
+                      if (enviarChecklist.derivacion) { setTimeout(() => { if (typeof openPrintWindow === "function") openPrintWindow("derivacion", "Derivación"); }, 900); }
+                      if (enviarChecklist.examenes) { setTimeout(() => handlePrint("Examenes-" + data.nombres), 1200); }
+                      setShowEnviarPanel(false);
+                    }} className="flex-1 px-2 py-1.5 bg-emerald-600 text-white text-[9px] font-black rounded-lg hover:bg-emerald-700">🖨️ PDF</button>
+                    <button onClick={() => {
+                      const nombre = data.nombres || "";
+                      const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
+                      const selDocs = Object.entries(enviarChecklist).filter(([,v]) => v).map(([k]) => ({certificado:"Certificado",historia:"Historia Clínica",formula:"Fórmula Médica",derivacion:"Derivación",examenes:"Exámenes"}[k])).join(", ");
+                      const docD = activeDoctorData || {};
+                      const subject = `Documentos Médicos — ${nombre}`;
+                      const body = `Estimado/a ${nombre},\n\nDocumentos emitidos: ${selDocs}\n\nPortal de Certificados:\n${portalLink}\n→ Cédula: ${data.docNumero || ""}\n\nCordialmente,\n${docD.nombre || ""}\n${docD.titulo || ""}\n${docD.licencia ? "Lic: " + docD.licencia : ""}\n${docD.email || emailConfig?.email || ""}`;
+                      const htmlBody = _generarEmailHTML(nombre, data.docNumero, portalLink, null, false);
+                      const destino = data.email || "";
+                      if (destino && destino.includes("@")) { _enviarEmail(destino, subject, body, htmlBody); }
+                      else { showPrompt("Email del paciente:", (em) => { if (em) _enviarEmail(em, subject, body, htmlBody); }); }
+                      setShowEnviarPanel(false);
+                    }} className="flex-1 px-2 py-1.5 bg-amber-500 text-white text-[9px] font-black rounded-lg hover:bg-amber-600">📧 Email</button>
+                    <button onClick={() => {
+                      const nombre = data.nombres || "";
+                      const tel = (data.celular || data.telefono || "").replace(/\D/g, "");
+                      const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
+                      const msg = encodeURIComponent(`${nombre}, sus documentos médicos están listos.\n📥 ${portalLink}\n→ Cédula: ${data.docNumero || ""}\n${activeDoctorData?.nombre || ""}`);
+                      if (tel.length >= 10) { window.open(`https://wa.me/${tel.startsWith("57") ? tel : "57" + tel}?text=${msg}`, "_blank"); }
+                      else { showPrompt("Celular:", (n) => { if (n) window.open(`https://wa.me/57${n.replace(/\D/g,"")}?text=${msg}`, "_blank"); }); }
+                      setShowEnviarPanel(false);
+                    }} className="flex-1 px-2 py-1.5 bg-green-500 text-white text-[9px] font-black rounded-lg hover:bg-green-600">📱 WA</button>
+                  </div>
+                </div>
               )}
 
               {dataType === "ocupacional" &&
@@ -23807,102 +23873,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
               </p>
             </div>
           </div>
-          <div className="ml-11">
-            <button onClick={() => setShowEnviarPanel(!showEnviarPanel)} className="px-4 py-1.5 bg-blue-600 text-white text-[10px] font-black rounded-lg hover:bg-blue-700 flex items-center gap-1.5">
-              📤 Imprimir / Enviar Documentos
-            </button>
-            {showEnviarPanel && (
-              <div className="mt-2 bg-white border border-gray-200 rounded-xl p-3 shadow-lg">
-                <p className="text-[10px] font-black text-gray-700 uppercase mb-2">Seleccione los documentos:</p>
-                <div className="space-y-1.5 mb-3">
-                  {[
-                    { k: "certificado", l: "📋 Certificado de Aptitud Laboral", always: true },
-                    { k: "historia", l: "📄 Historia Clínica Completa" },
-                    { k: "formula", l: "💊 Fórmula Médica / Prescripción" },
-                    { k: "derivacion", l: "🔀 Derivación / Interconsulta" },
-                    { k: "examenes", l: "🔬 Solicitud de Exámenes" },
-                  ].map(item => (
-                    <label key={item.k} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded-lg px-2 py-1">
-                      <input type="checkbox" checked={!!enviarChecklist[item.k]} onChange={() => setEnviarChecklist(p => ({...p, [item.k]: !p[item.k]}))} className="w-4 h-4 accent-blue-600 rounded" />
-                      <span className="text-xs text-gray-700">{item.l}</span>
-                    </label>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-2">
-                  <button onClick={() => {
-                    const docs = [];
-                    if (enviarChecklist.certificado) {
-                      docs.push({ title: "Certificado de Aptitud Laboral", html: _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null) });
-                    }
-                    if (enviarChecklist.historia) {
-                      docs.push({ title: "Historia Clínica", fn: () => { if (typeof _printHCClean === "function") _printHCClean(); else handlePrint(data.nombres); } });
-                    }
-                    if (enviarChecklist.formula) {
-                      docs.push({ title: "Fórmula Médica", fn: () => { if (typeof openPrintWindow === "function") openPrintWindow("formula", "Fórmula Médica"); } });
-                    }
-                    if (enviarChecklist.derivacion) {
-                      docs.push({ title: "Derivación", fn: () => { if (typeof openPrintWindow === "function") openPrintWindow("derivacion", "Derivación / Interconsulta"); } });
-                    }
-                    if (enviarChecklist.examenes) {
-                      docs.push({ title: "Solicitud Exámenes", fn: () => { handlePrint("Solicitud-Examenes-" + data.nombres); } });
-                    }
-                    if (docs.length === 0) { showAlert("Seleccione al menos un documento."); return; }
-                    // Si solo es certificado, abrir directamente
-                    if (docs.length === 1 && docs[0].html) {
-                      const w = window.open("", "_blank", "width=920,height=1150");
-                      if (!w) { showAlert("Permita ventanas emergentes."); return; }
-                      w.document.write(docs[0].html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Guardar / Imprimir PDF</button></div></body>'));
-                      w.document.close();
-                    } else {
-                      // Abrir cada documento con delay
-                      docs.forEach((d, i) => {
-                        setTimeout(() => {
-                          if (d.html) {
-                            const w = window.open("", "_blank", "width=920,height=1150");
-                            if (w) { w.document.write(d.html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 ' + d.title + '</button></div></body>')); w.document.close(); }
-                          } else if (d.fn) { d.fn(); }
-                        }, i * 500);
-                      });
-                    }
-                    setShowEnviarPanel(false);
-                  }} className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-black rounded-lg hover:bg-emerald-700 flex items-center gap-1">
-                    <Printer className="w-3 h-3" /> Imprimir / PDF
-                  </button>
-                  <button onClick={() => {
-                    const selDocs = Object.entries(enviarChecklist).filter(([,v]) => v).map(([k]) => k);
-                    if (selDocs.length === 0) { showAlert("Seleccione al menos un documento."); return; }
-                    const nombre = data.nombres || "";
-                    const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
-                    const docNames = selDocs.map(k => ({certificado:"Certificado de Aptitud",historia:"Historia Clínica",formula:"Fórmula Médica",derivacion:"Derivación",examenes:"Solicitud de Exámenes"}[k])).join(", ");
-                    const docD = activeDoctorData || {};
-                    const subject = `Documentos Médicos Ocupacionales — ${nombre}`;
-                    const body = `Estimado/a ${nombre},\n\nSe han generado los siguientes documentos de su evaluación médica ocupacional:\n\n${docNames}\n\n\nDESCARGUE SUS DOCUMENTOS\n\nPortal de Certificados:\n${portalLink}\n\n  1. Abra el link\n  2. Seleccione "Cédula"\n  3. Ingrese: ${data.docNumero || ""}\n  4. Descargue sus documentos\n\n\nCordialmente,\n${docD.nombre || "Médico Ocupacional"}\n${docD.titulo || ""}\n${docD.licencia ? "Licencia S.O.: " + docD.licencia : ""}\n${docD.ciudad || ""}\n${docD.email || emailConfig?.email || ""}`;
-                    const htmlBody = _generarEmailHTML(nombre, data.docNumero, portalLink, null, false);
-                    const destino = data.email || "";
-                    if (destino && destino.includes("@")) {
-                      _enviarEmail(destino, subject, body, htmlBody);
-                    } else {
-                      showPrompt("Email del paciente:", (em) => { if (em) _enviarEmail(em, subject, body, htmlBody); });
-                    }
-                    setShowEnviarPanel(false);
-                  }} className="px-3 py-1.5 bg-amber-500 text-white text-[10px] font-black rounded-lg hover:bg-amber-600 flex items-center gap-1">
-                    📧 Enviar por Email
-                  </button>
-                  <button onClick={() => {
-                    const nombre = data.nombres || "";
-                    const tel = (data.celular || data.telefono || "").replace(/\D/g, "");
-                    const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
-                    const msg = encodeURIComponent(`Estimado/a ${nombre}, sus documentos médicos ocupacionales están listos.\n\n📥 Descárguelos:\n${portalLink}\n→ Seleccione "Cédula" → Ingrese: ${data.docNumero || ""}\n\n${activeDoctorData?.nombre || "OcupaSalud"}`);
-                    if (tel.length >= 10) { window.open(`https://wa.me/${tel.startsWith("57") ? tel : "57" + tel}?text=${msg}`, "_blank"); }
-                    else { showPrompt("Celular:", (n) => { if (n) window.open(`https://wa.me/57${n.replace(/\D/g,"")}?text=${msg}`, "_blank"); }); }
-                    setShowEnviarPanel(false);
-                  }} className="px-3 py-1.5 bg-green-500 text-white text-[10px] font-black rounded-lg hover:bg-green-600 flex items-center gap-1">
-                    📱 WhatsApp
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <p className="text-[9px] text-emerald-500 ml-11">Use el botón "📤 Enviar" en la barra superior para descargar o enviar documentos.</p>
         </div>
       )}
       <div className="mt-6 flex justify-between items-end px-4 print-break-avoid">
@@ -28410,33 +28381,15 @@ Esta historia clínica debe conservarse mínimo 20 años.
               )}
               {found.estadoHistoria === "Cerrada" && (
                 <div className="mx-4 mb-3 bg-emerald-50 border-2 border-emerald-400 rounded-xl px-4 py-3 no-print">
-                  <div className="flex items-center gap-3 mb-2">
+                  <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
                       <Lock className="w-4 h-4 text-white" />
                     </div>
                     <div className="flex-1">
                       <p className="text-xs font-black text-emerald-800">Historia Clínica Firmada y Cerrada</p>
                       <p className="text-[10px] text-emerald-600">Código: <span className="font-mono font-bold">{found.codigoVerificacion || "--"}</span></p>
+                      <p className="text-[9px] text-emerald-500">Use "📤 Enviar" en la barra superior para enviar documentos.</p>
                     </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2 ml-11">
-                    <button onClick={() => {
-                      const nombre = found.nombres || "";
-                      const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
-                      const subject = encodeURIComponent(`Certificado Médico - ${nombre}`);
-                      const body = encodeURIComponent(`Estimado/a ${nombre},\n\nSu certificado médico ha sido emitido.\n\n📥 Portal de Certificados:\n${portalLink}\n→ Seleccione "🪪 Cédula" → Ingrese: ${found.docNumero || ""}\n\nCordialmente,\n${emailConfig?.nombre || activeDoctorData?.nombre || "OcupaSalud"}`);
-                      const em = found.email || "";
-                      if (em && em.includes("@")) { window.open(`mailto:${em}?subject=${subject}&body=${body}`, "_blank"); }
-                      else { showPrompt("Email del paciente:", (e2) => { if (e2) window.open(`mailto:${e2}?subject=${subject}&body=${body}`, "_blank"); }); }
-                    }} className="px-3 py-1 bg-amber-500 text-white text-[10px] font-black rounded-lg hover:bg-amber-600">📧 Email</button>
-                    <button onClick={() => {
-                      const nombre = found.nombres || "";
-                      const tel = (found.celular || found.telefono || "").replace(/\D/g, "");
-                      const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
-                      const msg = encodeURIComponent(`Estimado/a ${nombre}, su certificado médico está listo.\n\n📥 ${portalLink}\n→ Cédula: ${found.docNumero || ""}\n\n${emailConfig?.nombre || activeDoctorData?.nombre || "OcupaSalud"}`);
-                      if (tel.length >= 10) { window.open(`https://wa.me/${tel.startsWith("57") ? tel : "57" + tel}?text=${msg}`, "_blank"); }
-                      else { showPrompt("Celular:", (n) => { if (n) window.open(`https://wa.me/57${n.replace(/\D/g,"")}?text=${msg}`, "_blank"); }); }
-                    }} className="px-3 py-1 bg-green-500 text-white text-[10px] font-black rounded-lg hover:bg-green-600">📱 WhatsApp</button>
                   </div>
                 </div>
               )}
@@ -48692,6 +48645,12 @@ body{padding-top:52px;}
                           >
                             <Printer className="w-3 h-3" /> Todo
                           </button>
+                          {/* Botón Enviar para HC General cerrada */}
+                          {data.estadoHistoria === "Cerrada" && (
+                            <button onClick={() => setShowEnviarPanel(!showEnviarPanel)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition relative">
+                              📤 Enviar
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
