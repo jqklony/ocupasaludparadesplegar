@@ -11859,11 +11859,11 @@ const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : n
 const EncuestaPublicaForm = ({ token, sbUrl, sbKey, onVolver }) => {
   const { useState: useLocalState } = React;
   const [form, setForm] = useLocalState({
-    nombres: "", docTipo: "CC", docNumero: "", fechaNacimiento: "", genero: "",
-    estadoCivil: "", escolaridad: "", celular: "", email: "", direccion: "", ciudad: "Popayán",
-    eps: "", arl: "", afp: "", estrato: "", zonaResidencia: "Urbana",
+    nombres: "", docTipo: "CC", docNumero: "", fechaNacimiento: "", edad: "", genero: "",
+    estadoCivil: "", escolaridad: "", grupoEtnico: "", lateralidad: "Diestro",
+    celular: "", email: "", direccion: "", ciudad: "Popayán", zonaResidencia: "Urbana",
+    eps: "", arl: "", afp: "", estrato: "",
     cargo: "", area: "", antiguedad: "", tipoContrato: "", turnoTrabajo: "Diurno",
-    contactoEmergencia: "", parentesco: "", telEmergencia: "",
   });
   const [enviado, setEnviado] = useLocalState(false);
   const [error, setError] = useLocalState("");
@@ -11883,11 +11883,11 @@ const EncuestaPublicaForm = ({ token, sbUrl, sbKey, onVolver }) => {
   const handleSubmit = async () => {
     if (!form.nombres.trim() || form.nombres.trim().length < 5) { setError("Ingrese su nombre completo."); return; }
     if (!form.docNumero.trim()) { setError("Ingrese su número de documento."); return; }
+    if (!form.fechaNacimiento) { setError("Ingrese su fecha de nacimiento."); return; }
+    if (!form.genero) { setError("Seleccione su género."); return; }
     if (!form.celular.trim()) { setError("Ingrese su número de celular."); return; }
     if (!form.cargo.trim()) { setError("Ingrese su cargo actual."); return; }
     if (!form.eps.trim()) { setError("Seleccione su EPS."); return; }
-    if (!form.contactoEmergencia.trim()) { setError("Ingrese contacto de emergencia."); return; }
-    if (!form.telEmergencia.trim()) { setError("Ingrese teléfono de emergencia."); return; }
     setError("");
     setLoading(true);
     try {
@@ -11960,10 +11960,24 @@ const EncuestaPublicaForm = ({ token, sbUrl, sbKey, onVolver }) => {
                   <input value={form.docNumero} onChange={e => u("docNumero", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="1061234567" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Fecha Nacimiento *</label>
-                  <input type="date" value={form.fechaNacimiento} onChange={e => u("fechaNacimiento", e.target.value)} className="w-full p-2 border rounded-lg text-sm" />
+                  <input type="date" value={form.fechaNacimiento} onChange={e => {
+                    const fn = e.target.value;
+                    u("fechaNacimiento", fn);
+                    if (fn) {
+                      const hoy = new Date();
+                      const nac = new Date(fn + "T12:00:00");
+                      let edadCalc = hoy.getFullYear() - nac.getFullYear();
+                      if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) edadCalc--;
+                      u("edad", String(Math.max(0, edadCalc)));
+                    }
+                  }} className="w-full p-2 border rounded-lg text-sm" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Edad</label>
+                  <input value={form.edad} readOnly className="w-full p-2 border rounded-lg text-sm bg-gray-100 font-black text-center" placeholder="Auto" />
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Género *</label>
@@ -11973,7 +11987,7 @@ const EncuestaPublicaForm = ({ token, sbUrl, sbKey, onVolver }) => {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <div>
                   <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Estado Civil</label>
                   <select value={form.estadoCivil} onChange={e => u("estadoCivil", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
@@ -11986,6 +12000,19 @@ const EncuestaPublicaForm = ({ token, sbUrl, sbKey, onVolver }) => {
                   <select value={form.escolaridad} onChange={e => u("escolaridad", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
                     <option value="">Seleccione...</option>
                     {["Primaria","Secundaria","Técnico","Tecnólogo","Universitario","Posgrado","Ninguno"].map(v => <option key={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Grupo Étnico</label>
+                  <select value={form.grupoEtnico} onChange={e => u("grupoEtnico", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                    <option value="">Seleccione...</option>
+                    {["Mestizo","Afrocolombiano","Indígena","Blanco","Raizal","Palenquero","Rom/Gitano","Otro"].map(v => <option key={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Lateralidad</label>
+                  <select value={form.lateralidad} onChange={e => u("lateralidad", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                    {["Diestro","Zurdo","Ambidiestro"].map(v => <option key={v}>{v}</option>)}
                   </select>
                 </div>
               </div>
@@ -12005,7 +12032,7 @@ const EncuestaPublicaForm = ({ token, sbUrl, sbKey, onVolver }) => {
                   <input type="email" value={form.email} onChange={e => u("email", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="correo@email.com" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Dirección *</label>
                   <input value={form.direccion} onChange={e => u("direccion", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="Cra 5 #10-20" />
@@ -12014,43 +12041,46 @@ const EncuestaPublicaForm = ({ token, sbUrl, sbKey, onVolver }) => {
                   <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Ciudad *</label>
                   <input value={form.ciudad} onChange={e => u("ciudad", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="Popayán" />
                 </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Zona Residencia</label>
+                  <select value={form.zonaResidencia} onChange={e => u("zonaResidencia", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                    <option>Urbana</option><option>Rural</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
           {/* SEGURIDAD SOCIAL */}
           <div>
             <p className="text-xs font-black text-purple-800 uppercase mb-2 border-b border-purple-200 pb-1">🏥 Seguridad Social</p>
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">EPS *</label>
-                  <select value={form.eps} onChange={e => u("eps", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
-                    <option value="">Seleccione EPS...</option>
-                    {EPS_LIST.map(v => <option key={v}>{v}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">ARL</label>
-                  <select value={form.arl} onChange={e => u("arl", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
-                    <option value="">Seleccione ARL...</option>
-                    {ARL_LIST.map(v => <option key={v}>{v}</option>)}
-                  </select>
-                </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div>
+                <label className="text-[10px] font-bold text-gray-600 block mb-0.5">EPS *</label>
+                <select value={form.eps} onChange={e => u("eps", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                  <option value="">Seleccione EPS...</option>
+                  {EPS_LIST.map(v => <option key={v}>{v}</option>)}
+                </select>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Estrato</label>
-                  <select value={form.estrato} onChange={e => u("estrato", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
-                    <option value="">--</option>
-                    {[1,2,3,4,5,6].map(v => <option key={v}>{v}</option>)}
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Zona Residencia</label>
-                  <select value={form.zonaResidencia} onChange={e => u("zonaResidencia", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
-                    <option>Urbana</option><option>Rural</option>
-                  </select>
-                </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-600 block mb-0.5">ARL</label>
+                <select value={form.arl} onChange={e => u("arl", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                  <option value="">Seleccione ARL...</option>
+                  {ARL_LIST.map(v => <option key={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-600 block mb-0.5">AFP</label>
+                <select value={form.afp} onChange={e => u("afp", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                  <option value="">Seleccione...</option>
+                  {["PORVENIR","PROTECCIÓN","COLFONDOS","SKANDIA","COLPENSIONES","OTRA"].map(v => <option key={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Estrato</label>
+                <select value={form.estrato} onChange={e => u("estrato", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
+                  <option value="">--</option>
+                  {[1,2,3,4,5,6].map(v => <option key={v}>{v}</option>)}
+                </select>
               </div>
             </div>
           </div>
@@ -12086,27 +12116,6 @@ const EncuestaPublicaForm = ({ token, sbUrl, sbKey, onVolver }) => {
                     {["Diurno","Nocturno","Rotativo","Mixto"].map(v => <option key={v}>{v}</option>)}
                   </select>
                 </div>
-              </div>
-            </div>
-          </div>
-          {/* CONTACTO DE EMERGENCIA */}
-          <div>
-            <p className="text-xs font-black text-red-800 uppercase mb-2 border-b border-red-200 pb-1">🚨 Contacto de Emergencia</p>
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Nombre *</label>
-                <input value={form.contactoEmergencia} onChange={e => u("contactoEmergencia", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="Nombre completo" />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Parentesco</label>
-                <select value={form.parentesco} onChange={e => u("parentesco", e.target.value)} className="w-full p-2 border rounded-lg text-sm">
-                  <option value="">--</option>
-                  {["Esposo/a","Padre","Madre","Hijo/a","Hermano/a","Otro"].map(v => <option key={v}>{v}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Teléfono *</label>
-                <input type="tel" value={form.telEmergencia} onChange={e => u("telEmergencia", e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="300 987 6543" />
               </div>
             </div>
           </div>
@@ -26780,14 +26789,18 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                 const nuevos = resps.map(r2 => ({
                                   id: "pac_enc_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
                                   nombres: r2.nombres, docTipo: r2.docTipo || "CC", docNumero: r2.docNumero,
-                                  fechaNacimiento: r2.fechaNacimiento, genero: r2.genero, estadoCivil: r2.estadoCivil,
-                                  escolaridad: r2.escolaridad, celular: r2.celular, email: r2.email,
-                                  direccion: r2.direccion, ciudad: r2.ciudad, eps: r2.eps,
-                                  arl: r2.arl || comp?.arl || "", afp: r2.afp, estrato: r2.estrato,
-                                  zonaResidencia: r2.zonaResidencia, cargo: r2.cargo, area: r2.area,
+                                  fechaNacimiento: r2.fechaNacimiento, edad: r2.edad || "",
+                                  genero: r2.genero, estadoCivil: r2.estadoCivil,
+                                  escolaridad: r2.escolaridad, grupoEtnico: r2.grupoEtnico || "",
+                                  lateralidad: r2.lateralidad || "Diestro",
+                                  celular: r2.celular, email: r2.email,
+                                  direccion: r2.direccion, ciudad: r2.ciudad,
+                                  zonaResidencia: r2.zonaResidencia,
+                                  eps: r2.eps, arl: r2.arl || comp?.arl || "", afp: r2.afp,
+                                  estrato: r2.estrato,
+                                  cargo: r2.cargo, area: r2.area,
                                   antiguedadEmpresa: r2.antiguedad, tipoContrato: r2.tipoContrato,
-                                  turnoTrabajo: r2.turnoTrabajo, contactoEmergencia: r2.contactoEmergencia,
-                                  parentescoEmergencia: r2.parentesco, telEmergencia: r2.telEmergencia,
+                                  turnoTrabajo: r2.turnoTrabajo,
                                   empresaId: enc.empresaId, empresaNombre: enc.empresaNombre,
                                   empresaNit: comp?.nit || "", tipoExamen: enc.tipoExamen,
                                   fechaRegistro: new Date().toISOString(), estadoHistoria: "Pre-registrado",
