@@ -18239,8 +18239,8 @@ Esta historia clínica debe conservarse mínimo 20 años.
                 <Printer className="w-3 h-3" /> PDF
               </button>
 
-              {/* ── Descargar Todo: Certificado + Incapacidad + Fórmula/Derivación ── */}
-              {dataType === "ocupacional" && (
+              {/* ── Descargar Todo: Certificado + Incapacidad + Fórmula/Derivación (solo HC abierta) ── */}
+              {dataType === "ocupacional" && data.estadoHistoria !== "Cerrada" && (
                 <button
                   onClick={() => {
                     const docData = activeDoctorData || {};
@@ -18725,16 +18725,48 @@ Esta historia clínica debe conservarse mínimo 20 años.
                   </div>
                   <div className="flex gap-1.5 border-t border-gray-100 pt-2">
                     <button onClick={() => {
-                      // Imprimir seleccionados
+                      // Imprimir cada documento seleccionado en ventana nueva
+                      let delay = 0;
                       if (enviarChecklist.certificado) {
-                        const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
-                        const w = window.open("", "_blank", "width=920,height=1150");
-                        if (w) { w.document.write(html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Guardar PDF</button></div></body>')); w.document.close(); }
+                        setTimeout(() => {
+                          const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
+                          const w = window.open("", "_blank", "width=920,height=1150");
+                          if (w) { w.document.write(html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Guardar PDF</button></div></body>')); w.document.close(); }
+                        }, delay);
+                        delay += 500;
                       }
-                      if (enviarChecklist.historia) { setTimeout(() => handlePrint(data.nombres), 300); }
-                      if (enviarChecklist.formula) { setTimeout(() => { if (typeof openPrintWindow === "function") openPrintWindow("formula", "Fórmula Médica"); }, 600); }
-                      if (enviarChecklist.derivacion) { setTimeout(() => { if (typeof openPrintWindow === "function") openPrintWindow("derivacion", "Derivación"); }, 900); }
-                      if (enviarChecklist.examenes) { setTimeout(() => handlePrint("Examenes-" + data.nombres), 1200); }
+                      if (enviarChecklist.historia) {
+                        setTimeout(() => {
+                          // Generar HC en ventana nueva usando _printHCClean o buildPrintHeader
+                          if (typeof _printHCClean === "function") _printHCClean();
+                          else {
+                            const w = window.open("", "_blank", "width=920,height=1150");
+                            if (w) {
+                              const content = document.querySelector(".carta-visual");
+                              if (content) { w.document.write('<!DOCTYPE html><html><head><script src="https://cdn.tailwindcss.com"><\/script><style>@page{size:letter;margin:1cm}body{font-family:Arial;font-size:10pt;}</style></head><body>' + content.innerHTML + '</body></html>'); w.document.close(); }
+                            }
+                          }
+                        }, delay);
+                        delay += 500;
+                      }
+                      if (enviarChecklist.formula) {
+                        setTimeout(() => { printSection("print-formula-sec", "Fórmula Médica"); }, delay);
+                        delay += 500;
+                      }
+                      if (enviarChecklist.derivacion) {
+                        setTimeout(() => { printSection("print-deriv-sec", "Derivación / Interconsulta"); }, delay);
+                        delay += 500;
+                      }
+                      if (enviarChecklist.examenes) {
+                        setTimeout(() => {
+                          const w = window.open("", "_blank", "width=920,height=1150");
+                          if (w) {
+                            const sec = document.getElementById("solicitud-examenes-sec");
+                            if (sec) { w.document.write('<!DOCTYPE html><html><head><script src="https://cdn.tailwindcss.com"><\/script><style>@page{size:letter;margin:1cm}body{font-family:Arial;font-size:10pt;}</style></head><body>' + sec.innerHTML + '</body></html>'); w.document.close(); }
+                            else showAlert("No hay solicitud de exámenes para imprimir.");
+                          }
+                        }, delay);
+                      }
                       setShowEnviarPanel(false);
                     }} className="flex-1 px-2 py-1.5 bg-emerald-600 text-white text-[9px] font-black rounded-lg hover:bg-emerald-700">🖨️ PDF</button>
                     <button onClick={() => {
