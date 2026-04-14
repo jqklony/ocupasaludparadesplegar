@@ -12152,6 +12152,8 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
   const [busqueda, setBusqueda] = React.useState("");
   const [tipoBusqueda, setTipoBusqueda] = React.useState("codigo");
   const [resultado, setResultado] = React.useState(null);
+  const [resultadosEmpresa, setResultadosEmpresa] = React.useState([]);
+  const [certSeleccionados, setCertSeleccionados] = React.useState({});
   const [error, setError] = React.useState("");
   const [cargando, setCargando] = React.useState(false);
   const [intentos, setIntentos] = React.useState(0);
@@ -12251,6 +12253,30 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
           const r5 = await fetchKey("siso_portal_" + codeNoDash);
           if (r5.ok && r5.data) pac = r5.data;
         }
+      } else if (tipoBusqueda === "empresa") {
+        // Búsqueda por NIT de empresa: buscar todos los pacientes de esa empresa
+        const nitClean = q.replace(/[^0-9]/g, "");
+        try {
+          const rAll = await fetchConTimeout(`${sbUrl}/rest/v1/siso_store?select=key,value&key=like.siso_portal_doc_%`, { headers }, 15000);
+          if (rAll.ok) {
+            const rows = await rAll.json();
+            const matches = rows.filter(r => {
+              const v = r.value;
+              if (!v) return false;
+              const val = typeof v === "string" ? JSON.parse(v) : v;
+              return val && (val.empresaNit === nitClean || val.empresaNit === q.trim() || (val.empresaNombre || "").toLowerCase().includes(q.trim().toLowerCase()));
+            }).map(r => typeof r.value === "string" ? JSON.parse(r.value) : r.value);
+            if (matches.length > 0) {
+              setResultadosEmpresa(matches);
+              setCertSeleccionados({});
+              setCargando(false);
+              return;
+            }
+          }
+        } catch {}
+        setError("❌ No se encontraron certificados para esta empresa. Verifique el NIT o nombre.");
+        setCargando(false);
+        return;
       } else {
         // Búsqueda por cédula
         const docClean = q.replace(/\s/g, "");
@@ -12381,6 +12407,7 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
             {[
               { v: "codigo", label: "🔑 Código", hint: "SISO-2025-XXXX" },
               { v: "cedula", label: "🪪 Cédula", hint: "1234567890" },
+              { v: "empresa", label: "🏢 Empresa", hint: "NIT empresa" },
             ].map((opt) => (
               <button
                 key={opt.v}
@@ -12455,6 +12482,69 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
             {intentos > 0 && ` · Intentos: ${intentos}/${MAX_INTENTOS}`}
           </p>
         </div>
+
+        {/* ── Resultados Empresa (múltiples certificados) ── */}
+        {resultadosEmpresa.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-blue-700 px-4 py-3 flex items-center justify-between">
+              <div>
+                <p className="text-white font-black text-sm">🏢 Certificados de la Empresa</p>
+                <p className="text-blue-200 text-[10px]">{resultadosEmpresa[0]?.empresaNombre || "Empresa"} · {resultadosEmpresa.length} certificado(s)</p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => {
+                  const all = {};
+                  resultadosEmpresa.forEach((_, i) => { all[i] = true; });
+                  setCertSeleccionados(Object.keys(certSeleccionados).length === resultadosEmpresa.length ? {} : all);
+                }} className="px-3 py-1 bg-white/20 text-white text-[10px] font-black rounded-lg hover:bg-white/30">
+                  {Object.keys(certSeleccionados).length === resultadosEmpresa.length ? "☑ Deseleccionar" : "☐ Seleccionar todos"}
+                </button>
+                <button onClick={() => {
+                  const sel = resultadosEmpresa.filter((_, i) => certSeleccionados[i]);
+                  const pacs = sel.length > 0 ? sel : resultadosEmpresa;
+                  const w = window.open("","_blank","width=900,height=700");
+                  if (!w) return;
+                  const certs = pacs.map((p, i) => `<div style="${i > 0 ? "page-break-before:always" : ""}"><h2 style="color:#065f46;border-bottom:2px solid #065f46;padding-bottom:8px">Certificado ${i+1} de ${pacs.length}</h2><div style="background:#f0fdf4;padding:12px;border-radius:8px;margin:10px 0"><p><b>Trabajador:</b> ${p.nombres || "--"}</p><p><b>Documento:</b> ${p.docTipo || "CC"} ${p.docNumero || "--"}</p><p><b>Empresa:</b> ${p.empresaNombre || "--"}</p><p><b>Tipo Examen:</b> ${p.tipoExamen || "--"}</p><p><b>Concepto:</b> <span style="font-weight:900;font-size:14px">${p.conceptoAptitud || "--"}</span></p>${p.analisisRestricciones ? `<p><b>Restricciones:</b> ${p.analisisRestricciones}</p>` : ""}<p><b>Fecha:</b> ${p.fechaExamen || "--"}</p><p><b>Código:</b> ${p.codigoVerificacion || "--"}</p></div></div>`).join("");
+                  w.document.write(`<!DOCTYPE html><html><head><title>Certificados - ${pacs[0]?.empresaNombre || "Empresa"}</title><style>body{font-family:Arial;padding:20px;font-size:11px}h2{font-size:14px;margin-top:0}@media print{button{display:none}}</style></head><body><div style="text-align:center;margin-bottom:20px"><button onclick="window.print()" style="background:#065f46;color:white;border:none;padding:10px 24px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:12px">📥 Guardar como PDF / Imprimir (${pacs.length} certificados)</button></div>${certs}</body></html>`);
+                  w.document.close();
+                }} className="px-3 py-1 bg-emerald-500 text-white text-[10px] font-black rounded-lg hover:bg-emerald-600">
+                  📥 Descargar {Object.keys(certSeleccionados).length > 0 ? `(${Object.keys(certSeleccionados).length})` : `todos (${resultadosEmpresa.length})`}
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[400px] overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="p-2 w-8">☐</th>
+                    <th className="p-2 text-left font-bold text-gray-600">#</th>
+                    <th className="p-2 text-left font-bold text-gray-600">Trabajador</th>
+                    <th className="p-2 text-left font-bold text-gray-600">Documento</th>
+                    <th className="p-2 text-left font-bold text-gray-600">Tipo</th>
+                    <th className="p-2 text-left font-bold text-gray-600">Concepto</th>
+                    <th className="p-2 text-left font-bold text-gray-600">Fecha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resultadosEmpresa.map((p, i) => {
+                    const col = colorAptitud(p.conceptoAptitud);
+                    return (
+                      <tr key={i} className={`border-b border-gray-50 hover:bg-blue-50 cursor-pointer ${certSeleccionados[i] ? "bg-blue-50" : ""}`} onClick={() => setCertSeleccionados(prev => ({...prev, [i]: !prev[i]}))}>
+                        <td className="p-2 text-center"><input type="checkbox" checked={!!certSeleccionados[i]} readOnly /></td>
+                        <td className="p-2 text-gray-400">{i + 1}</td>
+                        <td className="p-2 font-bold text-gray-800">{p.nombres || "--"}</td>
+                        <td className="p-2 font-mono">{p.docNumero || "--"}</td>
+                        <td className="p-2">{p.tipoExamen || "--"}</td>
+                        <td className="p-2"><span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${col.badge}`}>{col.dot} {p.conceptoAptitud || "--"}</span></td>
+                        <td className="p-2 text-gray-500">{p.fechaExamen || "--"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* ── Resultado ── */}
         {resultado &&
@@ -13185,9 +13275,11 @@ function AppInner() {
     const sinEmail = [];
     if (modo === "empresa" && empresaEmail) {
       // Enviar todos los certificados a un solo email de la empresa
-      const nombres = pacientes.map(p => p.nombres).join(", ");
-      const subject = `Certificados Médicos Ocupacionales - ${pacientes.length} trabajador(es)`;
-      const body = `Estimado/a encargado de SST,\n\nAdjunto encontrará los certificados de aptitud médica ocupacional de los siguientes ${pacientes.length} trabajador(es):\n\n${pacientes.map((p, i) => `${i + 1}. ${p.nombres} - ${p.docTipo || "CC"} ${p.docNumero}`).join("\n")}\n\nPara consultar cada certificado, los trabajadores pueden acceder al portal con su número de documento.\n\nCordialmente,\n${emailConfig.nombre || activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional\n${emailConfig.email}`;
+      const empNombre = pacientes[0]?.empresaNombre || "Empresa";
+      const empNit = pacientes[0]?.empresaNit || "";
+      const portalUrl = window.location.origin + window.location.pathname + "#portaltrabajador";
+      const subject = `Certificados Médicos Ocupacionales - ${empNombre} - ${pacientes.length} trabajador(es)`;
+      const body = `Estimado/a encargado de SST de ${empNombre},\n\nSe han emitido los certificados de aptitud médica ocupacional de los siguientes ${pacientes.length} trabajador(es):\n\n${pacientes.map((p, i) => `${i + 1}. ${p.nombres} - ${p.docTipo || "CC"} ${p.docNumero} - ${p.conceptoAptitud || "Pendiente"}`).join("\n")}\n\n━━━ DESCARGAR CERTIFICADOS ━━━\n\nOpción 1 - Portal Empresa (todos los certificados):\n${portalUrl}\n→ Seleccione "🏢 Empresa" e ingrese el NIT: ${empNit}\n→ Podrá ver y descargar todos los certificados en PDF\n\nOpción 2 - Portal Individual:\n${portalUrl}\n→ Cada trabajador puede consultar con su número de cédula\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCordialmente,\n${emailConfig.nombre || activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional\n${emailConfig.email}`;
       const mailtoUrl = `mailto:${empresaEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       window.open(mailtoUrl, "_self");
       return { enviados: pacientes.length, fallidos: [], modo: "empresa" };
