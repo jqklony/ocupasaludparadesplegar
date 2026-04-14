@@ -13316,6 +13316,8 @@ function AppInner() {
     try { return JSON.parse(localStorage.getItem("siso_email_config") || "null") || { email: "", nombre: "", configurado: false, emailjsPublicKey: "", emailjsServiceId: "", emailjsTemplateId: "", emailjsConfigurado: false }; } catch { return { email: "", nombre: "", configurado: false, emailjsPublicKey: "", emailjsServiceId: "", emailjsTemplateId: "", emailjsConfigurado: false }; }
   });
   const [showEmailConfig, setShowEmailConfig] = useState(false);
+  const [showEnviarPanel, setShowEnviarPanel] = useState(false);
+  const [enviarChecklist, setEnviarChecklist] = useState({ certificado: true, historia: false, formula: false, derivacion: false, examenes: false });
   const saveEmailConfig = (cfg) => {
     setEmailConfig(cfg);
     localStorage.setItem("siso_email_config", JSON.stringify(cfg));
@@ -13357,7 +13359,6 @@ function AppInner() {
       `<p style="font-size:12px;color:#374151;margin:3px 0 0;">${docTitulo}</p>` +
       (docLicencia ? `<p style="font-size:11px;color:#6b7280;margin:2px 0 0;">Licencia S.O.: ${docLicencia}</p>` : "") +
       (docCiudad ? `<p style="font-size:11px;color:#6b7280;margin:2px 0 0;">📍 ${docCiudad}</p>` : "") +
-      (docCelular ? `<p style="font-size:11px;color:#6b7280;margin:2px 0 0;">📱 ${docCelular}</p>` : "") +
       (docEmailAddr ? `<p style="font-size:11px;color:#6b7280;margin:2px 0 0;">✉️ ${docEmailAddr}</p>` : "") +
       `</div></div>` +
       `<div style="background:#f3f4f6;padding:12px 30px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none;">` +
@@ -13411,7 +13412,7 @@ function AppInner() {
       const subject = `Certificados Médicos Ocupacionales — ${empNombre} — ${pacientes.length} trabajador(es)`;
       const docData = activeDoctorData || {};
       const listaTexto = pacientes.map((p, i) => `  ${i + 1}. ${p.nombres} — ${p.docTipo || "CC"} ${p.docNumero}`).join("\n");
-      const body = `Estimado/a encargado de SST,\n\n${empNombre}\n\nSe han emitido ${pacientes.length} certificados de aptitud médica ocupacional:\n\n${listaTexto}\n\n\nDESCARGAR CERTIFICADOS\n\nPortal de Certificados:\n${portalUrl}\n\n  1. Abra el link\n  2. Seleccione "Empresa"\n  3. Ingrese el NIT: ${empNit}\n  4. Descargue todos los certificados en PDF\n\nCada trabajador también puede consultar con su cédula.\n\n\nCordialmente,\n${docData.nombre || remitente}\n${docData.titulo || "Médico Especialista en Salud Ocupacional"}\n${docData.licencia ? "Licencia S.O.: " + docData.licencia : ""}\n${docData.ciudad || ""}\n${docData.celular ? "Cel: " + docData.celular : ""}\n${docData.email || emailConfig.email || ""}`;
+      const body = `Estimado/a encargado de SST,\n\n${empNombre}\n\nSe han emitido ${pacientes.length} certificados de aptitud médica ocupacional:\n\n${listaTexto}\n\n\nDESCARGAR CERTIFICADOS\n\nPortal de Certificados:\n${portalUrl}\n\n  1. Abra el link\n  2. Seleccione "Empresa"\n  3. Ingrese el NIT: ${empNit}\n  4. Descargue todos los certificados en PDF\n\nCada trabajador también puede consultar con su cédula.\n\n\nCordialmente,\n${docData.nombre || remitente}\n${docData.titulo || "Médico Especialista en Salud Ocupacional"}\n${docData.licencia ? "Licencia S.O.: " + docData.licencia : ""}\n${docData.ciudad || ""}\n${docData.email || emailConfig.email || ""}`;
       const listaHTML = pacientes.map((p, i) => `<tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:6px 8px;font-size:11px;color:#6b7280;">${i+1}</td><td style="padding:6px 8px;font-size:12px;font-weight:700;color:#111;">${p.nombres || ""}</td><td style="padding:6px 8px;font-size:11px;font-family:monospace;">${p.docTipo||"CC"} ${p.docNumero||""}</td></tr>`).join("");
       const extraHTML = `<p style="font-size:12px;color:#065f46;font-weight:900;margin:0 0 8px;">🏢 ${empNombre} — ${pacientes.length} certificados</p><table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#f3f4f6;"><th style="padding:6px 8px;font-size:10px;text-align:left;color:#6b7280;">#</th><th style="padding:6px 8px;font-size:10px;text-align:left;color:#6b7280;">Trabajador</th><th style="padding:6px 8px;font-size:10px;text-align:left;color:#6b7280;">Documento</th></tr></thead><tbody>${listaHTML}</tbody></table>`;
       const htmlBody = _generarEmailHTML("encargado de SST", empNit, portalUrl, extraHTML, true);
@@ -13424,7 +13425,7 @@ function AppInner() {
       if (!pac.email) { sinEmail.push(pac.nombres || "Sin nombre"); continue; }
       const subject = `Certificado Médico Ocupacional — ${pac.nombres || ""}`;
       const docData2 = activeDoctorData || {};
-      const body = `Estimado/a ${pac.nombres || ""},\n\nSu certificado de aptitud médica ocupacional ha sido emitido.\n\n\nDESCARGUE SU CERTIFICADO\n\nPortal de Certificados:\n${portalUrl}\n\n  1. Abra el link\n  2. Seleccione "Cédula"\n  3. Ingrese: ${pac.docNumero || ""}\n  4. Descargue su certificado en PDF\n\n\nCordialmente,\n${docData2.nombre || remitente}\n${docData2.titulo || "Médico Especialista en Salud Ocupacional"}\n${docData2.licencia ? "Licencia S.O.: " + docData2.licencia : ""}\n${docData2.ciudad || ""}\n${docData2.celular ? "Cel: " + docData2.celular : ""}\n${docData2.email || emailConfig.email || ""}`;
+      const body = `Estimado/a ${pac.nombres || ""},\n\nSu certificado de aptitud médica ocupacional ha sido emitido.\n\n\nDESCARGUE SU CERTIFICADO\n\nPortal de Certificados:\n${portalUrl}\n\n  1. Abra el link\n  2. Seleccione "Cédula"\n  3. Ingrese: ${pac.docNumero || ""}\n  4. Descargue su certificado en PDF\n\n\nCordialmente,\n${docData2.nombre || remitente}\n${docData2.titulo || "Médico Especialista en Salud Ocupacional"}\n${docData2.licencia ? "Licencia S.O.: " + docData2.licencia : ""}\n${docData2.ciudad || ""}\n${docData2.email || emailConfig.email || ""}`;
       const htmlBody = _generarEmailHTML(pac.nombres, pac.docNumero, portalUrl, null, false);
       const r = await _enviarEmail(pac.email, subject, body, htmlBody);
       enviados.push(pac.nombres);
@@ -23788,57 +23789,101 @@ Esta historia clínica debe conservarse mínimo 20 años.
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 ml-11">
-            <button
-              onClick={() => {
-                const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
-                const w = window.open("", "_blank", "width=920,height=1150");
-                if (!w) { showAlert("Permita ventanas emergentes."); return; }
-                w.document.write(html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Guardar / Imprimir PDF</button></div></body>'));
-                w.document.close();
-              }}
-              className="px-3 py-1 bg-emerald-600 text-white text-[10px] font-black rounded-lg hover:bg-emerald-700 flex items-center gap-1"
-            >
-              <Printer className="w-3 h-3" /> Certificado PDF
+          <div className="ml-11">
+            <button onClick={() => setShowEnviarPanel(!showEnviarPanel)} className="px-4 py-1.5 bg-blue-600 text-white text-[10px] font-black rounded-lg hover:bg-blue-700 flex items-center gap-1.5">
+              📤 Imprimir / Enviar Documentos
             </button>
-            <button
-              onClick={() => {
-                const nombre = data.nombres || "";
-                const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
-                const subject = encodeURIComponent(`Certificado Médico Ocupacional - ${nombre}`);
-                const body = encodeURIComponent(`Estimado/a ${nombre},\n\nSu certificado de aptitud médica ocupacional ha sido emitido.\n\n━━━ DESCARGUE SU CERTIFICADO ━━━\n\n📥 Portal de Certificados:\n${portalLink}\n\n→ Seleccione "🪪 Cédula"\n→ Ingrese: ${data.docNumero || ""}\n→ Descargue su certificado en PDF\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCordialmente,\n${emailConfig?.nombre || activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional`);
-                const destino = data.email || data.celular || "";
-                if (destino && destino.includes("@")) {
-                  window.open(`mailto:${destino}?subject=${subject}&body=${body}`, "_blank");
-                } else {
-                  showPrompt("Email del paciente (no registrado):", (em) => {
-                    if (em) window.open(`mailto:${em}?subject=${subject}&body=${body}`, "_blank");
-                  });
-                }
-              }}
-              className="px-3 py-1 bg-amber-500 text-white text-[10px] font-black rounded-lg hover:bg-amber-600 flex items-center gap-1"
-            >
-              📧 Enviar Email
-            </button>
-            <button
-              onClick={() => {
-                const nombre = data.nombres || "";
-                const tel = (data.celular || data.telefono || "").replace(/\D/g, "");
-                const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
-                const msg = encodeURIComponent(`Estimado/a ${nombre}, su certificado médico ocupacional está listo.\n\n📥 Descárguelo:\n${portalLink}\n→ Seleccione "Cédula" → Ingrese: ${data.docNumero || ""}\n\n${emailConfig?.nombre || activeDoctorData?.nombre || "OcupaSalud"}`);
-                if (tel.length >= 10) {
-                  const telFull = tel.startsWith("57") ? tel : "57" + tel;
-                  window.open(`https://wa.me/${telFull}?text=${msg}`, "_blank");
-                } else {
-                  showPrompt("Celular del paciente:", (num) => {
-                    if (num) { const n = num.replace(/\D/g, ""); window.open(`https://wa.me/57${n}?text=${msg}`, "_blank"); }
-                  });
-                }
-              }}
-              className="px-3 py-1 bg-green-500 text-white text-[10px] font-black rounded-lg hover:bg-green-600 flex items-center gap-1"
-            >
-              📱 WhatsApp
-            </button>
+            {showEnviarPanel && (
+              <div className="mt-2 bg-white border border-gray-200 rounded-xl p-3 shadow-lg">
+                <p className="text-[10px] font-black text-gray-700 uppercase mb-2">Seleccione los documentos:</p>
+                <div className="space-y-1.5 mb-3">
+                  {[
+                    { k: "certificado", l: "📋 Certificado de Aptitud Laboral", always: true },
+                    { k: "historia", l: "📄 Historia Clínica Completa" },
+                    { k: "formula", l: "💊 Fórmula Médica / Prescripción" },
+                    { k: "derivacion", l: "🔀 Derivación / Interconsulta" },
+                    { k: "examenes", l: "🔬 Solicitud de Exámenes" },
+                  ].map(item => (
+                    <label key={item.k} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded-lg px-2 py-1">
+                      <input type="checkbox" checked={!!enviarChecklist[item.k]} onChange={() => setEnviarChecklist(p => ({...p, [item.k]: !p[item.k]}))} className="w-4 h-4 accent-blue-600 rounded" />
+                      <span className="text-xs text-gray-700">{item.l}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-2">
+                  <button onClick={() => {
+                    const docs = [];
+                    if (enviarChecklist.certificado) {
+                      docs.push({ title: "Certificado de Aptitud Laboral", html: _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null) });
+                    }
+                    if (enviarChecklist.historia) {
+                      docs.push({ title: "Historia Clínica", fn: () => { if (typeof _printHCClean === "function") _printHCClean(); else handlePrint(data.nombres); } });
+                    }
+                    if (enviarChecklist.formula) {
+                      docs.push({ title: "Fórmula Médica", fn: () => { if (typeof openPrintWindow === "function") openPrintWindow("formula", "Fórmula Médica"); } });
+                    }
+                    if (enviarChecklist.derivacion) {
+                      docs.push({ title: "Derivación", fn: () => { if (typeof openPrintWindow === "function") openPrintWindow("derivacion", "Derivación / Interconsulta"); } });
+                    }
+                    if (enviarChecklist.examenes) {
+                      docs.push({ title: "Solicitud Exámenes", fn: () => { handlePrint("Solicitud-Examenes-" + data.nombres); } });
+                    }
+                    if (docs.length === 0) { showAlert("Seleccione al menos un documento."); return; }
+                    // Si solo es certificado, abrir directamente
+                    if (docs.length === 1 && docs[0].html) {
+                      const w = window.open("", "_blank", "width=920,height=1150");
+                      if (!w) { showAlert("Permita ventanas emergentes."); return; }
+                      w.document.write(docs[0].html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Guardar / Imprimir PDF</button></div></body>'));
+                      w.document.close();
+                    } else {
+                      // Abrir cada documento con delay
+                      docs.forEach((d, i) => {
+                        setTimeout(() => {
+                          if (d.html) {
+                            const w = window.open("", "_blank", "width=920,height=1150");
+                            if (w) { w.document.write(d.html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 ' + d.title + '</button></div></body>')); w.document.close(); }
+                          } else if (d.fn) { d.fn(); }
+                        }, i * 500);
+                      });
+                    }
+                    setShowEnviarPanel(false);
+                  }} className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-black rounded-lg hover:bg-emerald-700 flex items-center gap-1">
+                    <Printer className="w-3 h-3" /> Imprimir / PDF
+                  </button>
+                  <button onClick={() => {
+                    const selDocs = Object.entries(enviarChecklist).filter(([,v]) => v).map(([k]) => k);
+                    if (selDocs.length === 0) { showAlert("Seleccione al menos un documento."); return; }
+                    const nombre = data.nombres || "";
+                    const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
+                    const docNames = selDocs.map(k => ({certificado:"Certificado de Aptitud",historia:"Historia Clínica",formula:"Fórmula Médica",derivacion:"Derivación",examenes:"Solicitud de Exámenes"}[k])).join(", ");
+                    const docD = activeDoctorData || {};
+                    const subject = `Documentos Médicos Ocupacionales — ${nombre}`;
+                    const body = `Estimado/a ${nombre},\n\nSe han generado los siguientes documentos de su evaluación médica ocupacional:\n\n${docNames}\n\n\nDESCARGUE SUS DOCUMENTOS\n\nPortal de Certificados:\n${portalLink}\n\n  1. Abra el link\n  2. Seleccione "Cédula"\n  3. Ingrese: ${data.docNumero || ""}\n  4. Descargue sus documentos\n\n\nCordialmente,\n${docD.nombre || "Médico Ocupacional"}\n${docD.titulo || ""}\n${docD.licencia ? "Licencia S.O.: " + docD.licencia : ""}\n${docD.ciudad || ""}\n${docD.email || emailConfig?.email || ""}`;
+                    const htmlBody = _generarEmailHTML(nombre, data.docNumero, portalLink, null, false);
+                    const destino = data.email || "";
+                    if (destino && destino.includes("@")) {
+                      _enviarEmail(destino, subject, body, htmlBody);
+                    } else {
+                      showPrompt("Email del paciente:", (em) => { if (em) _enviarEmail(em, subject, body, htmlBody); });
+                    }
+                    setShowEnviarPanel(false);
+                  }} className="px-3 py-1.5 bg-amber-500 text-white text-[10px] font-black rounded-lg hover:bg-amber-600 flex items-center gap-1">
+                    📧 Enviar por Email
+                  </button>
+                  <button onClick={() => {
+                    const nombre = data.nombres || "";
+                    const tel = (data.celular || data.telefono || "").replace(/\D/g, "");
+                    const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
+                    const msg = encodeURIComponent(`Estimado/a ${nombre}, sus documentos médicos ocupacionales están listos.\n\n📥 Descárguelos:\n${portalLink}\n→ Seleccione "Cédula" → Ingrese: ${data.docNumero || ""}\n\n${activeDoctorData?.nombre || "OcupaSalud"}`);
+                    if (tel.length >= 10) { window.open(`https://wa.me/${tel.startsWith("57") ? tel : "57" + tel}?text=${msg}`, "_blank"); }
+                    else { showPrompt("Celular:", (n) => { if (n) window.open(`https://wa.me/57${n.replace(/\D/g,"")}?text=${msg}`, "_blank"); }); }
+                    setShowEnviarPanel(false);
+                  }} className="px-3 py-1.5 bg-green-500 text-white text-[10px] font-black rounded-lg hover:bg-green-600 flex items-center gap-1">
+                    📱 WhatsApp
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
