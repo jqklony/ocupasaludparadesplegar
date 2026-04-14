@@ -12432,7 +12432,7 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
           </div>
           <div>
             <h1 className="text-white font-black text-sm tracking-tight">
-              Portal del Trabajador
+              Portal de Certificados
             </h1>
             <p className="text-teal-200 text-[10px]">
               Servicio Médico Ocupacional · SISO OcupaSalud
@@ -12456,11 +12456,11 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
             <span className="text-2xl mt-0.5">📋</span>
             <div>
               <h2 className="font-black text-gray-800 text-sm">
-                Consulta tu evaluación médica
+                Consulta y descarga certificados
               </h2>
               <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                Ingresa el código entregado por el médico o tu número de cédula
-                para ver el resultado de tu examen de aptitud laboral.
+                Ingresa tu código de verificación, número de cédula, o NIT/nombre de empresa
+                para consultar y descargar certificados de aptitud laboral en PDF.
               </p>
             </div>
           </div>
@@ -13338,7 +13338,7 @@ function AppInner() {
       const empNit = pacientes[0]?.empresaNit || "";
       const portalUrl = window.location.origin + window.location.pathname + "#portaltrabajador";
       const subject = `Certificados Médicos Ocupacionales - ${empNombre} - ${pacientes.length} trabajador(es)`;
-      const body = `Estimado/a encargado de SST de ${empNombre},\n\nSe han emitido los certificados de aptitud médica ocupacional de los siguientes ${pacientes.length} trabajador(es):\n\n${pacientes.map((p, i) => `${i + 1}. ${p.nombres} - ${p.docTipo || "CC"} ${p.docNumero} - ${p.conceptoAptitud || "Pendiente"}`).join("\n")}\n\n━━━ DESCARGAR CERTIFICADOS ━━━\n\nOpción 1 - Portal Empresa (todos los certificados):\n${portalUrl}\n→ Seleccione "🏢 Empresa" e ingrese el NIT: ${empNit}\n→ Podrá ver y descargar todos los certificados en PDF\n\nOpción 2 - Portal Individual:\n${portalUrl}\n→ Cada trabajador puede consultar con su número de cédula\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCordialmente,\n${emailConfig.nombre || activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional\n${emailConfig.email}`;
+      const body = `Estimado/a encargado de SST de ${empNombre},\n\nSe han emitido los certificados de aptitud médica ocupacional de los siguientes ${pacientes.length} trabajador(es):\n\n${pacientes.map((p, i) => `${i + 1}. ${p.nombres} - ${p.docTipo || "CC"} ${p.docNumero} - ${p.conceptoAptitud || "Pendiente"}`).join("\n")}\n\n━━━ DESCARGAR CERTIFICADOS ━━━\n\nPortal de Certificados:\n${portalUrl}\n\n→ Seleccione "🏢 Empresa" e ingrese el NIT: ${empNit}\n→ Podrá ver y descargar TODOS los certificados en PDF\n\n→ Cada trabajador también puede consultar con su cédula\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCordialmente,\n${emailConfig.nombre || activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional\n${emailConfig.email}`;
       const mailtoUrl = `mailto:${empresaEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       window.open(mailtoUrl, "_self");
       return { enviados: pacientes.length, fallidos: [], modo: "empresa" };
@@ -19592,26 +19592,10 @@ Esta historia clínica debe conservarse mínimo 20 años.
                 </div>
                 <div className="text-left min-w-0">
                   <p className="font-black text-gray-800 text-xs leading-tight">
-                    Portal Trabajador
+                    Portal de Certificados
                   </p>
                   <p className="text-[10px] text-gray-400 truncate">
-                    Código / Cédula / Empresa
-                  </p>
-                </div>
-              </button>
-              <button
-                onClick={() => { window.location.hash = "#portaltrabajador"; setShowPortalPublico(true); }}
-                className="bg-white border border-gray-100 rounded-xl p-3 flex items-center gap-2.5 hover:border-indigo-200 hover:bg-indigo-50/40 transition group shadow-sm"
-              >
-                <div className="bg-indigo-50 p-2 rounded-lg group-hover:bg-indigo-100 transition flex-shrink-0">
-                  <Building2 className="w-4 h-4 text-indigo-600" />
-                </div>
-                <div className="text-left min-w-0">
-                  <p className="font-black text-gray-800 text-xs leading-tight">
-                    Portal Empresa
-                  </p>
-                  <p className="text-[10px] text-gray-400 truncate">
-                    Acceso convenio
+                    Código · Cédula · Empresa
                   </p>
                 </div>
               </button>
@@ -29174,7 +29158,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
               </button>
               <div>
                 <h2 className="text-lg font-black flex items-center gap-2">
-                  🧑‍💼 Portal del Trabajador
+                  🧑‍💼 Portal de Certificados
                 </h2>
                 <p className="text-teal-200 text-xs mt-0.5">
                   Res. 2346/2007 Art. 14 · Acceso a su Historia Clínica
@@ -34798,7 +34782,7 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
         clinica: true,
       },
       {
-        label: "Portal Trabajador",
+        label: "Portal de Certificados",
         libre: true,
         starter: true,
         pro: true,
@@ -35224,7 +35208,7 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
                         ["Nube", `${plan.storageMB / 1024}GB`],
                         ["Telemedicina", "Ilimitada"],
                         ["IA / Análisis", "Incluido"],
-                        ["Portal Empresa", "✅ Incluido"],
+                        ["Portal de Certificados (Empresa)", "✅ Incluido"],
                         ["Facturación DIAN", "✅ Incluido"],
                         ["FHIR R4", "✅ Incluido"],
                         ["Soporte prioritario", "✅ Incluido"],
