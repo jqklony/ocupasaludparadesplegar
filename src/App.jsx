@@ -14121,6 +14121,11 @@ function AppInner() {
         const _billSuf = currentUser?.empresaId ? "empresa_" + currentUser.empresaId : currentUser?.user || "shared";
         applyCloud(`siso_saved_bills_${_billSuf}`, setSavedBillsList, [], `siso_saved_bills_${_billSuf}`);
       }
+      // Encuestas: sincronizar desde Supabase
+      {
+        const _encSuf = currentUser?.user || "shared";
+        applyCloud(`siso_encuestas_${_encSuf}`, setEncuestas, [], "siso_encuestas");
+      }
       applyCloud(
         "siso_saved_reports",
         setSavedReports,
