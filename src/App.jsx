@@ -12258,21 +12258,36 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
         const nitClean = q.replace(/[^0-9]/g, "");
         const qLower = q.trim().toLowerCase();
         try {
-          // 1) Buscar por NIT exacto en índice
+          // 1) Buscar por NIT en índice — probar variantes (con/sin DV)
           let empresaIdx = null;
+          // Intentar NIT exacto
           const r1 = await fetchKey("siso_portal_empresa_" + nitClean);
           if (r1.ok && r1.data) empresaIdx = r1.data;
-          // 2) Si no encontró, buscar por nombre en todos los índices de empresa
-          if (!empresaIdx) {
-            const rAll = await fetchConTimeout(`${sbUrl}/rest/v1/siso_store?select=key,value&key=like.siso_portal_empresa_%`, { headers }, 12000);
-            if (rAll.ok) {
-              const rows = await rAll.json();
-              const match = rows.find(r => {
-                const v = typeof r.value === "string" ? JSON.parse(r.value) : r.value;
-                return v && ((v.nombre || "").toLowerCase().includes(qLower) || (v.nit || "") === nitClean);
-              });
-              if (match) empresaIdx = typeof match.value === "string" ? JSON.parse(match.value) : match.value;
+          // Si no encontró, probar agregando dígitos comunes (0-9) al final (DV)
+          if (!empresaIdx && nitClean.length >= 6) {
+            for (let dv = 0; dv <= 9; dv++) {
+              const r1b = await fetchKey("siso_portal_empresa_" + nitClean + dv);
+              if (r1b.ok && r1b.data) { empresaIdx = r1b.data; break; }
             }
+          }
+          // Si no encontró, probar quitando último dígito (quizás el DV sobra)
+          if (!empresaIdx && nitClean.length > 6) {
+            const r1c = await fetchKey("siso_portal_empresa_" + nitClean.slice(0, -1));
+            if (r1c.ok && r1c.data) empresaIdx = r1c.data;
+          }
+          // 2) Si no encontró por NIT, buscar por nombre en los índices
+          if (!empresaIdx && qLower.length >= 3) {
+            try {
+              const rAll = await fetchConTimeout(`${sbUrl}/rest/v1/siso_store?select=key,value&key=like.siso_portal_empresa_%`, { headers }, 12000);
+              if (rAll.ok) {
+                const rows = await rAll.json();
+                const match = rows.find(r => {
+                  const v = typeof r.value === "string" ? JSON.parse(r.value) : r.value;
+                  return v && (v.nombre || "").toLowerCase().includes(qLower);
+                });
+                if (match) empresaIdx = typeof match.value === "string" ? JSON.parse(match.value) : match.value;
+              }
+            } catch {}
           }
           if (empresaIdx && empresaIdx.documentos && empresaIdx.documentos.length > 0) {
             // Fetch each worker's portal data
