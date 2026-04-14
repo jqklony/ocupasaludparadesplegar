@@ -13347,8 +13347,9 @@ function AppInner() {
     for (const pac of pacientes) {
       const destino = pac.email;
       if (!destino) { sinEmail.push(pac.nombres || "Sin nombre"); continue; }
+      const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
       const subject = `Certificado Médico Ocupacional - ${pac.nombres || ""}`;
-      const body = `Estimado/a ${pac.nombres || ""},\n\nSu certificado de aptitud médica ocupacional ha sido emitido.\n\nPuede consultarlo en nuestro portal ingresando su número de documento: ${pac.docNumero || ""}\n\nCordialmente,\n${emailConfig.nombre || activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional`;
+      const body = `Estimado/a ${pac.nombres || ""},\n\nSu certificado de aptitud médica ocupacional ha sido emitido.\n\n━━━ DESCARGUE SU CERTIFICADO ━━━\n\n📥 Ingrese al Portal de Certificados:\n${portalLink}\n\n→ Seleccione "🪪 Cédula"\n→ Ingrese su número de documento: ${pac.docNumero || ""}\n→ Podrá ver y descargar su certificado en PDF\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCordialmente,\n${emailConfig.nombre || activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional\n${emailConfig.email || ""}`;
       // Usar BCC al email del médico para tener copia
       const mailtoUrl = `mailto:${destino}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&bcc=${encodeURIComponent(emailConfig.email)}`;
       enviados.push(pac.nombres);
@@ -25809,10 +25810,10 @@ Esta historia clínica debe conservarse mínimo 20 años.
     });
     // Helper para envío de certificado
     const _enviarCertEmail = (pac) => {
-      const email = pac.email || pac.celular ? "" : "";
       const nombre = pac.nombres || "";
+      const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
       const subject = encodeURIComponent(`Certificado Médico Ocupacional - ${nombre}`);
-      const body = encodeURIComponent(`Estimado/a ${nombre},\n\nAdjunto encontrará su certificado de aptitud médica ocupacional.\n\nPara consultar su certificado en línea, ingrese a nuestro portal con su número de documento: ${pac.docNumero || ""}\n\nCordialmente,\n${activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional`);
+      const body = encodeURIComponent(`Estimado/a ${nombre},\n\nSu certificado de aptitud médica ocupacional ha sido emitido.\n\n━━━ DESCARGUE SU CERTIFICADO ━━━\n\n📥 Ingrese al Portal de Certificados:\n${portalLink}\n\n→ Seleccione "🪪 Cédula"\n→ Ingrese su número de documento: ${pac.docNumero || ""}\n→ Podrá ver y descargar su certificado en PDF\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCordialmente,\n${emailConfig?.nombre || activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional\n${emailConfig?.email || ""}`);
       if (pac.email) {
         window.open(`mailto:${pac.email}?subject=${subject}&body=${body}`, "_blank");
       } else {
@@ -25824,7 +25825,8 @@ Esta historia clínica debe conservarse mínimo 20 años.
     const _enviarCertWhatsApp = (pac) => {
       const nombre = pac.nombres || "";
       const tel = (pac.celular || pac.telefono || "").replace(/\D/g, "");
-      const msg = encodeURIComponent(`Estimado/a ${nombre}, su certificado de aptitud médica ocupacional está listo.\n\nPuede consultarlo en nuestro portal con su número de documento: ${pac.docNumero || ""}\n\n${activeDoctorData?.nombre || "OcupaSalud"} - Médico Ocupacional`);
+      const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
+      const msg = encodeURIComponent(`Estimado/a ${nombre}, su certificado de aptitud médica ocupacional está listo.\n\n📥 Descárguelo aquí:\n${portalLink}\n→ Seleccione "Cédula" e ingrese: ${pac.docNumero || ""}\n\n${emailConfig?.nombre || activeDoctorData?.nombre || "OcupaSalud"} - Médico Ocupacional`);
       if (tel.length >= 10) {
         const telFull = tel.startsWith("57") ? tel : "57" + tel;
         window.open(`https://wa.me/${telFull}?text=${msg}`, "_blank");
