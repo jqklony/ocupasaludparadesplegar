@@ -12549,6 +12549,71 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
           </p>
         </div>
 
+        {/* ── Documentación por periodo (Portal Empresa Completo) ── */}
+        {resultadosEmpresa.length > 0 && (() => {
+          const nitBusq = busqueda.replace(/[^0-9]/g, "");
+          const [portalDocs, setPortalDocs] = React.useState(null);
+          const [docsLoaded, setDocsLoaded] = React.useState(false);
+          React.useEffect(() => {
+            if (!nitBusq || nitBusq.length < 4 || docsLoaded) return;
+            // Try multiple NIT variants
+            const tryNits = [nitBusq];
+            for (let d = 0; d <= 9; d++) tryNits.push(nitBusq + d);
+            if (nitBusq.length > 6) tryNits.push(nitBusq.slice(0, -1));
+            (async () => {
+              for (const n of tryNits) {
+                try {
+                  const r = await fetch(`${sbUrl}/rest/v1/siso_store?key=eq.siso_portal_empresa_docs_${n}&select=value`, { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } });
+                  const d = await r.json();
+                  if (d[0]?.value) { setPortalDocs(d[0].value); break; }
+                } catch {}
+              }
+              setDocsLoaded(true);
+            })();
+          }, [nitBusq, docsLoaded]);
+          return portalDocs?.periodos?.length > 0 ? (
+            <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 overflow-hidden mb-3">
+              <div className="bg-emerald-700 px-4 py-3">
+                <p className="text-white font-black text-sm">📦 Documentación por Periodo — {portalDocs.nombre}</p>
+                <p className="text-emerald-200 text-[10px]">NIT: {portalDocs.nit}</p>
+              </div>
+              <div className="p-3 space-y-3">
+                {portalDocs.periodos.map((per, pi) => (
+                  <div key={pi} className="border border-gray-200 rounded-xl p-3">
+                    <p className="text-xs font-black text-gray-800 mb-2">📅 {per.periodo} <span className="text-gray-400 font-normal">({per.fecha})</span></p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {per.informe && (
+                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-2">
+                          <p className="text-[10px] font-black text-blue-800">📋 Informe Epidemiológico</p>
+                          <p className="text-[9px] text-blue-600">{per.informe.totalPacientes} trabajadores</p>
+                        </div>
+                      )}
+                      {per.certificados && (
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-2 cursor-pointer hover:bg-emerald-100" onClick={() => {/* certificados ya se muestran abajo */}}>
+                          <p className="text-[10px] font-black text-emerald-800">📄 Certificados</p>
+                          <p className="text-[9px] text-emerald-600">{per.certificados.count} disponibles ↓</p>
+                        </div>
+                      )}
+                      {per.cuenta && (
+                        <div className="bg-orange-50 border border-orange-100 rounded-lg p-2">
+                          <p className="text-[10px] font-black text-orange-800">💰 Cuenta de Cobro No. {per.cuenta.number}</p>
+                          <p className="text-[9px] text-orange-600">${Number(per.cuenta.amount || 0).toLocaleString("es-CO")}</p>
+                        </div>
+                      )}
+                      {per.custodia && (
+                        <div className="bg-purple-50 border border-purple-100 rounded-lg p-2">
+                          <p className="text-[10px] font-black text-purple-800">📁 Carta de Custodia</p>
+                          <p className="text-[9px] text-purple-600">{per.custodia.fecha} · {per.custodia.medicoNombre}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null;
+        })()}
+
         {/* ── Resultados Empresa (múltiples certificados) ── */}
         {resultadosEmpresa.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -18631,13 +18696,13 @@ Esta historia clínica debe conservarse mínimo 20 años.
                   <Download className="w-3 h-3" /> Descargar / Enviar
                 </button>
               )}
-              {/* Toggle panel al hacer clic en Descargar/Enviar */}
+              {/* Botón Descargar/Enviar con checklist — reemplaza el botón Todo cuando HC cerrada */}
               {data.estadoHistoria === "Cerrada" && dataType === "ocupacional" && (
                 <button
                   onClick={() => setShowEnviarPanel(!showEnviarPanel)}
-                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 no-print hover:bg-blue-700 relative"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 no-print transition ${showEnviarPanel ? "bg-red-500 hover:bg-red-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
                 >
-                  📤 {showEnviarPanel ? "Cerrar" : "Enviar"}
+                  {showEnviarPanel ? "✕ Cerrar" : "📤 Descargar / Enviar"}
                 </button>
               )}
               {/* Panel checklist de Descargar/Enviar — HC Ocupacional */}
@@ -49329,21 +49394,56 @@ body{padding-top:52px;}
               </div>
               {/* Botón enviar */}
               {todoListo ? (
-                <button onClick={() => {
+                <button onClick={async () => {
                   const portalUrl = window.location.origin + window.location.pathname + "#portaltrabajador";
                   const docD = activeDoctorData || {};
                   const nitEmp = comp ? `${comp.nit}${comp.dv ? "-" + comp.dv : ""}` : emp.empresaNit;
+                  const nitClean = (nitEmp || "").replace(/[^0-9]/g, "");
+                  // Generar código de acceso para la empresa
+                  const codigoAcceso = "EMP-" + nitClean.slice(-4) + "-" + Math.random().toString(36).substring(2, 6).toUpperCase();
+                  // Guardar documentación completa en Supabase para el portal
+                  const mesActual = new Date().toISOString().slice(0, 7);
+                  const informeData = savedInformes.find(i => i.empresaId === emp.empresaId && !i.tipo);
+                  const custodiaData = savedInformes.find(i => i.empresaId === emp.empresaId && i.tipo === "custodia");
+                  const certsEmpresa = patientsList.filter(p => p.empresaId === emp.empresaId && p.estadoHistoria === "Cerrada");
+                  const portalDocsData = {
+                    nit: nitClean,
+                    nombre: emp.empresaNombre,
+                    codigoAcceso,
+                    updatedAt: new Date().toISOString(),
+                    periodos: [{
+                      periodo: mesActual,
+                      fecha: new Date().toISOString().split("T")[0],
+                      informe: informeData ? { totalPacientes: informeData.totalPacientes || emp.totalPacientes, resumen: informeData.resumen || "", fecha: informeData.fecha } : null,
+                      certificados: { count: certCount, documentos: certsEmpresa.map(p => (p.docNumero || "").replace(/\s/g, "")) },
+                      cuenta: cuentaData ? { number: cuentaData.number, amount: cuentaData.amount, date: cuentaData.date, concept: cuentaData.concept } : null,
+                      custodia: custodiaData ? { fecha: custodiaData.fecha, medicoNombre: custodiaData.medicoNombre } : null,
+                    }],
+                  };
+                  // Merge with existing data (add new periodo, don't overwrite old ones)
+                  try {
+                    const existR = await fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_portal_empresa_docs_${nitClean}&select=value`, { headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` } });
+                    const existD = await existR.json();
+                    if (existD[0]?.value?.periodos) {
+                      const oldPeriodos = existD[0].value.periodos.filter(p => p.periodo !== mesActual);
+                      portalDocsData.periodos = [...portalDocsData.periodos, ...oldPeriodos];
+                      portalDocsData.codigoAcceso = existD[0].value.codigoAcceso || codigoAcceso; // mantener código existente
+                    }
+                  } catch {}
+                  await _sbSet(`siso_portal_empresa_docs_${nitClean}`, portalDocsData);
+                  // Enviar email
+                  const codAccFinal = portalDocsData.codigoAcceso;
                   const subject = `Documentación Médica Ocupacional — ${emp.empresaNombre}`;
-                  const body = `Estimado/a encargado de SST,\n\n${emp.empresaNombre}\n\nSe adjunta la documentación completa de las evaluaciones médicas ocupacionales:\n\n  📋 Informe Epidemiológico — ${emp.totalPacientes} trabajadores\n  📄 ${certCount} Certificados de Aptitud Laboral\n  💰 Cuenta de Cobro No. ${cuentaData?.number || "—"} — $${Number(cuentaData?.amount || 0).toLocaleString("es-CO")}\n  📁 Carta de Custodia de Historias Clínicas\n\n\nDESCARGAR DOCUMENTOS\n\nPortal de Certificados:\n${portalUrl}\n\n  1. Abra el link\n  2. Seleccione "Empresa"\n  3. Ingrese NIT: ${nitEmp}\n  4. Descargue certificados e informe en PDF\n\n\nCordialmente,\n${docD.nombre || "Médico Ocupacional"}\n${docD.titulo || ""}\n${docD.licencia ? "Licencia S.O.: " + docD.licencia : ""}\n${docD.ciudad || ""}\n${docD.email || emailConfig?.email || ""}`;
-                  const extraHTML = `<p style="font-size:12px;color:#065f46;font-weight:900;margin:0 0 10px;">📦 Documentación completa — ${emp.empresaNombre}</p><table style="width:100%;border-collapse:collapse;"><tbody><tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px;font-size:12px;">📋 Informe Epidemiológico</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">${emp.totalPacientes} trabajadores</td></tr><tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px;font-size:12px;">📄 Certificados de Aptitud</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">${certCount} certificados</td></tr><tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px;font-size:12px;">💰 Cuenta de Cobro</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">No. ${cuentaData?.number || "—"} · $${Number(cuentaData?.amount || 0).toLocaleString("es-CO")}</td></tr><tr><td style="padding:8px;font-size:12px;">📁 Carta de Custodia</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">✅ Generada</td></tr></tbody></table>`;
+                  const body = `Estimado/a encargado de SST,\n\n${emp.empresaNombre}\n\nSe adjunta la documentación completa:\n\n  📋 Informe Epidemiológico — ${emp.totalPacientes} trabajadores\n  📄 ${certCount} Certificados de Aptitud Laboral\n  💰 Cuenta de Cobro No. ${cuentaData?.number || "—"} — $${Number(cuentaData?.amount || 0).toLocaleString("es-CO")}\n  📁 Carta de Custodia de HC\n\n\nACCEDA A SUS DOCUMENTOS\n\nPortal de Certificados:\n${portalUrl}\n\n  1. Seleccione "🏢 Empresa"\n  2. Ingrese NIT: ${nitEmp}\n  3. Descargue todos los documentos\n\n  Código de acceso: ${codAccFinal}\n\n\nCordialmente,\n${docD.nombre || ""}\n${docD.titulo || ""}\n${docD.licencia ? "Lic: " + docD.licencia : ""}\n${docD.ciudad || ""}\n${docD.email || emailConfig?.email || ""}`;
+                  const extraHTML = `<p style="font-size:12px;color:#065f46;font-weight:900;margin:0 0 10px;">📦 Documentación completa — ${emp.empresaNombre}</p><table style="width:100%;border-collapse:collapse;"><tbody><tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px;font-size:12px;">📋 Informe Epidemiológico</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">${emp.totalPacientes} trabajadores</td></tr><tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px;font-size:12px;">📄 Certificados</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">${certCount} certificados</td></tr><tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px;font-size:12px;">💰 Cuenta de Cobro</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">No. ${cuentaData?.number || "—"} · $${Number(cuentaData?.amount || 0).toLocaleString("es-CO")}</td></tr><tr><td style="padding:8px;font-size:12px;">📁 Carta de Custodia</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">✅</td></tr></tbody></table><div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;margin-top:12px;text-align:center;"><p style="font-size:10px;color:#065f46;font-weight:700;margin:0;">🔑 Código de acceso empresarial</p><p style="font-size:18px;font-family:monospace;font-weight:900;color:#065f46;margin:4px 0 0;letter-spacing:2px;">${codAccFinal}</p></div>`;
                   const htmlBody = _generarEmailHTML("encargado de SST", nitEmp, portalUrl, extraHTML, true);
                   const emailEmp = comp?.emailContacto || comp?.email || "";
                   if (emailEmp) {
                     _enviarEmail(emailEmp, subject, body, htmlBody);
-                    showAlert("✅ Documentación enviada a " + emailEmp);
+                    showAlert(`✅ Documentación enviada a ${emailEmp}\n\n🔑 Código de acceso: ${codAccFinal}\n\nLa empresa puede acceder al portal con su NIT para ver y descargar todos los documentos.`);
                   } else {
                     showPrompt("Email de la empresa:", (em) => {
-                      if (em) { _enviarEmail(em, subject, body, htmlBody); showAlert("✅ Documentación enviada a " + em); }
+                      if (em) { _enviarEmail(em, subject, body, htmlBody); showAlert(`✅ Enviado a ${em}\n🔑 Código: ${codAccFinal}`); }
                     });
                   }
                   setShowEnvioIntegral(false);
