@@ -13313,7 +13313,7 @@ function AppInner() {
   const [patFiltroEmpresa, setPatFiltroEmpresa] = useState("");
   // ═══ EMAIL CONFIG — persiste en Supabase ═══
   const [emailConfig, setEmailConfig] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("siso_email_config") || "null") || { email: "", nombre: "", configurado: false }; } catch { return { email: "", nombre: "", configurado: false }; }
+    try { return JSON.parse(localStorage.getItem("siso_email_config") || "null") || { email: "", nombre: "", configurado: false, emailjsPublicKey: "", emailjsServiceId: "", emailjsTemplateId: "", emailjsConfigurado: false }; } catch { return { email: "", nombre: "", configurado: false, emailjsPublicKey: "", emailjsServiceId: "", emailjsTemplateId: "", emailjsConfigurado: false }; }
   });
   const [showEmailConfig, setShowEmailConfig] = useState(false);
   const saveEmailConfig = (cfg) => {
@@ -13321,46 +13321,72 @@ function AppInner() {
     localStorage.setItem("siso_email_config", JSON.stringify(cfg));
     _sbSet("siso_email_config_" + (currentUser?.user || "shared"), cfg);
   };
+  // ═══ ENVIAR EMAIL: EmailJS (automático) o mailto (manual) ═══
+  const _enviarEmailJS = async (to, subject, body) => {
+    if (!emailConfig.emailjsConfigurado || !window.emailjs) return false;
+    try {
+      window.emailjs.init(emailConfig.emailjsPublicKey);
+      await window.emailjs.send(emailConfig.emailjsServiceId, emailConfig.emailjsTemplateId, {
+        to_email: to,
+        from_name: emailConfig.nombre || activeDoctorData?.nombre || "OcupaSalud",
+        from_email: emailConfig.email,
+        subject: subject,
+        message: body,
+        reply_to: emailConfig.email,
+      });
+      return true;
+    } catch (e) {
+      console.warn("[EmailJS] Error:", e);
+      return false;
+    }
+  };
+  const _enviarEmail = async (to, subject, body) => {
+    // Intentar EmailJS primero
+    if (emailConfig.emailjsConfigurado && window.emailjs) {
+      const ok = await _enviarEmailJS(to, subject, body);
+      if (ok) return { method: "emailjs", ok: true };
+    }
+    // Fallback: mailto
+    const mailtoUrl = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&bcc=${encodeURIComponent(emailConfig.email || "")}`;
+    window.open(mailtoUrl, "_blank");
+    return { method: "mailto", ok: true };
+  };
   // Función de envío masivo de certificados por email
   const enviarCertificadosMasivo = async (pacientes, empresaEmail, modo) => {
-    // modo: "empresa" = todo al email de la empresa | "individual" = a cada trabajador con BCC
     if (!emailConfig.configurado || !emailConfig.email) {
-      showAlert("⚠️ Configure su cuenta de email primero.\n\nVaya a la configuración de email (botón ✉️) e ingrese su correo.");
+      showAlert("⚠️ Configure su cuenta de email primero.\n\nVaya a la configuración de email (botón ✉️).");
       setShowEmailConfig(true);
       return { enviados: 0, fallidos: [] };
     }
+    const portalUrl = window.location.origin + window.location.pathname + "#portaltrabajador";
+    const remitente = emailConfig.nombre || activeDoctorData?.nombre || "OcupaSalud";
     const enviados = [];
     const fallidos = [];
     const sinEmail = [];
+    const usaEmailJS = emailConfig.emailjsConfigurado && window.emailjs;
     if (modo === "empresa" && empresaEmail) {
-      // Enviar todos los certificados a un solo email de la empresa
       const empNombre = pacientes[0]?.empresaNombre || "Empresa";
       const empNit = pacientes[0]?.empresaNit || "";
-      const portalUrl = window.location.origin + window.location.pathname + "#portaltrabajador";
       const subject = `Certificados Médicos Ocupacionales - ${empNombre} - ${pacientes.length} trabajador(es)`;
-      const body = `Estimado/a encargado de SST de ${empNombre},\n\nSe han emitido los certificados de aptitud médica ocupacional de los siguientes ${pacientes.length} trabajador(es):\n\n${pacientes.map((p, i) => `${i + 1}. ${p.nombres} - ${p.docTipo || "CC"} ${p.docNumero} - ${p.conceptoAptitud || "Pendiente"}`).join("\n")}\n\n━━━ DESCARGAR CERTIFICADOS ━━━\n\nPortal de Certificados:\n${portalUrl}\n\n→ Seleccione "🏢 Empresa" e ingrese el NIT: ${empNit}\n→ Podrá ver y descargar TODOS los certificados en PDF\n\n→ Cada trabajador también puede consultar con su cédula\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCordialmente,\n${emailConfig.nombre || activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional\n${emailConfig.email}`;
-      const mailtoUrl = `mailto:${empresaEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      window.open(mailtoUrl, "_self");
+      const body = `Estimado/a encargado de SST de ${empNombre},\n\nSe han emitido los certificados de aptitud médica ocupacional de los siguientes ${pacientes.length} trabajador(es):\n\n${pacientes.map((p, i) => `${i + 1}. ${p.nombres} - ${p.docTipo || "CC"} ${p.docNumero} - ${p.conceptoAptitud || "Pendiente"}`).join("\n")}\n\n━━━ DESCARGAR CERTIFICADOS ━━━\n\nPortal de Certificados:\n${portalUrl}\n\n→ Seleccione "🏢 Empresa" e ingrese el NIT: ${empNit}\n→ Podrá ver y descargar TODOS los certificados en PDF\n→ Cada trabajador también puede consultar con su cédula\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCordialmente,\n${remitente}\nMédico Ocupacional\n${emailConfig.email}`;
+      const r = await _enviarEmail(empresaEmail, subject, body);
+      if (r.method === "emailjs") showAlert(`✅ Email enviado automáticamente a ${empresaEmail}\n\n${pacientes.length} certificados notificados.`);
       return { enviados: pacientes.length, fallidos: [], modo: "empresa" };
     }
-    // Modo individual: enviar a cada trabajador
+    // Modo individual
     for (const pac of pacientes) {
-      const destino = pac.email;
-      if (!destino) { sinEmail.push(pac.nombres || "Sin nombre"); continue; }
-      const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
+      if (!pac.email) { sinEmail.push(pac.nombres || "Sin nombre"); continue; }
       const subject = `Certificado Médico Ocupacional - ${pac.nombres || ""}`;
-      const body = `Estimado/a ${pac.nombres || ""},\n\nSu certificado de aptitud médica ocupacional ha sido emitido.\n\n━━━ DESCARGUE SU CERTIFICADO ━━━\n\n📥 Ingrese al Portal de Certificados:\n${portalLink}\n\n→ Seleccione "🪪 Cédula"\n→ Ingrese su número de documento: ${pac.docNumero || ""}\n→ Podrá ver y descargar su certificado en PDF\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCordialmente,\n${emailConfig.nombre || activeDoctorData?.nombre || "OcupaSalud"}\nMédico Ocupacional\n${emailConfig.email || ""}`;
-      // Usar BCC al email del médico para tener copia
-      const mailtoUrl = `mailto:${destino}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&bcc=${encodeURIComponent(emailConfig.email)}`;
+      const body = `Estimado/a ${pac.nombres || ""},\n\nSu certificado de aptitud médica ocupacional ha sido emitido.\n\n━━━ DESCARGUE SU CERTIFICADO ━━━\n\n📥 Portal de Certificados:\n${portalUrl}\n\n→ Seleccione "🪪 Cédula"\n→ Ingrese: ${pac.docNumero || ""}\n→ Descargue su certificado en PDF\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCordialmente,\n${remitente}\nMédico Ocupacional`;
+      const r = await _enviarEmail(pac.email, subject, body);
       enviados.push(pac.nombres);
-      // Abrir con delay para no saturar
-      await new Promise(resolve => setTimeout(resolve, 600));
-      window.open(mailtoUrl, "_blank");
+      if (usaEmailJS) await new Promise(resolve => setTimeout(resolve, 1100)); // rate limit EmailJS: 1/seg
     }
+    const metodo = usaEmailJS ? "automáticamente" : "(revise cada ventana y presione Enviar)";
     if (sinEmail.length > 0) {
-      showAlert(`⚠️ ${sinEmail.length} trabajador(es) SIN email registrado:\n\n${sinEmail.join("\n")}\n\n✅ ${enviados.length} email(s) abiertos para enviar.`);
+      showAlert(`⚠️ ${sinEmail.length} sin email:\n${sinEmail.join(", ")}\n\n✅ ${enviados.length} email(s) enviados ${metodo}`);
     } else {
-      showAlert(`✅ ${enviados.length} email(s) abiertos para enviar.\n\nRevise cada ventana y presione Enviar.`);
+      showAlert(`✅ ${enviados.length} email(s) enviados ${metodo}`);
     }
     return { enviados: enviados.length, fallidos: sinEmail };
   };
@@ -49090,10 +49116,10 @@ body{padding-top:52px;}
         renderCurrentView()
       )}
       {renderMensajesOverlay()}
-      {/* MODAL: Configuración de Email */}
+      {/* MODAL: Configuración de Email + EmailJS */}
       {showEmailConfig && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 my-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-black text-gray-800">✉️ Configuración de Email</h3>
               <button onClick={() => setShowEmailConfig(false)} className="text-gray-400 hover:text-red-500 text-xl font-black">✕</button>
@@ -49104,28 +49130,97 @@ body{padding-top:52px;}
                   <p className="text-xs font-bold text-emerald-600 uppercase">Cuenta configurada</p>
                   <p className="text-lg font-black text-emerald-800 mt-1">{emailConfig.email}</p>
                   <p className="text-xs text-gray-500">{emailConfig.nombre}</p>
+                  <div className="mt-2">
+                    {emailConfig.emailjsConfigurado ? (
+                      <span className="bg-emerald-200 text-emerald-800 px-3 py-1 rounded-full text-[10px] font-black">✅ Envío automático (EmailJS)</span>
+                    ) : (
+                      <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-[10px] font-black">⚠️ Modo manual (mailto:)</span>
+                    )}
+                  </div>
                 </div>
-                <button onClick={() => { saveEmailConfig({ email: "", nombre: "", configurado: false }); }} className="w-full py-2 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-black hover:bg-red-100">🚪 Cerrar sesión de email / Cambiar cuenta</button>
+                {!emailConfig.emailjsConfigurado && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                    <p className="text-[10px] font-black text-blue-800 mb-1">🚀 ¿Quiere envío automático? Configure EmailJS (gratis)</p>
+                    <p className="text-[9px] text-blue-600">Con EmailJS los emails se envían con 1 clic, sin abrir Gmail manualmente. 200 emails/mes gratis.</p>
+                    <button onClick={() => { saveEmailConfig({...emailConfig, configurado: false}); }} className="mt-2 text-[10px] bg-blue-600 text-white px-3 py-1 rounded-lg font-bold hover:bg-blue-700">⚙️ Configurar EmailJS</button>
+                  </div>
+                )}
+                <button onClick={() => { saveEmailConfig({ email: "", nombre: "", configurado: false, emailjsPublicKey: "", emailjsServiceId: "", emailjsTemplateId: "", emailjsConfigurado: false }); }} className="w-full py-2 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-black hover:bg-red-100">🚪 Cerrar sesión / Cambiar cuenta</button>
               </div>
             ) : (
-              <div className="space-y-3">
-                <p className="text-xs text-gray-500">Configure su email para enviar certificados directamente desde la plataforma. Esta configuración se guarda en la nube y persiste entre navegadores.</p>
-                <div>
-                  <label className="text-[10px] font-black text-gray-600 uppercase block mb-1">Email del médico / clínica *</label>
-                  <input type="email" id="email-cfg-email" className="w-full p-2 border border-gray-200 rounded-lg text-sm" placeholder="doctor@email.com" defaultValue={emailConfig.email} />
+              <div className="space-y-4">
+                {/* PASO 1: Datos básicos */}
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-xs font-black text-gray-700 mb-2">📧 Paso 1: Sus datos de email</p>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-[10px] font-black text-gray-600 uppercase block mb-0.5">Email *</label>
+                      <input type="email" id="email-cfg-email" className="w-full p-2 border border-gray-200 rounded-lg text-sm" placeholder="doctor@gmail.com" defaultValue={emailConfig.email} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-gray-600 uppercase block mb-0.5">Nombre remitente</label>
+                      <input id="email-cfg-nombre" className="w-full p-2 border border-gray-200 rounded-lg text-sm" placeholder="Dr. Juan Pérez" defaultValue={emailConfig.nombre || activeDoctorData?.nombre || ""} />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[10px] font-black text-gray-600 uppercase block mb-1">Nombre remitente</label>
-                  <input id="email-cfg-nombre" className="w-full p-2 border border-gray-200 rounded-lg text-sm" placeholder="Dr. Juan Pérez - Médico Ocupacional" defaultValue={emailConfig.nombre || activeDoctorData?.nombre || ""} />
+                {/* PASO 2: EmailJS (opcional) */}
+                <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                  <p className="text-xs font-black text-blue-800 mb-1">🚀 Paso 2: Envío automático con EmailJS (opcional, gratis)</p>
+                  <p className="text-[9px] text-blue-600 mb-2">Sin esto, se abrirá Gmail/Outlook para enviar manualmente. Con EmailJS se envía con 1 clic.</p>
+                  <div className="bg-white rounded-lg p-2.5 border border-blue-200 mb-2">
+                    <p className="text-[10px] font-black text-gray-700 mb-1.5">📋 Guía paso a paso:</p>
+                    <ol className="text-[9px] text-gray-600 space-y-1 list-decimal pl-4">
+                      <li>Vaya a <a href="https://www.emailjs.com/pricing/" target="_blank" rel="noreferrer" className="text-blue-600 underline font-bold">emailjs.com</a> → Crear cuenta gratis (Sign Up)</li>
+                      <li>En el dashboard, clic en <strong>"Add New Service"</strong> → seleccione Gmail u Outlook → conecte su cuenta</li>
+                      <li>Copie el <strong>Service ID</strong> (ej: service_abc123)</li>
+                      <li>Vaya a <strong>"Email Templates"</strong> → <strong>"Create New Template"</strong></li>
+                      <li>En el template, use estas variables en el cuerpo:<br/><code className="bg-gray-100 px-1 rounded text-[8px]">{"{{from_name}} - {{subject}}"}</code><br/><code className="bg-gray-100 px-1 rounded text-[8px]">{"{{message}}"}</code><br/>En "To Email": <code className="bg-gray-100 px-1 rounded text-[8px]">{"{{to_email}}"}</code><br/>En "Reply To": <code className="bg-gray-100 px-1 rounded text-[8px]">{"{{reply_to}}"}</code></li>
+                      <li>Guarde el template → copie el <strong>Template ID</strong> (ej: template_xyz789)</li>
+                      <li>Vaya a <strong>"Account"</strong> → copie su <strong>Public Key</strong></li>
+                      <li>Pegue los 3 valores abajo ↓</li>
+                    </ol>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div>
+                      <label className="text-[9px] font-bold text-blue-700 block">Public Key</label>
+                      <input id="email-cfg-pk" className="w-full p-1.5 border border-blue-200 rounded-lg text-xs font-mono" placeholder="ej: user_AbCdEfGhIjK" defaultValue={emailConfig.emailjsPublicKey} />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-blue-700 block">Service ID</label>
+                      <input id="email-cfg-sid" className="w-full p-1.5 border border-blue-200 rounded-lg text-xs font-mono" placeholder="ej: service_abc123" defaultValue={emailConfig.emailjsServiceId} />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-blue-700 block">Template ID</label>
+                      <input id="email-cfg-tid" className="w-full p-1.5 border border-blue-200 rounded-lg text-xs font-mono" placeholder="ej: template_xyz789" defaultValue={emailConfig.emailjsTemplateId} />
+                    </div>
+                  </div>
                 </div>
+                {/* Botón guardar */}
                 <button onClick={() => {
                   const em = document.getElementById("email-cfg-email")?.value?.trim();
                   const nm = document.getElementById("email-cfg-nombre")?.value?.trim();
+                  const pk = document.getElementById("email-cfg-pk")?.value?.trim() || "";
+                  const sid = document.getElementById("email-cfg-sid")?.value?.trim() || "";
+                  const tid = document.getElementById("email-cfg-tid")?.value?.trim() || "";
                   if (!em || !em.includes("@")) { showAlert("Ingrese un email válido."); return; }
-                  saveEmailConfig({ email: em, nombre: nm || activeDoctorData?.nombre || "", configurado: true });
-                  showAlert("✅ Email configurado: " + em + "\n\nAhora puede enviar certificados desde la plataforma.");
+                  const ejsOk = pk && sid && tid;
+                  saveEmailConfig({
+                    email: em,
+                    nombre: nm || activeDoctorData?.nombre || "",
+                    configurado: true,
+                    emailjsPublicKey: pk,
+                    emailjsServiceId: sid,
+                    emailjsTemplateId: tid,
+                    emailjsConfigurado: ejsOk,
+                  });
+                  if (ejsOk) {
+                    showAlert("✅ Email configurado con envío automático (EmailJS)\n\n📧 " + em + "\n\nLos certificados se enviarán con 1 clic, sin abrir Gmail.");
+                  } else {
+                    showAlert("✅ Email configurado: " + em + "\n\n⚠️ Sin EmailJS: se abrirá Gmail/Outlook para enviar.\nPuede configurar EmailJS más adelante para envío automático.");
+                  }
                   setShowEmailConfig(false);
                 }} className="w-full py-2.5 bg-emerald-700 text-white rounded-xl text-sm font-black hover:bg-emerald-800">✅ Guardar Configuración</button>
+                <p className="text-[8px] text-gray-400 text-center">La configuración se guarda en la nube (Supabase) y funciona en cualquier navegador/computador.</p>
               </div>
             )}
           </div>
