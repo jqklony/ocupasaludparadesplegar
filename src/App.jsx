@@ -12254,27 +12254,42 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
           if (r5.ok && r5.data) pac = r5.data;
         }
       } else if (tipoBusqueda === "empresa") {
-        // Búsqueda por NIT de empresa: buscar todos los pacientes de esa empresa
+        // Búsqueda por NIT de empresa: usar índice siso_portal_empresa_{nit}
         const nitClean = q.replace(/[^0-9]/g, "");
+        const qLower = q.trim().toLowerCase();
         try {
-          const rAll = await fetchConTimeout(`${sbUrl}/rest/v1/siso_store?select=key,value&key=like.siso_portal_doc_%`, { headers }, 15000);
-          if (rAll.ok) {
-            const rows = await rAll.json();
-            const matches = rows.filter(r => {
-              const v = r.value;
-              if (!v) return false;
-              const val = typeof v === "string" ? JSON.parse(v) : v;
-              return val && (val.empresaNit === nitClean || val.empresaNit === q.trim() || (val.empresaNombre || "").toLowerCase().includes(q.trim().toLowerCase()));
-            }).map(r => typeof r.value === "string" ? JSON.parse(r.value) : r.value);
-            if (matches.length > 0) {
-              setResultadosEmpresa(matches);
+          // 1) Buscar por NIT exacto en índice
+          let empresaIdx = null;
+          const r1 = await fetchKey("siso_portal_empresa_" + nitClean);
+          if (r1.ok && r1.data) empresaIdx = r1.data;
+          // 2) Si no encontró, buscar por nombre en todos los índices de empresa
+          if (!empresaIdx) {
+            const rAll = await fetchConTimeout(`${sbUrl}/rest/v1/siso_store?select=key,value&key=like.siso_portal_empresa_%`, { headers }, 12000);
+            if (rAll.ok) {
+              const rows = await rAll.json();
+              const match = rows.find(r => {
+                const v = typeof r.value === "string" ? JSON.parse(r.value) : r.value;
+                return v && ((v.nombre || "").toLowerCase().includes(qLower) || (v.nit || "") === nitClean);
+              });
+              if (match) empresaIdx = typeof match.value === "string" ? JSON.parse(match.value) : match.value;
+            }
+          }
+          if (empresaIdx && empresaIdx.documentos && empresaIdx.documentos.length > 0) {
+            // Fetch each worker's portal data
+            const resultados = [];
+            for (const doc of empresaIdx.documentos) {
+              const rDoc = await fetchKey("siso_portal_doc_" + doc.replace(/\s/g, ""));
+              if (rDoc.ok && rDoc.data) resultados.push(rDoc.data);
+            }
+            if (resultados.length > 0) {
+              setResultadosEmpresa(resultados);
               setCertSeleccionados({});
               setCargando(false);
               return;
             }
           }
-        } catch {}
-        setError("❌ No se encontraron certificados para esta empresa. Verifique el NIT o nombre.");
+        } catch (e) { console.warn("Portal empresa search error:", e); }
+        setError("❌ No se encontraron certificados para esta empresa.\n\nVerifique el NIT o nombre. Solo aparecen empresas con historias clínicas cerradas.");
         setCargando(false);
         return;
       } else {
@@ -16069,6 +16084,22 @@ const handleLogin = (u, p) => {
         // FIX: también guardar con formato alternativo para compatibilidad con códigos viejos
         if (code && !code.startsWith("CV-")) {
           _sbSet("siso_portal_CV-" + code, portalData);
+        }
+        // Actualizar índice de empresa para búsqueda en portal
+        if (closed.empresaNit && closed.empresaId && closed.empresaId !== "particular") {
+          const _nitIdx = (closed.empresaNit || "").replace(/[^0-9]/g, "");
+          if (_nitIdx.length >= 3) {
+            fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_portal_empresa_${_nitIdx}&select=value`, {
+              headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` }
+            }).then(r => r.json()).then(d => {
+              const existing = d[0]?.value || { nit: _nitIdx, nombre: closed.empresaNombre || "", documentos: [] };
+              const docNum = (closed.docNumero || "").replace(/\s/g, "");
+              if (docNum && !existing.documentos.includes(docNum)) existing.documentos.push(docNum);
+              existing.updatedAt = new Date().toISOString();
+              existing.nombre = closed.empresaNombre || existing.nombre;
+              _sbSet(`siso_portal_empresa_${_nitIdx}`, existing);
+            }).catch(() => {});
+          }
         }
         // ── Auto-marcar paciente agendado como "Visto" (tiempo real) ──────────
         if (data._agendaId) {
