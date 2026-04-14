@@ -13818,7 +13818,19 @@ function AppInner() {
       };
       // Pacientes: cargados por usuario específico en handleLogin - no cargar genérico
       // Empresas: se cargan por usuario en handleLogin, no aquí
+      // Caja movimientos: sincronizar desde Supabase (clave con sufijo de usuario)
+      {
+        const _cajaSuf = currentUser?.empresaId ? "empresa_" + currentUser.empresaId : currentUser?.user || "shared";
+        const _cajaCloudKey = `siso_caja_movs_${_cajaSuf}`;
+        const _cajaLocalKey = `siso_caja_${_cajaSuf}`;
+        applyCloud(_cajaCloudKey, setCajaMovimientos, [], _cajaLocalKey);
+      }
       applyCloud("siso_saved_bills", setSavedBillsList, [], "siso_saved_bills");
+      // Bills con sufijo de usuario
+      {
+        const _billSuf = currentUser?.empresaId ? "empresa_" + currentUser.empresaId : currentUser?.user || "shared";
+        applyCloud(`siso_saved_bills_${_billSuf}`, setSavedBillsList, [], `siso_saved_bills_${_billSuf}`);
+      }
       applyCloud(
         "siso_saved_reports",
         setSavedReports,
