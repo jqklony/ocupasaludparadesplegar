@@ -237,7 +237,7 @@ const sps = (k, fb) => {
 // ══ POLÍTICA PÚBLICA PORTAL TRABAJADOR - ejecutar en Supabase SQL Editor ══
 // CREATE POLICY portal_public_read ON siso_store
 //   FOR SELECT USING (key LIKE 'siso_portal_%');
-// Portal URL: https://fw5fnt.csb.app/#portaltrabajador
+// Portal URL: {origin}/#portaltrabajador (dinámico)
 // ════════════════════════════════════════════════════════════════════════
 // ✅ No expone datos de otros usuarios por el aislamiento por _medicoId
 // ✅ Rotar la key cada 90 días en el dashboard de Supabase
@@ -12137,7 +12137,7 @@ const EncuestaPublicaForm = ({ token, sbUrl, sbKey, onVolver }) => {
 // Solo requiere: código de verificación de HC O número de cédula
 // Consulta DIRECTA a Supabase (no usa estado del App)
 // SEC-13: Sin acceso a datos de otros pacientes
-const PORTAL_URL = "https://fw5fnt.csb.app/#portaltrabajador";
+const PORTAL_URL = (typeof window !== "undefined" ? window.location.origin + window.location.pathname : "") + "#portaltrabajador";
 // ══════════════════════════════════════════════════════════════════════════
 // PORTAL PÚBLICO DEL TRABAJADOR - v2 - Acceso sin login
 // URL: https://fw5fnt.csb.app/#portaltrabajador
@@ -13860,7 +13860,7 @@ function AppInner() {
   useEffect(() => {
     const hash = window.location.hash;
     if (hash === "#portaltrabajador" || hash === "#portal") {
-      history.replaceState(null, "", window.location.pathname);
+      // NO limpiar hash — mantenerlo para que al recargar se mantenga en el portal
       setShowPortalPublico(true);
     }
     // Deep-link: #encuesta?token=xxx — formulario público de encuesta sociodemográfica
@@ -19555,7 +19555,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
             </p>
             <div className="grid grid-cols-3 gap-2">
               <button
-                onClick={() => goTo("portaltrabajador")}
+                onClick={() => { window.location.hash = "#portaltrabajador"; setShowPortalPublico(true); }}
                 className="bg-white border border-gray-100 rounded-xl p-3 flex items-center gap-2.5 hover:border-teal-200 hover:bg-teal-50/40 transition group shadow-sm"
               >
                 <div className="bg-teal-50 p-2 rounded-lg group-hover:bg-teal-100 transition flex-shrink-0">
@@ -19566,12 +19566,12 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     Portal Trabajador
                   </p>
                   <p className="text-[10px] text-gray-400 truncate">
-                    Consulta código
+                    Código / Cédula / Empresa
                   </p>
                 </div>
               </button>
               <button
-                onClick={() => goTo("portalempresa")}
+                onClick={() => { window.location.hash = "#portaltrabajador"; setShowPortalPublico(true); }}
                 className="bg-white border border-gray-100 rounded-xl p-3 flex items-center gap-2.5 hover:border-indigo-200 hover:bg-indigo-50/40 transition group shadow-sm"
               >
                 <div className="bg-indigo-50 p-2 rounded-lg group-hover:bg-indigo-100 transition flex-shrink-0">
@@ -29163,30 +29163,22 @@ Esta historia clínica debe conservarse mínimo 20 años.
                 🔗 Link de acceso para el trabajador
               </p>
               <p className="text-[10px] text-teal-600 font-mono break-all select-all mb-2">
-                https://fw5fnt.csb.app/#portaltrabajador
+                {window.location.origin + window.location.pathname}#portaltrabajador
               </p>
               <div className="flex gap-2 flex-wrap">
                 <button
                   onClick={() => {
-                    navigator.clipboard
-                      ?.writeText("https://fw5fnt.csb.app/#portaltrabajador")
-                      .then(() =>
-                        showAlert(
-                          "✅ Enlace copiado.\nComparta: https://fw5fnt.csb.app/#portaltrabajador\n\nEl trabajador ingresa con su código o cédula."
-                        )
-                      )
-                      .catch(() =>
-                        showAlert(
-                          "URL: https://fw5fnt.csb.app/#portaltrabajador"
-                        )
-                      );
+                    const _pUrl = window.location.origin + window.location.pathname + "#portaltrabajador";
+                    navigator.clipboard?.writeText(_pUrl)
+                      .then(() => showAlert("✅ Enlace copiado.\nComparta: " + _pUrl + "\n\nEl trabajador ingresa con su código, cédula o NIT de empresa."))
+                      .catch(() => showAlert("URL: " + _pUrl));
                   }}
                   className="text-[10px] bg-teal-600 text-white px-3 py-1 rounded-lg font-bold flex items-center gap-1 hover:bg-teal-700"
                 >
                   📋 Copiar enlace
                 </button>
                 <a
-                  href="https://fw5fnt.csb.app/#portaltrabajador"
+                  href="#portaltrabajador"
                   target="_blank"
                   rel="noreferrer"
                   className="text-[10px] bg-white border border-teal-300 text-teal-700 px-3 py-1 rounded-lg font-bold flex items-center gap-1 hover:bg-teal-50"
@@ -29194,7 +29186,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                   🔗 Abrir enlace
                 </a>
                 <button
-                  onClick={() => setShowPortalPublico(true)}
+                  onClick={() => { window.location.hash = "#portaltrabajador"; setShowPortalPublico(true); }}
                   className="text-[10px] bg-teal-50 border border-teal-200 text-teal-700 px-3 py-1 rounded-lg font-bold flex items-center gap-1 hover:bg-teal-100"
                 >
                   🧑‍💼 Vista previa
@@ -49012,7 +49004,7 @@ body{padding-top:52px;}
         <PortalPublicoTrabajador
           sbUrl={_SB_URL}
           sbKey={_SB_KEY}
-          onVolver={currentUser ? () => setShowPortalPublico(false) : null}
+          onVolver={currentUser ? () => { setShowPortalPublico(false); history.replaceState(null, "", window.location.pathname); } : null}
         />
       ) : (
         renderCurrentView()
