@@ -17792,7 +17792,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
     }
 
     // ═══ 18. ANÁLISIS CLÍNICO IA ═══
-    if (data.analisisIA) sections.push(sec("🧠", "Análisis Clínico IA") + '<div style="padding:6px 10px;font-size:9pt;white-space:pre-wrap;line-height:1.5;background:#fefce8;border:1px solid #fde68a;border-radius:4px;margin:4px 0;">' + _nl(data.analisisIA) + '</div>');
+    if (data.analisisIA) sections.push(sec("🧠", "Análisis Clínico") + '<div style="padding:6px 10px;font-size:9pt;white-space:pre-wrap;line-height:1.5;background:#fefce8;border:1px solid #fde68a;border-radius:4px;margin:4px 0;">' + _nl(data.analisisIA) + '</div>');
 
     // ═══ 19. SVE ═══
     if (data.sveRecomendado?.length > 0) {
@@ -17879,12 +17879,16 @@ Esta historia clínica debe conservarse mínimo 20 años.
     }
 
     // ═══ ENSAMBLAR DOCUMENTO ═══
+    const _hcStyles = '@page{size:letter portrait;margin:1.1cm 1.4cm 1.3cm 1.4cm;}*{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}body{font-family:"Segoe UI",Arial,Helvetica,sans-serif;font-size:9.5pt;color:#111;margin:0;padding:14mm 16mm;line-height:1.45;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #b7e3c9;padding:5px 8px;font-size:8.5pt;}th{font-weight:700;text-align:left;background-color:#d1fae5!important;color:#065f46;}p{margin:3px 0;}ul{margin:4px 0;padding-left:16px;}li{margin-bottom:2px;font-size:9pt;}.sec-hdr{background-color:#065f46!important;color:#fff!important;padding:6px 12px;margin:14px 0 6px;font-weight:900;font-size:9.5pt;text-transform:uppercase;border-radius:4px;}.np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:9999;}.np-bar button{border:none;padding:6px 16px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;background:#10b981;color:#fff;}tr:nth-child(even){background-color:#f0fdf4!important;}@media print{.np-bar{display:none!important;}body{padding:0;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}table{page-break-inside:auto;}tr{page-break-inside:avoid;}th{background-color:#d1fae5!important;}}';
+    const _hcBody = sections.join("");
+    // Store for reuse by checklist
+    window._lastHCCleanStyles = _hcStyles;
+    window._lastHCCleanBody = _hcBody;
     var w = window.open("", "_blank", "width=870,height=1100");
     if (!w) { showAlert("Permita las ventanas emergentes para imprimir."); return; }
-    w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>[OCUPASALUD] ' + _e(data.nombres||"HC") + '</title>' +
-    '<style>@page{size:letter portrait;margin:1.1cm 1.4cm 1.3cm 1.4cm;}*{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}body{font-family:"Segoe UI",Arial,Helvetica,sans-serif;font-size:9.5pt;color:#111;margin:0;padding:14mm 16mm;line-height:1.45;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #b7e3c9;padding:5px 8px;font-size:8.5pt;}th{font-weight:700;text-align:left;background-color:#d1fae5!important;color:#065f46;}p{margin:3px 0;}ul{margin:4px 0;padding-left:16px;}li{margin-bottom:2px;font-size:9pt;}.sec-hdr{background-color:#065f46!important;color:#fff!important;padding:6px 12px;margin:14px 0 6px;font-weight:900;font-size:9.5pt;text-transform:uppercase;border-radius:4px;}.np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:9999;}.np-bar button{border:none;padding:6px 16px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;background:#10b981;color:#fff;}tr:nth-child(even){background-color:#f0fdf4!important;}@media print{.np-bar{display:none!important;}body{padding:0;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}table{page-break-inside:auto;}tr{page-break-inside:avoid;}th{background-color:#d1fae5!important;}}</style></head><body>' +
+    w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>[OCUPASALUD] ' + _e(data.nombres||"HC") + '</title><style>' + _hcStyles + '</style></head><body>' +
     '<div class="np-bar"><span style="flex:1;font-weight:700;">\uD83D\uDCCB HC ' + _e(data.nombres||"") + ' \u2014 ' + _e(data.codigoVerificacion||"") + '</span><button onclick="window.print()">\uD83D\uDCE5 Guardar / Imprimir PDF</button><button onclick="window.close()" style="background:#ef4444;">\u2715 Cerrar</button></div>' +
-    '<div style="margin-top:50px;">' + sections.join("") + '</div></body></html>');
+    '<div style="margin-top:50px;">' + _hcBody + '</div></body></html>');
     w.document.close();
     w.focus();
   };
@@ -18275,43 +18279,47 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     <button onClick={() => {
                       const selected = Object.entries(enviarChecklist).filter(([,v]) => v).map(([k]) => k);
                       if (selected.length === 0) { showAlert("Seleccione al menos un documento."); return; }
-                      // Solo certificado → ventana dedicada con formato profesional
-                      if (selected.length === 1 && selected[0] === "certificado") {
-                        const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
-                        const w = window.open("", "_blank", "width=920,height=1150");
-                        if (w) { w.document.write(html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Guardar PDF</button></div></body>')); w.document.close(); }
+
+                      // Solo 1 doc → usar función original dedicada (máxima calidad)
+                      if (selected.length === 1) {
+                        if (selected[0] === "certificado") {
+                          const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
+                          const w = window.open("", "_blank", "width=920,height=1150");
+                          if (w) { w.document.write(html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Guardar PDF</button></div></body>')); w.document.close(); }
+                        } else if (selected[0] === "historia") { _printHCClean(); }
+                        else if (selected[0] === "formula") { openPrintWindow("formula", "Fórmula Médica"); }
+                        else if (selected[0] === "derivacion") { openPrintWindow("derivacion", "Derivación / Interconsulta"); }
+                        else if (selected[0] === "examenes") { handlePrint("Exámenes-" + data.nombres); }
                         setShowEnviarPanel(false);
                         return;
                       }
-                      // Solo HC → _printHCClean con formato profesional
-                      if (selected.length === 1 && selected[0] === "historia") {
-                        _printHCClean();
-                        setShowEnviarPanel(false);
-                        return;
-                      }
-                      // Solo fórmula → openPrintWindow
-                      if (selected.length === 1 && selected[0] === "formula") {
-                        openPrintWindow("formula", "Fórmula Médica");
-                        setShowEnviarPanel(false);
-                        return;
-                      }
-                      // Solo derivación → openPrintWindow
-                      if (selected.length === 1 && selected[0] === "derivacion") {
-                        openPrintWindow("derivacion", "Derivación / Interconsulta");
-                        setShowEnviarPanel(false);
-                        return;
-                      }
-                      // Múltiples documentos → abrir TODOS inmediatamente (sin setTimeout)
-                      // El popup blocker no bloquea si se abren en el mismo click handler
-                      const windows = [];
-                      if (selected.includes("certificado")) {
-                        const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
-                        const w = window.open("", "_blank", "width=920,height=1150");
-                        if (w) { w.document.write(html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Certificado</button></div></body>')); w.document.close(); windows.push(w); }
-                      }
+
+                      // Múltiples docs → 1 SOLA ventana combinando HTMLs
+                      // Primero generar HC para tener los estilos frescos
                       if (selected.includes("historia")) {
-                        _printHCClean();
+                        _printHCClean(); // esto guarda _lastHCCleanStyles y _lastHCCleanBody
+                        // Cerrar la ventana que abrió _printHCClean (la usaremos combinada)
                       }
+
+                      // Recopilar secciones HTML
+                      const pages = [];
+                      const allStyles = [];
+
+                      if (selected.includes("certificado")) {
+                        const certHtml = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
+                        const styleMatch = certHtml.match(/<style>([\s\S]*?)<\/style>/);
+                        const bodyMatch = certHtml.match(/<body[^>]*>([\s\S]*)<\/body>/);
+                        if (styleMatch) allStyles.push(styleMatch[1]);
+                        if (bodyMatch) pages.push('<div style="page-break-after:always;">' + bodyMatch[1] + '</div>');
+                      }
+
+                      if (selected.includes("historia") && window._lastHCCleanBody) {
+                        if (window._lastHCCleanStyles && !allStyles.includes(window._lastHCCleanStyles)) {
+                          allStyles.push(window._lastHCCleanStyles);
+                        }
+                        pages.push('<div style="page-break-before:always;">' + window._lastHCCleanBody + '</div>');
+                      }
+
                       if (selected.includes("formula")) {
                         openPrintWindow("formula", "Fórmula Médica");
                       }
@@ -18320,6 +18328,18 @@ Esta historia clínica debe conservarse mínimo 20 años.
                       }
                       if (selected.includes("examenes")) {
                         handlePrint("Exámenes-" + data.nombres);
+                      }
+
+                      // Si tenemos certificado y/o HC, abrir ventana combinada
+                      if (pages.length > 0) {
+                        const w = window.open("", "_blank", "width=920,height=1200");
+                        if (w) {
+                          const combinedStyles = allStyles.join("\n");
+                          const _esc2 = (v) => String(v||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
+                          w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Documentos - ' + _esc2(data.nombres) + '</title><style>' + combinedStyles + ' .np-dl{position:fixed;bottom:20px;right:20px;z-index:9999;} .np-dl button{background:#065f46;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:900;font-size:11pt;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2);} @media print{.np-dl{display:none!important;}}</style></head><body>' + pages.join("") + '<div class="np-dl"><button onclick="window.print()">📥 Guardar / Imprimir PDF (' + pages.length + ' docs)</button></div></body></html>');
+                          w.document.close();
+                          w.focus();
+                        }
                       }
                       setShowEnviarPanel(false);
                     }} className="flex-1 px-2 py-1.5 bg-emerald-600 text-white text-[9px] font-black rounded-lg hover:bg-emerald-700">🖨️ PDF</button>
