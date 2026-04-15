@@ -17430,7 +17430,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
     }, 200);
   };
   // ══ FIX: Imprimir HC como documento HTML limpio (sin sobreposición) ══
-  const _printHCClean = () => {
+  const _printHCClean = (silentMode) => {
     const _e = (v) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const _nl = (v) => _e(v).replace(/\n/g, "<br/>");
     const doc = activeDoctorData || {};
@@ -17884,6 +17884,8 @@ Esta historia clínica debe conservarse mínimo 20 años.
     // Store for reuse by checklist
     window._lastHCCleanStyles = _hcStyles;
     window._lastHCCleanBody = _hcBody;
+    // silentMode: solo genera HTML sin abrir ventana (para combinar con otros docs)
+    if (silentMode) return;
     var w = window.open("", "_blank", "width=870,height=1100");
     if (!w) { showAlert("Permita las ventanas emergentes para imprimir."); return; }
     w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>[OCUPASALUD] ' + _e(data.nombres||"HC") + '</title><style>' + _hcStyles + '</style></head><body>' +
@@ -18295,52 +18297,34 @@ Esta historia clínica debe conservarse mínimo 20 años.
                       }
 
                       // Múltiples docs → 1 SOLA ventana combinando HTMLs
-                      // Primero generar HC para tener los estilos frescos
-                      if (selected.includes("historia")) {
-                        _printHCClean(); // esto guarda _lastHCCleanStyles y _lastHCCleanBody
-                        // Cerrar la ventana que abrió _printHCClean (la usaremos combinada)
-                      }
-
-                      // Recopilar secciones HTML
                       const pages = [];
                       const allStyles = [];
 
+                      // Certificado: extraer styles y body del HTML completo
                       if (selected.includes("certificado")) {
                         const certHtml = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
                         const styleMatch = certHtml.match(/<style>([\s\S]*?)<\/style>/);
                         const bodyMatch = certHtml.match(/<body[^>]*>([\s\S]*)<\/body>/);
                         if (styleMatch) allStyles.push(styleMatch[1]);
-                        if (bodyMatch) pages.push('<div style="page-break-after:always;">' + bodyMatch[1] + '</div>');
+                        if (bodyMatch) pages.push(bodyMatch[1]);
                       }
 
-                      if (selected.includes("historia") && window._lastHCCleanBody) {
-                        if (window._lastHCCleanStyles && !allStyles.includes(window._lastHCCleanStyles)) {
-                          allStyles.push(window._lastHCCleanStyles);
-                        }
-                        pages.push('<div style="page-break-before:always;">' + window._lastHCCleanBody + '</div>');
-                      }
-
-                      if (selected.includes("formula")) {
-                        openPrintWindow("formula", "Fórmula Médica");
-                      }
-                      if (selected.includes("derivacion")) {
-                        openPrintWindow("derivacion", "Derivación / Interconsulta");
-                      }
-                      if (selected.includes("examenes")) {
-                        handlePrint("Exámenes-" + data.nombres);
-                      }
-
-                      // Si tenemos certificado y/o HC, abrir ventana combinada
-                      if (pages.length > 0) {
-                        const w = window.open("", "_blank", "width=920,height=1200");
-                        if (w) {
-                          const combinedStyles = allStyles.join("\n");
-                          const _esc2 = (v) => String(v||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
-                          w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Documentos - ' + _esc2(data.nombres) + '</title><style>' + combinedStyles + ' .np-dl{position:fixed;bottom:20px;right:20px;z-index:9999;} .np-dl button{background:#065f46;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:900;font-size:11pt;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2);} @media print{.np-dl{display:none!important;}}</style></head><body>' + pages.join("") + '<div class="np-dl"><button onclick="window.print()">📥 Guardar / Imprimir PDF (' + pages.length + ' docs)</button></div></body></html>');
-                          w.document.close();
-                          w.focus();
+                      // HC: generar en modo silencioso (sin abrir ventana)
+                      if (selected.includes("historia")) {
+                        _printHCClean(true); // silentMode = true → no abre ventana, solo guarda HTML
+                        if (window._lastHCCleanBody) {
+                          if (window._lastHCCleanStyles) allStyles.push(window._lastHCCleanStyles);
+                          pages.push('<div style="page-break-before:always;padding:14mm 16mm;">' + window._lastHCCleanBody + '</div>');
                         }
                       }
+
+                      if (pages.length === 0) { showAlert("No se pudo generar los documentos."); return; }
+                      const w = window.open("", "_blank", "width=920,height=1200");
+                      if (!w) { showAlert("Permita ventanas emergentes."); return; }
+                      const _esc2 = (v) => String(v||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
+                      w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Documentos - ' + _esc2(data.nombres) + '</title><style>' + allStyles.join("\n") + ' .np-dl{position:fixed;bottom:20px;right:20px;z-index:9999;} .np-dl button{background:#065f46;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:900;font-size:11pt;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2);} @media print{.np-dl{display:none!important;}}</style></head><body>' + pages.join("") + '<div class="np-dl"><button onclick="window.print()">📥 Guardar / Imprimir PDF (' + pages.length + ' docs)</button></div></body></html>');
+                      w.document.close();
+                      w.focus();
                       setShowEnviarPanel(false);
                     }} className="flex-1 px-2 py-1.5 bg-emerald-600 text-white text-[9px] font-black rounded-lg hover:bg-emerald-700">🖨️ PDF</button>
                     <button onClick={() => {
