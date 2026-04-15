@@ -18240,7 +18240,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
               </button>
 
               {/* ── Descargar Todo: Certificado + Incapacidad + Fórmula/Derivación ── */}
-              {dataType === "ocupacional" && data.estadoHistoria !== "Cerrada" && (
+              {dataType === "ocupacional" && (
                 <button
                   onClick={() => {
                     const docData = activeDoctorData || {};
@@ -18679,16 +18679,26 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     <style>${sharedCss}</style>
                     </head><body>
                     <div class="dl-bar">
-                      <span class="title">📄 4 documentos - ${_esc(
+                      <span class="title">📄 Documentos - ${_esc(
                         data.nombres
                       )} · ${_esc(data.fechaExamen || "")}</span>
                       <button class="btn-print" onclick="window.print()">📥 Guardar / Imprimir PDF</button>
                       <button class="btn-close" onclick="window.close()">✕ Cerrar</button>
                     </div>
-                    ${certSec}${incapSec}${formulaSec}${derivSec}
+                    ${showEnviarPanel
+                      ? [
+                          enviarChecklist.certificado ? certSec : "",
+                          enviarChecklist.historia ? (() => { const el = document.querySelector(".carta-visual"); return el ? '<div class="page page-break">' + el.outerHTML + '</div>' : ""; })() : "",
+                          enviarChecklist.formula ? formulaSec : "",
+                          enviarChecklist.derivacion ? derivSec : "",
+                          enviarChecklist.examenes ? (() => { const el2 = document.getElementById("solicitud-examenes-content"); return el2 ? '<div class="page page-break">' + el2.outerHTML + '</div>' : ""; })() : "",
+                        ].filter(Boolean).join("")
+                      : `${certSec}${incapSec}${formulaSec}${derivSec}`
+                    }
                     </body></html>`);
                     w.document.close();
                     w.focus();
+                    if (showEnviarPanel) setShowEnviarPanel(false);
                   }}
                   className="bg-cyan-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 no-print hover:bg-cyan-800"
                   title="Descargar o enviar documentos seleccionados"
@@ -18706,77 +18716,32 @@ Esta historia clínica debe conservarse mínimo 20 años.
                 </button>
               )}
               {/* Panel checklist de Descargar/Enviar — HC Ocupacional */}
-              {showEnviarPanel && data.estadoHistoria === "Cerrada" && dataType === "ocupacional" && (
-                <div className="absolute right-0 top-12 z-50 bg-white border border-gray-200 rounded-xl p-3 shadow-2xl w-72">
-                  <p className="text-[10px] font-black text-gray-700 uppercase mb-2">📤 Seleccione documentos:</p>
+              {showEnviarPanel && dataType === "ocupacional" && (() => {
+                const hasMeds = (data.formulaMedicamentos || []).length > 0;
+                const hasDeriv = (data.derivaciones || []).length > 0;
+                const hasExams = (data.examenesSolicitados || []).length > 0;
+                return (
+                <div className="absolute right-0 top-12 z-50 bg-white border border-gray-200 rounded-xl p-3 shadow-2xl w-80">
+                  <p className="text-[10px] font-black text-gray-700 uppercase mb-2">📤 Seleccione documentos y presione "Descargar / Enviar":</p>
                   <div className="space-y-1 mb-2">
                     {[
-                      { k: "certificado", l: "📋 Certificado de Aptitud" },
-                      { k: "historia", l: "📄 Historia Clínica" },
-                      { k: "formula", l: "💊 Fórmula / Prescripción" },
-                      { k: "derivacion", l: "🔀 Derivación" },
-                      { k: "examenes", l: "🔬 Solicitud Exámenes" },
+                      { k: "certificado", l: "📋 Certificado de Aptitud", available: true },
+                      { k: "historia", l: "📄 Historia Clínica Completa", available: true },
+                      { k: "formula", l: "💊 Fórmula / Prescripción", available: hasMeds },
+                      { k: "derivacion", l: "🔀 Derivación / Interconsulta", available: hasDeriv },
+                      { k: "examenes", l: "🔬 Solicitud de Exámenes", available: hasExams },
                     ].map(item => (
-                      <label key={item.k} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded px-1.5 py-1">
-                        <input type="checkbox" checked={!!enviarChecklist[item.k]} onChange={() => setEnviarChecklist(p => ({...p, [item.k]: !p[item.k]}))} className="w-3.5 h-3.5 accent-blue-600" />
-                        <span className="text-[10px] text-gray-700">{item.l}</span>
+                      <label key={item.k} className={`flex items-center gap-2 rounded px-1.5 py-1 ${item.available ? "cursor-pointer hover:bg-gray-50" : "opacity-40 cursor-not-allowed"}`}>
+                        <input type="checkbox" checked={item.available ? !!enviarChecklist[item.k] : false} disabled={!item.available} onChange={() => { if (item.available) setEnviarChecklist(p => ({...p, [item.k]: !p[item.k]})); }} className="w-3.5 h-3.5 accent-blue-600" />
+                        <span className="text-[10px] text-gray-700 flex-1">{item.l}</span>
+                        <span className={`text-[8px] font-bold ${item.available ? "text-emerald-600" : "text-gray-400"}`}>{item.available ? "✅" : "Sin datos"}</span>
                       </label>
                     ))}
                   </div>
+                  <div className="bg-blue-50 rounded-lg p-2 mb-2 text-center">
+                    <p className="text-[9px] text-blue-700 font-bold">↑ Presione el botón <strong>"Descargar / Enviar"</strong> para generar el PDF</p>
+                  </div>
                   <div className="flex gap-1.5 border-t border-gray-100 pt-2">
-                    <button onClick={() => {
-                      // Usar las funciones existentes que YA funcionan perfectamente
-                      let delay = 0;
-                      let opened = 0;
-                      if (enviarChecklist.certificado) {
-                        setTimeout(() => {
-                          // Certificado: HTML completo con sus propios estilos (idéntico a la plataforma)
-                          const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
-                          const w = window.open("", "_blank", "width=920,height=1150");
-                          if (w) {
-                            const htmlConBtn = html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Guardar / Imprimir PDF</button><p>Seleccione <b>Guardar como PDF</b></p></div></body>');
-                            w.document.write(htmlConBtn);
-                            w.document.close();
-                            w.focus();
-                          }
-                        }, delay);
-                        delay += 800;
-                        opened++;
-                      }
-                      if (enviarChecklist.historia) {
-                        setTimeout(() => {
-                          // HC: usar _printHCClean que genera la HC formateada perfectamente
-                          _printHCClean();
-                        }, delay);
-                        delay += 800;
-                        opened++;
-                      }
-                      if (enviarChecklist.formula) {
-                        setTimeout(() => {
-                          // Fórmula: usar openPrintWindow que ya genera la fórmula formateada
-                          openPrintWindow("formula", "Fórmula Médica");
-                        }, delay);
-                        delay += 800;
-                        opened++;
-                      }
-                      if (enviarChecklist.derivacion) {
-                        setTimeout(() => {
-                          // Derivación: usar openPrintWindow que ya genera la derivación formateada
-                          openPrintWindow("derivacion", "Derivación / Interconsulta");
-                        }, delay);
-                        delay += 800;
-                        opened++;
-                      }
-                      if (enviarChecklist.examenes) {
-                        setTimeout(() => {
-                          // Exámenes: usar handlePrint de la vista actual
-                          handlePrint("Solicitud-Examenes-" + (data.nombres || ""));
-                        }, delay);
-                        opened++;
-                      }
-                      if (opened === 0) showAlert("Seleccione al menos un documento.");
-                      else setShowEnviarPanel(false);
-                    }} className="flex-1 px-2 py-1.5 bg-emerald-600 text-white text-[9px] font-black rounded-lg hover:bg-emerald-700">🖨️ PDF</button>
                     <button onClick={() => {
                       const nombre = data.nombres || "";
                       const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
@@ -18801,7 +18766,8 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     }} className="flex-1 px-2 py-1.5 bg-green-500 text-white text-[9px] font-black rounded-lg hover:bg-green-600">📱 WA</button>
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               {dataType === "ocupacional" &&
                 data.estadoHistoria === "Cerrada" && (
