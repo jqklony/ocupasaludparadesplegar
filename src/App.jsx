@@ -18301,26 +18301,25 @@ Esta historia clínica debe conservarse mínimo 20 años.
                         setShowEnviarPanel(false);
                         return;
                       }
-                      // Múltiples documentos → abrir cada uno en su ventana con delay
-                      let delay = 0;
+                      // Múltiples documentos → abrir TODOS inmediatamente (sin setTimeout)
+                      // El popup blocker no bloquea si se abren en el mismo click handler
+                      const windows = [];
                       if (selected.includes("certificado")) {
-                        setTimeout(() => {
-                          const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
-                          const w = window.open("", "_blank", "width=920,height=1150");
-                          if (w) { w.document.write(html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Certificado PDF</button></div></body>')); w.document.close(); }
-                        }, delay); delay += 700;
+                        const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
+                        const w = window.open("", "_blank", "width=920,height=1150");
+                        if (w) { w.document.write(html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Certificado</button></div></body>')); w.document.close(); windows.push(w); }
                       }
                       if (selected.includes("historia")) {
-                        setTimeout(() => _printHCClean(), delay); delay += 700;
+                        _printHCClean();
                       }
                       if (selected.includes("formula")) {
-                        setTimeout(() => openPrintWindow("formula", "Fórmula Médica"), delay); delay += 700;
+                        openPrintWindow("formula", "Fórmula Médica");
                       }
                       if (selected.includes("derivacion")) {
-                        setTimeout(() => openPrintWindow("derivacion", "Derivación"), delay); delay += 700;
+                        openPrintWindow("derivacion", "Derivación / Interconsulta");
                       }
                       if (selected.includes("examenes")) {
-                        setTimeout(() => handlePrint("Exámenes-" + data.nombres), delay);
+                        handlePrint("Exámenes-" + data.nombres);
                       }
                       setShowEnviarPanel(false);
                     }} className="flex-1 px-2 py-1.5 bg-emerald-600 text-white text-[9px] font-black rounded-lg hover:bg-emerald-700">🖨️ PDF</button>
