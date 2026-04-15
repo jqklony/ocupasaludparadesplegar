@@ -18239,7 +18239,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                 <Printer className="w-3 h-3" /> PDF
               </button>
 
-              {/* ── Descargar Todo: Certificado + Incapacidad + Fórmula/Derivación (solo HC abierta) ── */}
+              {/* ── Descargar Todo: Certificado + Incapacidad + Fórmula/Derivación ── */}
               {dataType === "ocupacional" && data.estadoHistoria !== "Cerrada" && (
                 <button
                   onClick={() => {
@@ -18725,48 +18725,56 @@ Esta historia clínica debe conservarse mínimo 20 años.
                   </div>
                   <div className="flex gap-1.5 border-t border-gray-100 pt-2">
                     <button onClick={() => {
-                      // Imprimir cada documento seleccionado en ventana nueva
-                      let delay = 0;
+                      // Usar la misma lógica de generación del botón cyan original
+                      const docData = activeDoctorData || {};
+                      const sig = activeSignature || "";
+                      const _esc = (v) => String(v || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                      const sharedCss = `*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Segoe UI',Arial,sans-serif;font-size:9.5pt;color:#111;}.page{padding:14mm 16mm;min-height:100vh;}.page-break{page-break-before:always;}.hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--accent,#065f46);padding-bottom:10px;margin-bottom:14px;}.hdr-left .doc-name{font-size:11pt;font-weight:900;color:var(--accent,#065f46);}.hdr-left p,.hdr-right p{font-size:8pt;color:#555;margin-top:1px;}.hdr-right{text-align:right;}.doc-title{font-size:13pt;font-weight:900;text-transform:uppercase;color:var(--accent,#065f46);}table{width:100%;border-collapse:collapse;margin:8px 0;}td,th{border:1px solid #ccc;padding:6px 10px;font-size:9pt;}th{font-weight:900;text-align:left;}.sig-row{margin-top:40px;display:flex;justify-content:space-between;align-items:flex-end;}.sig-block{text-align:center;}.sig-line{border-top:1.5px solid #333;padding-top:4px;font-size:8pt;font-weight:700;margin-top:50px;width:200px;}.dl-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:9999;}.dl-bar .title{flex:1;font-size:9.5pt;font-weight:700;}.dl-bar button{border:none;padding:6px 16px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;}.btn-print{background:#10b981;color:#fff;}.btn-close{background:#ef4444;color:#fff;}.badge{display:inline-block;padding:3px 10px;border-radius:4px;font-size:11pt;font-weight:900;color:#fff;}.alerta{background:#fef9c3;border:1px solid #fde047;padding:7px 12px;border-radius:6px;font-size:8.5pt;color:#713f12;margin:8px 0;}.consent{margin-top:8px;font-size:7pt;color:#9ca3af;border-top:1px dashed #e5e7eb;padding-top:6px;}@page{size:letter portrait;margin:0;}@media print{.dl-bar{display:none!important;}.page{padding:12mm 15mm;}}`;
+                      const hdrFn = (title, accent) => `<div class="hdr"><div class="hdr-left"><div class="doc-name">${_esc(docData.nombre || "")}</div><p>${_esc(docData.titulo || "Médico Ocupacional")}</p><p>Lic: ${_esc(docData.licencia || "")} · ${_esc(docData.ciudad || "")}</p></div><div class="hdr-right"><p class="doc-title">${title}</p><p>Paciente: ${_esc(data.nombres || "")}</p><p>${_esc(data.docTipo || "CC")} ${_esc(data.docNumero || "")}</p><p>Fecha: ${_esc(data.fechaExamen || "")}</p></div></div>`;
+                      const sigBlock = `<div class="sig-row"><div class="sig-block"><div class="sig-line">Firma del Trabajador<br/>${_esc(data.docTipo||"CC")} ${_esc(data.docNumero||"")}</div></div><div class="sig-block">${sig ? '<img src="'+sig+'" style="max-height:60px;display:block;margin:0 auto 4px;"/>' : '<div style="height:50px;"></div>'}<div class="sig-line">${_esc(docData.nombre||"")}<br/>${_esc(docData.titulo||"")}<br/>Lic: ${_esc(docData.licencia||"")}</div></div></div>`;
+                      let sections = [];
+                      let docCount = 0;
                       if (enviarChecklist.certificado) {
-                        setTimeout(() => {
-                          const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
-                          const w = window.open("", "_blank", "width=920,height=1150");
-                          if (w) { w.document.write(html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Guardar PDF</button></div></body>')); w.document.close(); }
-                        }, delay);
-                        delay += 500;
+                        const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
+                        const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/);
+                        sections.push(`<div class="page" style="--accent:#065f46;">${bodyMatch ? bodyMatch[1] : html}</div>`);
+                        docCount++;
                       }
                       if (enviarChecklist.historia) {
-                        setTimeout(() => {
-                          // Generar HC en ventana nueva usando _printHCClean o buildPrintHeader
-                          if (typeof _printHCClean === "function") _printHCClean();
-                          else {
-                            const w = window.open("", "_blank", "width=920,height=1150");
-                            if (w) {
-                              const content = document.querySelector(".carta-visual");
-                              if (content) { w.document.write('<!DOCTYPE html><html><head><script src="https://cdn.tailwindcss.com"><\/script><style>@page{size:letter;margin:1cm}body{font-family:Arial;font-size:10pt;}</style></head><body>' + content.innerHTML + '</body></html>'); w.document.close(); }
-                            }
-                          }
-                        }, delay);
-                        delay += 500;
+                        // HC completa — capturar del DOM
+                        const cartaEl = document.querySelector(".carta-visual");
+                        if (cartaEl) { sections.push(`<div class="page page-break">${cartaEl.innerHTML}</div>`); docCount++; }
                       }
                       if (enviarChecklist.formula) {
-                        setTimeout(() => { printSection("print-formula-sec", "Fórmula Médica"); }, delay);
-                        delay += 500;
+                        const meds = data.formulaMedicamentos || [];
+                        if (meds.length > 0) {
+                          const medRows = meds.map((m,i) => `<tr><td>${i+1}</td><td><strong>${_esc(m.nombre||"")}</strong></td><td>${_esc(m.presentacion||"")}</td><td>${_esc(m.dosis||"")}</td><td>${_esc(m.via||"")}</td><td>${_esc(m.frecuencia||"")}</td><td>${_esc(m.duracion||"")}</td><td>${_esc(m.cantidad||"")}</td></tr>`).join("");
+                          sections.push(`<div class="page page-break" style="--accent:#065f46;">${hdrFn("Prescripción Médica","#065f46")}<table><thead><tr><th>#</th><th>Medicamento</th><th>Presentación</th><th>Dosis</th><th>Vía</th><th>Frecuencia</th><th>Duración</th><th>Cant.</th></tr></thead><tbody>${medRows}</tbody></table>${sigBlock}</div>`);
+                          docCount++;
+                        }
                       }
                       if (enviarChecklist.derivacion) {
-                        setTimeout(() => { printSection("print-deriv-sec", "Derivación / Interconsulta"); }, delay);
-                        delay += 500;
+                        const derivs = data.derivaciones || [];
+                        if (derivs.length > 0) {
+                          const derivRows = derivs.map((d2,i) => `<tr><td>${i+1}</td><td><strong>${_esc(d2.especialidad||"")}</strong></td><td>${_esc(d2.motivo||"")}</td><td>${_esc(d2.prioridad||"")}</td></tr>`).join("");
+                          sections.push(`<div class="page page-break" style="--accent:#2563eb;">${hdrFn("Derivación / Interconsulta","#2563eb")}<table><thead><tr><th>#</th><th>Especialidad</th><th>Motivo</th><th>Prioridad</th></tr></thead><tbody>${derivRows}</tbody></table>${sigBlock}</div>`);
+                          docCount++;
+                        }
                       }
                       if (enviarChecklist.examenes) {
-                        setTimeout(() => {
-                          const w = window.open("", "_blank", "width=920,height=1150");
-                          if (w) {
-                            const sec = document.getElementById("solicitud-examenes-sec");
-                            if (sec) { w.document.write('<!DOCTYPE html><html><head><script src="https://cdn.tailwindcss.com"><\/script><style>@page{size:letter;margin:1cm}body{font-family:Arial;font-size:10pt;}</style></head><body>' + sec.innerHTML + '</body></html>'); w.document.close(); }
-                            else showAlert("No hay solicitud de exámenes para imprimir.");
-                          }
-                        }, delay);
+                        const exams = data.examenesSolicitados || [];
+                        if (exams.length > 0) {
+                          const examRows = exams.map((e2,i) => `<tr><td>${i+1}</td><td><strong>${_esc(e2.nombre || e2.examen || "")}</strong></td><td>${_esc(e2.cups||"")}</td><td>${_esc(e2.justificacion||"")}</td></tr>`).join("");
+                          sections.push(`<div class="page page-break" style="--accent:#0d9488;">${hdrFn("Solicitud de Exámenes","#0d9488")}<table><thead><tr><th>#</th><th>Examen</th><th>CUPS</th><th>Justificación</th></tr></thead><tbody>${examRows}</tbody></table>${sigBlock}</div>`);
+                          docCount++;
+                        }
                       }
+                      if (sections.length === 0) { showAlert("No hay documentos para imprimir o los seleccionados están vacíos."); return; }
+                      const w = window.open("", "_blank", "width=950,height=1200");
+                      if (!w) { showAlert("Permita ventanas emergentes."); return; }
+                      w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Documentos - ${_esc(data.nombres)}</title><style>${sharedCss}</style></head><body><div class="dl-bar"><span class="title">📄 ${docCount} documento(s) - ${_esc(data.nombres)}</span><button class="btn-print" onclick="window.print()">📥 Guardar / Imprimir PDF</button><button class="btn-close" onclick="window.close()">✕ Cerrar</button></div>${sections.join("")}</body></html>`);
+                      w.document.close();
+                      w.focus();
                       setShowEnviarPanel(false);
                     }} className="flex-1 px-2 py-1.5 bg-emerald-600 text-white text-[9px] font-black rounded-lg hover:bg-emerald-700">🖨️ PDF</button>
                     <button onClick={() => {
