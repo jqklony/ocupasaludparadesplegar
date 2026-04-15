@@ -48296,17 +48296,76 @@ body{padding-top:52px;}
                             <Printer className="w-3 h-3" /> Deriv.
                           </button>
                           <button
-                            onClick={() => window.print()}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-700 text-white hover:bg-slate-800 transition"
+                            onClick={() => setShowEnviarPanel(!showEnviarPanel)}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition ${showEnviarPanel ? "bg-red-500 hover:bg-red-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
                           >
-                            <Printer className="w-3 h-3" /> Todo
+                            {showEnviarPanel ? "✕ Cerrar" : "📤 Descargar / Enviar"}
                           </button>
-                          {/* Botón Enviar para HC General cerrada */}
-                          {data.estadoHistoria === "Cerrada" && (
-                            <button onClick={() => setShowEnviarPanel(!showEnviarPanel)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition relative">
-                              📤 Enviar
-                            </button>
-                          )}
+                          {/* Panel checklist HC General */}
+                          {showEnviarPanel && (() => {
+                            const hasMedsG = (data.formulaMedicamentos || []).length > 0;
+                            const hasDerivG = (data.derivaciones || []).length > 0;
+                            const hasPlanG = !!(data.plan?.paraclinicosSolicitados || data.plan?.recomendaciones || data.plan?.conducta);
+                            const [chkG, setChkG] = React.useState({ historia: true, prescripcion: true, examenes: true, derivaciones: true });
+                            return (
+                              <div className="absolute right-0 top-12 z-50 bg-white border border-gray-200 rounded-xl p-3 shadow-2xl w-80">
+                                <p className="text-[10px] font-black text-gray-700 uppercase mb-2">📤 Seleccione documentos:</p>
+                                <div className="space-y-1 mb-2">
+                                  {[
+                                    { k: "historia", l: "📄 Historia Clínica Completa", available: true },
+                                    { k: "prescripcion", l: "💊 Prescripción Médica", available: hasMedsG },
+                                    { k: "examenes", l: "🔬 Exámenes / Recomendaciones", available: hasPlanG },
+                                    { k: "derivaciones", l: "🔀 Derivaciones / Interconsultas", available: hasDerivG },
+                                  ].map(item => (
+                                    <label key={item.k} className={`flex items-center gap-2 rounded px-1.5 py-1 ${item.available ? "cursor-pointer hover:bg-gray-50" : "opacity-40 cursor-not-allowed"}`}>
+                                      <input type="checkbox" checked={item.available ? !!chkG[item.k] : false} disabled={!item.available} onChange={() => { if (item.available) setChkG(p => ({...p, [item.k]: !p[item.k]})); }} className="w-3.5 h-3.5 accent-blue-600" />
+                                      <span className="text-[10px] text-gray-700 flex-1">{item.l}</span>
+                                      <span className={`text-[8px] font-bold ${item.available ? "text-emerald-600" : "text-gray-400"}`}>{item.available ? "✅" : "Sin datos"}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                                <div className="flex gap-1.5 border-t border-gray-100 pt-2">
+                                  <button onClick={() => {
+                                    const sel = Object.entries(chkG).filter(([,v]) => v).map(([k]) => k);
+                                    if (sel.length === 0) { showAlert("Seleccione al menos un documento."); return; }
+                                    // 1 solo doc → función original
+                                    if (sel.length === 1) {
+                                      if (sel[0] === "historia") { handlePrint(data.nombres || "HC General"); }
+                                      else if (sel[0] === "prescripcion") { printSection("gn-prescripcion", "Prescripción Médica"); }
+                                      else if (sel[0] === "examenes") { printSection("gn-examenes", "Exámenes y Recomendaciones"); }
+                                      else if (sel[0] === "derivaciones") { printSection("gn-derivaciones", "Derivaciones"); }
+                                      setShowEnviarPanel(false);
+                                      return;
+                                    }
+                                    // Múltiples → imprimir página completa (incluye todo)
+                                    handlePrint(data.nombres || "HC General");
+                                    setShowEnviarPanel(false);
+                                  }} className="flex-1 px-2 py-1.5 bg-emerald-600 text-white text-[9px] font-black rounded-lg hover:bg-emerald-700">🖨️ PDF</button>
+                                  <button onClick={() => {
+                                    const nombre = data.nombres || "";
+                                    const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
+                                    const docD = activeDoctorData || {};
+                                    const subject = `Documentos Médicos — ${nombre}`;
+                                    const body = `Estimado/a ${nombre},\n\nSus documentos médicos han sido emitidos.\n\nPortal de Certificados:\n${portalLink}\n→ Cédula: ${data.docNumero || ""}\n\nCordialmente,\n${docD.nombre || ""}\n${docD.titulo || ""}\n${docD.licencia ? "Lic: " + docD.licencia : ""}\n${docD.email || emailConfig?.email || ""}`;
+                                    const htmlBody = _generarEmailHTML(nombre, data.docNumero, portalLink, null, false);
+                                    const destino = data.email || "";
+                                    if (destino && destino.includes("@")) { _enviarEmail(destino, subject, body, htmlBody); }
+                                    else { showPrompt("Email del paciente:", (em) => { if (em) _enviarEmail(em, subject, body, htmlBody); }); }
+                                    setShowEnviarPanel(false);
+                                  }} className="flex-1 px-2 py-1.5 bg-amber-500 text-white text-[9px] font-black rounded-lg hover:bg-amber-600">📧 Email</button>
+                                  <button onClick={() => {
+                                    const nombre = data.nombres || "";
+                                    const tel = (data.celular || data.telefono || "").replace(/\D/g, "");
+                                    const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
+                                    const msg = encodeURIComponent(`${nombre}, sus documentos médicos están listos.\n📥 ${portalLink}\n→ Cédula: ${data.docNumero || ""}\n${activeDoctorData?.nombre || ""}`);
+                                    if (tel.length >= 10) { window.open(`https://wa.me/${tel.startsWith("57") ? tel : "57" + tel}?text=${msg}`, "_blank"); }
+                                    else { showPrompt("Celular:", (n) => { if (n) window.open(`https://wa.me/57${n.replace(/\D/g,"")}?text=${msg}`, "_blank"); }); }
+                                    setShowEnviarPanel(false);
+                                  }} className="flex-1 px-2 py-1.5 bg-green-500 text-white text-[9px] font-black rounded-lg hover:bg-green-600">📱 WA</button>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
