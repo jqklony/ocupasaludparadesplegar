@@ -16173,6 +16173,7 @@ const handleLogin = (u, p) => {
     };
     const list = [...patientsList];
     const idx = list.findIndex((p) => p.id === toSave.id);
+    const isNew = idx < 0;
     if (idx >= 0) list[idx] = toSave;
     else list.push(toSave);
     setPatientsList(list);
@@ -16181,6 +16182,31 @@ const handleLogin = (u, p) => {
     setTimeout(() => setSaveStatus(""), 2500);
     _setHcDirty(false);
     logAccess("Guardado", toSave.id, dataType); // AUDIT: Res. 1888/2025 RDA
+    // Auto-registro en agenda cuando es paciente nuevo
+    if (isNew && toSave.nombres) {
+      const hoy = new Date().toISOString().split("T")[0];
+      const horaActual = new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", hour12: false });
+      const isParticular = !toSave.empresaId || toSave.empresaId === "particular" || (toSave.empresaNombre || "").toUpperCase().includes("PARTICULAR");
+      const costo = isParticular ? "28000" : "35000";
+      const nuevaCita = {
+        id: "cita_auto_" + Date.now(),
+        fecha: toSave.fechaExamen || hoy,
+        hora: horaActual,
+        pacienteNombre: toSave.nombres,
+        pacienteDoc: toSave.docNumero || "",
+        empresa: toSave.empresaNombre || "Particular",
+        empresaId: toSave.empresaId || "",
+        tipoConsulta: toSave.tipoExamen || dataType || "general",
+        medicoId: currentUser?.user || "",
+        medicoNombre: activeDoctorData?.nombre || currentUser?.name || "",
+        estado: "atendido",
+        costo,
+        _autoFromHC: true,
+      };
+      const updAgenda = [...(agendados || []), nuevaCita];
+      setAgendados(updAgenda);
+      _sync("siso_agendados", JSON.stringify(updAgenda));
+    }
   };
   const handleCloseHistory = () => {
     if (!data.conceptoAptitud && dataType === "ocupacional") {
@@ -43118,6 +43144,27 @@ ${
                   </div>
                 )}
               </div>
+              {/* ── EXPORTAR POR MÉDICO ── */}
+              {_isAdmin(currentUser?.role) && (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                  <p className="text-xs font-black text-gray-700 uppercase mb-3">👨‍⚕️ Exportar Pacientes por Médico</p>
+                  <button onClick={() => {
+                    const medicos = usersList.filter(u => ["medico","administrador","super_admin"].includes(u.role) && u.activo !== false);
+                    const rows = [["Médico","Paciente","Documento","Empresa","Tipo Examen","Fecha","Estado","Tarifa"]];
+                    medicos.forEach(med => {
+                      patientsList.filter(p => p._medicoId === med.user && p.estadoHistoria === "Cerrada").forEach(p => {
+                        const isPart = !p.empresaId || p.empresaId === "particular" || (p.empresaNombre||"").toUpperCase().includes("PARTICULAR");
+                        rows.push([med.name || med.user, p.nombres || "", p.docNumero || "", p.empresaNombre || "Particular", p.tipoExamen || "general", p.fechaExamen || "", p.estadoHistoria || "", isPart ? "28000" : "35000"]);
+                      });
+                    });
+                    const csv = rows.map(r => r.map(v => '"' + String(v||"").replace(/"/g,'""') + '"').join(",")).join("\n");
+                    const b = new Blob([csv], { type: "text/csv" }); const u = URL.createObjectURL(b);
+                    const a = document.createElement("a"); a.href = u; a.download = "pacientes_por_medico.csv"; a.click(); URL.revokeObjectURL(u);
+                  }} className="px-4 py-2 bg-indigo-700 text-white text-xs font-black rounded-xl hover:bg-indigo-800">
+                    📥 Exportar Pacientes por Médico (CSV)
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
