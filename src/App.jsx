@@ -18273,30 +18273,56 @@ Esta historia clínica debe conservarse mínimo 20 años.
                   </div>
                   <div className="flex gap-1.5 border-t border-gray-100 pt-2">
                     <button onClick={() => {
-                      // Abrir cada doc seleccionado en su propia ventana con la función ORIGINAL que ya funciona
-                      let opened = 0;
+                      const selected = Object.entries(enviarChecklist).filter(([,v]) => v).map(([k]) => k);
+                      if (selected.length === 0) { showAlert("Seleccione al menos un documento."); return; }
+                      // Solo certificado → ventana dedicada con formato profesional
+                      if (selected.length === 1 && selected[0] === "certificado") {
+                        const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
+                        const w = window.open("", "_blank", "width=920,height=1150");
+                        if (w) { w.document.write(html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Guardar PDF</button></div></body>')); w.document.close(); }
+                        setShowEnviarPanel(false);
+                        return;
+                      }
+                      // Solo HC → _printHCClean con formato profesional
+                      if (selected.length === 1 && selected[0] === "historia") {
+                        _printHCClean();
+                        setShowEnviarPanel(false);
+                        return;
+                      }
+                      // Solo fórmula → openPrintWindow
+                      if (selected.length === 1 && selected[0] === "formula") {
+                        openPrintWindow("formula", "Fórmula Médica");
+                        setShowEnviarPanel(false);
+                        return;
+                      }
+                      // Solo derivación → openPrintWindow
+                      if (selected.length === 1 && selected[0] === "derivacion") {
+                        openPrintWindow("derivacion", "Derivación / Interconsulta");
+                        setShowEnviarPanel(false);
+                        return;
+                      }
+                      // Múltiples documentos → abrir cada uno en su ventana con delay
                       let delay = 0;
-                      if (enviarChecklist.certificado) {
+                      if (selected.includes("certificado")) {
                         setTimeout(() => {
                           const html = _generarCertificadoHTMLNormalizado(data, activeDoctorData, activeSignature, null);
                           const w = window.open("", "_blank", "width=920,height=1150");
-                          if (w) { w.document.write(html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Guardar PDF</button></div></body>')); w.document.close(); }
-                        }, delay); delay += 600; opened++;
+                          if (w) { w.document.write(html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Certificado PDF</button></div></body>')); w.document.close(); }
+                        }, delay); delay += 700;
                       }
-                      if (enviarChecklist.historia) {
-                        setTimeout(() => _printHCClean(), delay); delay += 600; opened++;
+                      if (selected.includes("historia")) {
+                        setTimeout(() => _printHCClean(), delay); delay += 700;
                       }
-                      if (enviarChecklist.formula && (data.formulaMedicamentos||[]).length > 0) {
-                        setTimeout(() => openPrintWindow("formula", "Fórmula Médica"), delay); delay += 600; opened++;
+                      if (selected.includes("formula")) {
+                        setTimeout(() => openPrintWindow("formula", "Fórmula Médica"), delay); delay += 700;
                       }
-                      if (enviarChecklist.derivacion && (data.derivaciones||[]).length > 0) {
-                        setTimeout(() => openPrintWindow("derivacion", "Derivación"), delay); delay += 600; opened++;
+                      if (selected.includes("derivacion")) {
+                        setTimeout(() => openPrintWindow("derivacion", "Derivación"), delay); delay += 700;
                       }
-                      if (enviarChecklist.examenes && (data.examenesSolicitados||[]).length > 0) {
-                        setTimeout(() => handlePrint("Exámenes-" + data.nombres), delay); opened++;
+                      if (selected.includes("examenes")) {
+                        setTimeout(() => handlePrint("Exámenes-" + data.nombres), delay);
                       }
-                      if (opened === 0) showAlert("Seleccione al menos un documento con datos.");
-                      else setShowEnviarPanel(false);
+                      setShowEnviarPanel(false);
                     }} className="flex-1 px-2 py-1.5 bg-emerald-600 text-white text-[9px] font-black rounded-lg hover:bg-emerald-700">🖨️ PDF</button>
                     <button onClick={() => {
                       const nombre = data.nombres || "";
