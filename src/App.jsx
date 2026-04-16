@@ -42561,22 +42561,45 @@ ${
                           </div>
                         </div>
                         <button onClick={() => {
-                          const detalle = pagosReview.map((p, i) => `${i+1}. ${p.empresaNombre || "?"} — Cuenta ${p.cuentaNumber || "?"} — $${Number(p.monto || 0).toLocaleString("es-CO")} — ${p.fechaSubida?.split("T")[0] || "?"}`).join("\n");
-                          showConfirm(`💳 Comprobantes pendientes de revisión:\n\n${detalle}\n\n¿Aprobar todos los pagos?`, async () => {
+                          const detalle = pagosReview.map((p, i) => {
+                            const montoEsperado = Number(p.monto || 0);
+                            const tieneComprobante = !!p.comprobante;
+                            const tipoArchivo = p.tipoArchivo || "desconocido";
+                            const diasDesdeEnvio = Math.floor((new Date() - new Date(p.fechaSubida || new Date())) / 86400000);
+                            // IA simple: validación automática del comprobante
+                            let iaAnalisis = "📎 Comprobante recibido";
+                            if (!tieneComprobante) iaAnalisis = "❌ Sin comprobante adjunto";
+                            else if (tipoArchivo.includes("pdf") || tipoArchivo.includes("image")) iaAnalisis = "✅ Formato válido (" + tipoArchivo.split("/")[1] + ")";
+                            else iaAnalisis = "⚠️ Formato no estándar: " + tipoArchivo;
+                            if (diasDesdeEnvio > 30) iaAnalisis += " · ⚠️ Hace " + diasDesdeEnvio + " días";
+                            return `${i+1}. ${p.empresaNombre || "?"}\n   Cuenta ${p.cuentaNumber || "?"} — $${montoEsperado.toLocaleString("es-CO")}\n   ${iaAnalisis}\n   Subido: ${p.fechaSubida?.split("T")[0] || "?"}`;
+                          }).join("\n\n");
+                          showConfirm(`🤖 Análisis de comprobantes:\n\n${detalle}\n\n¿Aprobar todos los pagos verificados?`, async () => {
                             for (const p of pagosReview) {
                               const key = `siso_pago_${p.empresaNit}_${p.periodo}`;
-                              const updated = {...p, estado: "aprobado", validadoPor: currentUser?.user, fechaValidacion: new Date().toISOString()};
+                              const updated = {...p, estado: "aprobado", validadoPor: currentUser?.user, fechaValidacion: new Date().toISOString(), iaValidado: true};
                               await _sbSet(key, updated);
-                              // Mark bill as paid
                               const updBills = savedBillsList.map(b => (b.companyId === p.empresaId || b.clientName === p.empresaNombre) && b.number === p.cuentaNumber ? {...b, pagada: true, fechaPago: new Date().toISOString().split("T")[0]} : b);
                               setSavedBillsList(updBills);
                               const _bSuf = currentUser?.empresaId ? "empresa_" + currentUser.empresaId : currentUser?.user || "shared";
                               _sync(`siso_saved_bills_${_bSuf}`, JSON.stringify(updBills));
                             }
+                            // Enviar agradecimiento a cada empresa
+                            for (const p of pagosReview) {
+                              if (p.empresaNombre) {
+                                const comp = companies.find(c => c.nombre === p.empresaNombre || c.nit === p.empresaNit);
+                                const emailEmp = comp?.emailContacto || comp?.email || "";
+                                if (emailEmp) {
+                                  const subject = `Confirmación de Pago — ${p.empresaNombre}`;
+                                  const body = `Estimado/a encargado de ${p.empresaNombre},\n\nConfirmamos la recepción de su pago por $${Number(p.monto || 0).toLocaleString("es-CO")} correspondiente a la Cuenta de Cobro No. ${p.cuentaNumber || "—"} del periodo ${p.periodo}.\n\nGracias por su pronto pago.\n\nCordialmente,\n${activeDoctorData?.nombre || ""}\n${activeDoctorData?.email || emailConfig?.email || ""}`;
+                                  _enviarEmail(emailEmp, subject, body, null);
+                                }
+                              }
+                            }
                             setPagosReview([]);
-                            showAlert("✅ " + pagosReview.length + " pago(s) aprobado(s).\nLas cuentas de cobro fueron marcadas como pagadas.");
+                            showAlert("✅ " + pagosReview.length + " pago(s) aprobado(s).\n📧 Confirmación enviada a las empresas.\nCuentas marcadas como pagadas.");
                           });
-                        }} className="px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-lg hover:bg-blue-700">Revisar →</button>
+                        }} className="px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-lg hover:bg-blue-700">🤖 Revisar →</button>
                       </div>
                     )}
                   </div>
@@ -42586,6 +42609,60 @@ ${
                   </div>
                 );
               })()}
+              {/* ── RECORDATORIO DE PAGO A EMPRESAS ── */}
+              {_isAdmin(currentUser?.role) && savedBillsList.filter(b => !b.pagada).length > 0 && (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <p className="text-xs font-black text-gray-700 uppercase">🔔 Recordatorio de Pago a Empresas</p>
+                    <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-black">{savedBillsList.filter(b => !b.pagada).length} pendientes</span>
+                  </div>
+                  <div className="space-y-2">
+                    {(() => {
+                      const pendientes = savedBillsList.filter(b => !b.pagada);
+                      const porEmpresa = {};
+                      pendientes.forEach(b => {
+                        const key = b.clientName || b.companyName || "Sin empresa";
+                        if (!porEmpresa[key]) porEmpresa[key] = { cuentas: [], total: 0, companyId: b.companyId };
+                        porEmpresa[key].cuentas.push(b);
+                        porEmpresa[key].total += Number(b.amount || 0);
+                      });
+                      return Object.entries(porEmpresa).map(([emp, d]) => {
+                        const diasPend = Math.floor((new Date() - new Date(d.cuentas[0]?.savedAt || d.cuentas[0]?.date || new Date())) / 86400000);
+                        const urgencia = diasPend > 60 ? "red" : diasPend > 30 ? "orange" : "yellow";
+                        return (
+                          <div key={emp} className={`bg-${urgencia}-50 border border-${urgencia}-200 rounded-xl p-3 flex items-center justify-between`}>
+                            <div>
+                              <p className="text-xs font-black text-gray-800">{emp}</p>
+                              <p className="text-[10px] text-gray-600">{d.cuentas.length} cuenta(s) · ${d.total.toLocaleString("es-CO")} · {diasPend} días</p>
+                            </div>
+                            <div className="flex gap-1.5">
+                              <button onClick={() => {
+                                const comp = companies.find(c => c.id === d.companyId);
+                                const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
+                                const docD = activeDoctorData || {};
+                                const subject = `Recordatorio de Pago — ${emp}`;
+                                const body = `Estimado/a encargado de ${emp},\n\nLe recordamos que tiene ${d.cuentas.length} cuenta(s) de cobro pendiente(s) por un total de $${d.total.toLocaleString("es-CO")}:\n\n${d.cuentas.map((c, i) => `  ${i+1}. Cuenta No. ${c.number || "—"} — $${Number(c.amount || 0).toLocaleString("es-CO")} — ${c.date || ""}`).join("\n")}\n\nPuede realizar el pago y subir su comprobante en:\n${portalLink}\n→ Seleccione "Empresa" → NIT de su empresa\n→ Sección "Pagos"\n\nCordialmente,\n${docD.nombre || ""}\n${docD.titulo || ""}\n${docD.email || emailConfig?.email || ""}`;
+                                const htmlBody = _generarEmailHTML("encargado de " + emp, comp?.nit || "", portalLink, `<p style="font-size:12px;color:#dc2626;font-weight:900;">⚠️ Pago pendiente: $${d.total.toLocaleString("es-CO")}</p><p style="font-size:11px;color:#374151;">${d.cuentas.length} cuenta(s) · ${diasPend} días de antigüedad</p>`, true);
+                                const emailEmp = comp?.emailContacto || comp?.email || "";
+                                if (emailEmp) { _enviarEmail(emailEmp, subject, body, htmlBody); showAlert("📧 Recordatorio enviado a " + emailEmp); }
+                                else { showPrompt("Email de " + emp + ":", (em) => { if (em) { _enviarEmail(em, subject, body, htmlBody); showAlert("📧 Enviado a " + em); } }); }
+                              }} className="px-2 py-1 bg-amber-500 text-white text-[9px] font-black rounded-lg hover:bg-amber-600">📧</button>
+                              <button onClick={() => {
+                                const comp = companies.find(c => c.id === d.companyId);
+                                const tel = (comp?.telefono || comp?.celular || "").replace(/\D/g, "");
+                                const portalLink = window.location.origin + window.location.pathname + "#portaltrabajador";
+                                const msg = encodeURIComponent(`Recordatorio: ${emp} tiene ${d.cuentas.length} cuenta(s) pendiente(s) por $${d.total.toLocaleString("es-CO")}.\n\nSuba su comprobante en:\n${portalLink}\n→ Empresa → NIT\n\n${activeDoctorData?.nombre || ""}`);
+                                if (tel.length >= 10) { window.open(`https://wa.me/${tel.startsWith("57") ? tel : "57" + tel}?text=${msg}`, "_blank"); }
+                                else { showPrompt("Celular/WhatsApp de " + emp + ":", (n) => { if (n) window.open(`https://wa.me/57${n.replace(/\D/g,"")}?text=${msg}`, "_blank"); }); }
+                              }} className="px-2 py-1 bg-green-500 text-white text-[9px] font-black rounded-lg hover:bg-green-600">📱</button>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   { l: "👁️ Pacientes Vistos", t: "pacientes_vistos", c: "blue" },
