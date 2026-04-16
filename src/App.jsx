@@ -12290,10 +12290,40 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
           if (r5.ok && r5.data) pac = r5.data;
         }
       } else if (tipoBusqueda === "empresa") {
-        // Búsqueda por NIT de empresa: usar índice siso_portal_empresa_{nit}
-        const nitClean = q.replace(/[^0-9]/g, "");
-        const qLower = q.trim().toLowerCase();
+        // Búsqueda por NIT o código de acceso de empresa
+        const qTrim = q.trim();
+        const isCodigoAcceso = qTrim.toUpperCase().startsWith("EMP-");
+        const nitClean = qTrim.replace(/[^0-9]/g, "");
+        const qLower = qTrim.toLowerCase();
         try {
+          // 0) Si es código de acceso (EMP-XXXX-YYYY), buscar directamente
+          if (isCodigoAcceso) {
+            const rAll = await fetchConTimeout(`${sbUrl}/rest/v1/siso_store?select=key,value&key=like.siso_portal_empresa_docs_%`, { headers }, 12000);
+            if (rAll.ok) {
+              const rows = await rAll.json();
+              const match = rows.find(r => r.value?.codigoAcceso === qTrim.toUpperCase());
+              if (match) {
+                // Encontrado por código — cargar certificados de esta empresa
+                const docData = match.value;
+                const nitEmp = docData.nit;
+                // Buscar certificados
+                const rIdx = await fetchKey("siso_portal_empresa_" + nitEmp);
+                if (rIdx.ok && rIdx.data && rIdx.data.documentos) {
+                  const resultados2 = [];
+                  for (const doc of rIdx.data.documentos) {
+                    const rDoc = await fetchKey("siso_portal_doc_" + doc.replace(/\s/g, ""));
+                    if (rDoc.ok && rDoc.data) resultados2.push(rDoc.data);
+                  }
+                  if (resultados2.length > 0) { setResultadosEmpresa(resultados2); setCertSeleccionados({}); }
+                }
+                setCargando(false);
+                return;
+              }
+            }
+            setError("❌ Código de acceso no encontrado. Verifique que sea correcto (formato: EMP-XXXX-YYYY).");
+            setCargando(false);
+            return;
+          }
           // 1) Buscar por NIT en índice — probar variantes (con/sin DV)
           let empresaIdx = null;
           // Intentar NIT exacto
@@ -12473,7 +12503,7 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
             {[
               { v: "codigo", label: "🔑 Código", hint: "SISO-2025-XXXX" },
               { v: "cedula", label: "🪪 Cédula", hint: "1234567890" },
-              { v: "empresa", label: "🏢 Empresa", hint: "NIT empresa" },
+              { v: "empresa", label: "🏢 Empresa", hint: "NIT o Código EMP-XXXX" },
             ].map((opt) => (
               <button
                 key={opt.v}
