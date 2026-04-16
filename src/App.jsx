@@ -12610,6 +12610,66 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
                   </div>
                 ))}
               </div>
+              {/* ── SECCIÓN DE PAGOS PENDIENTES ── */}
+              {portalDocs.periodos.some(p => p.cuenta) && (() => {
+                const [pagosState, setPagosState] = React.useState({});
+                const [pagosLoaded, setPagosLoaded] = React.useState(false);
+                React.useEffect(() => {
+                  if (pagosLoaded) return;
+                  (async () => {
+                    const estados = {};
+                    for (const per of portalDocs.periodos.filter(p => p.cuenta)) {
+                      try {
+                        const r = await fetch(`${sbUrl}/rest/v1/siso_store?key=eq.siso_pago_${portalDocs.nit}_${per.periodo}&select=value`, { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } });
+                        const d = await r.json();
+                        if (d[0]?.value) estados[per.periodo] = d[0].value;
+                      } catch {}
+                    }
+                    setPagosState(estados);
+                    setPagosLoaded(true);
+                  })();
+                }, [pagosLoaded]);
+                return (
+                  <div className="border-t border-emerald-200 p-3">
+                    <p className="text-xs font-black text-gray-700 mb-2">💳 Pagos</p>
+                    {portalDocs.periodos.filter(p => p.cuenta).map((per, pi) => {
+                      const pago = pagosState[per.periodo];
+                      return (
+                        <div key={pi} className={`rounded-lg p-2.5 mb-2 border ${pago?.estado === "aprobado" ? "bg-emerald-50 border-emerald-200" : pago?.comprobante ? "bg-blue-50 border-blue-200" : "bg-amber-50 border-amber-200"}`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] font-black text-gray-800">Cuenta No. {per.cuenta.number} — {per.periodo}</p>
+                              <p className="text-[10px] text-gray-600">Monto: <strong>${Number(per.cuenta.amount || 0).toLocaleString("es-CO")}</strong></p>
+                            </div>
+                            {pago?.estado === "aprobado" ? (
+                              <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full">✅ Pagado</span>
+                            ) : pago?.comprobante ? (
+                              <span className="text-[10px] font-black text-blue-700 bg-blue-100 px-2 py-1 rounded-full">📎 En revisión</span>
+                            ) : (
+                              <label className="cursor-pointer">
+                                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  if (file.size > 5 * 1024 * 1024) { alert("Máximo 5MB."); return; }
+                                  const reader = new FileReader();
+                                  reader.onload = async () => {
+                                    const pagoData = { empresaNit: portalDocs.nit, empresaNombre: portalDocs.nombre, periodo: per.periodo, cuentaNumber: per.cuenta.number, monto: per.cuenta.amount, comprobante: reader.result.substring(0, 500000), nombreArchivo: file.name, tipoArchivo: file.type, fechaSubida: new Date().toISOString(), estado: "pendiente_revision" };
+                                    await fetch(`${sbUrl}/rest/v1/siso_store`, { method: "POST", headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ key: `siso_pago_${portalDocs.nit}_${per.periodo}`, value: pagoData, updated_at: new Date().toISOString() }) });
+                                    setPagosState(prev => ({...prev, [per.periodo]: pagoData}));
+                                    alert("✅ Comprobante subido.\nEl médico será notificado.");
+                                  };
+                                  reader.readAsDataURL(file);
+                                }} />
+                                <span className="px-3 py-1.5 bg-amber-600 text-white text-[10px] font-black rounded-lg hover:bg-amber-700 cursor-pointer">📎 Subir Comprobante</span>
+                              </label>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           ) : null;
         })()}
@@ -42460,7 +42520,21 @@ ${
               {(() => {
                 const vencidas90 = savedBillsList.filter(b => !b.pagada && (new Date() - new Date(b.savedAt || b.date || new Date())) / 86400000 > 90);
                 const pendHoy = pacientesHoy.filter(p => !movHoy.find(m => m.tipo === "ingreso" && m.pacienteId === p.id));
-                return (vencidas90.length > 0 || pendHoy.length > 0) ? (
+                // Check for pending payment reviews
+                const [pagosReview, setPagosReview] = React.useState([]);
+                React.useEffect(() => {
+                  (async () => {
+                    try {
+                      const r = await fetch(`${_SB_URL}/rest/v1/siso_store?select=key,value&key=like.siso_pago_%`, { headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` } });
+                      if (r.ok) {
+                        const rows = await r.json();
+                        const pending = rows.filter(row => row.value?.estado === "pendiente_revision").map(row => row.value);
+                        setPagosReview(pending);
+                      }
+                    } catch {}
+                  })();
+                }, []);
+                return (vencidas90.length > 0 || pendHoy.length > 0 || pagosReview.length > 0) ? (
                   <div className="space-y-2">
                     {vencidas90.length > 0 && (
                       <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center justify-between">
@@ -42476,6 +42550,33 @@ ${
                         <div className="flex items-center gap-2"><span className="text-lg">⏳</span>
                           <p className="text-xs font-black text-amber-800">{pendHoy.length} paciente(s) de hoy sin cobrar</p></div>
                         <button onClick={() => setCajaTab("caja")} className="px-3 py-1 bg-amber-600 text-white text-[10px] font-black rounded-lg hover:bg-amber-700">Cobrar →</button>
+                      </div>
+                    )}
+                    {pagosReview.length > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2"><span className="text-lg">💳</span>
+                          <div>
+                            <p className="text-xs font-black text-blue-800">{pagosReview.length} comprobante(s) de pago pendiente(s) de revisión</p>
+                            <p className="text-[10px] text-blue-600">{pagosReview.map(p => p.empresaNombre || "Empresa").join(", ")}</p>
+                          </div>
+                        </div>
+                        <button onClick={() => {
+                          const detalle = pagosReview.map((p, i) => `${i+1}. ${p.empresaNombre || "?"} — Cuenta ${p.cuentaNumber || "?"} — $${Number(p.monto || 0).toLocaleString("es-CO")} — ${p.fechaSubida?.split("T")[0] || "?"}`).join("\n");
+                          showConfirm(`💳 Comprobantes pendientes de revisión:\n\n${detalle}\n\n¿Aprobar todos los pagos?`, async () => {
+                            for (const p of pagosReview) {
+                              const key = `siso_pago_${p.empresaNit}_${p.periodo}`;
+                              const updated = {...p, estado: "aprobado", validadoPor: currentUser?.user, fechaValidacion: new Date().toISOString()};
+                              await _sbSet(key, updated);
+                              // Mark bill as paid
+                              const updBills = savedBillsList.map(b => (b.companyId === p.empresaId || b.clientName === p.empresaNombre) && b.number === p.cuentaNumber ? {...b, pagada: true, fechaPago: new Date().toISOString().split("T")[0]} : b);
+                              setSavedBillsList(updBills);
+                              const _bSuf = currentUser?.empresaId ? "empresa_" + currentUser.empresaId : currentUser?.user || "shared";
+                              _sync(`siso_saved_bills_${_bSuf}`, JSON.stringify(updBills));
+                            }
+                            setPagosReview([]);
+                            showAlert("✅ " + pagosReview.length + " pago(s) aprobado(s).\nLas cuentas de cobro fueron marcadas como pagadas.");
+                          });
+                        }} className="px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-lg hover:bg-blue-700">Revisar →</button>
                       </div>
                     )}
                   </div>
