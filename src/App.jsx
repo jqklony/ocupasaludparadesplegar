@@ -12607,33 +12607,57 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
                 <p className="text-white font-black text-sm">📦 Documentación por Periodo — {portalDocs.nombre}</p>
                 <p className="text-emerald-200 text-[10px]">NIT: {portalDocs.nit}</p>
               </div>
+              {/* Panel de bienvenida */}
+              <div className="p-3 bg-emerald-50 border-b border-emerald-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white font-black text-lg">🏢</div>
+                  <div>
+                    <p className="text-sm font-black text-emerald-900">{portalDocs.nombre}</p>
+                    <p className="text-[10px] text-emerald-600">NIT: {portalDocs.nit} · Código: {portalDocs.codigoAcceso || "—"}</p>
+                  </div>
+                </div>
+              </div>
               <div className="p-3 space-y-3">
                 {portalDocs.periodos.map((per, pi) => (
-                  <div key={pi} className="border border-gray-200 rounded-xl p-3">
-                    <p className="text-xs font-black text-gray-800 mb-2">📅 {per.periodo} <span className="text-gray-400 font-normal">({per.fecha})</span></p>
-                    <div className="grid grid-cols-2 gap-2">
+                  <div key={pi} className="border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+                      <p className="text-xs font-black text-gray-800">📅 Periodo: {per.periodo} <span className="text-gray-400 font-normal">· {per.fecha}</span></p>
+                    </div>
+                    <div className="p-3 space-y-2">
                       {per.informe && (
-                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-2">
-                          <p className="text-[10px] font-black text-blue-800">📋 Informe Epidemiológico</p>
-                          <p className="text-[9px] text-blue-600">{per.informe.totalPacientes} trabajadores</p>
+                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-2.5 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] font-black text-blue-800">📋 Informe Epidemiológico</p>
+                            <p className="text-[9px] text-blue-600">{per.informe.totalPacientes} trabajadores evaluados</p>
+                          </div>
+                          <span className="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">Disponible</span>
                         </div>
                       )}
                       {per.certificados && (
-                        <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-2 cursor-pointer hover:bg-emerald-100" onClick={() => {/* certificados ya se muestran abajo */}}>
-                          <p className="text-[10px] font-black text-emerald-800">📄 Certificados</p>
-                          <p className="text-[9px] text-emerald-600">{per.certificados.count} disponibles ↓</p>
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] font-black text-emerald-800">📄 Certificados de Aptitud</p>
+                            <p className="text-[9px] text-emerald-600">{per.certificados.count} certificados · Descargue abajo ↓</p>
+                          </div>
+                          <span className="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">✅ {per.certificados.count}</span>
                         </div>
                       )}
                       {per.cuenta && (
-                        <div className="bg-orange-50 border border-orange-100 rounded-lg p-2">
-                          <p className="text-[10px] font-black text-orange-800">💰 Cuenta de Cobro No. {per.cuenta.number}</p>
-                          <p className="text-[9px] text-orange-600">${Number(per.cuenta.amount || 0).toLocaleString("es-CO")}</p>
+                        <div className="bg-orange-50 border border-orange-100 rounded-lg p-2.5 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] font-black text-orange-800">💰 Cuenta de Cobro No. {per.cuenta.number}</p>
+                            <p className="text-[9px] text-orange-600">Monto: ${Number(per.cuenta.amount || 0).toLocaleString("es-CO")} · {per.cuenta.date || ""}</p>
+                          </div>
+                          <span className="text-[9px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-bold">${Number(per.cuenta.amount || 0).toLocaleString("es-CO")}</span>
                         </div>
                       )}
                       {per.custodia && (
-                        <div className="bg-purple-50 border border-purple-100 rounded-lg p-2">
-                          <p className="text-[10px] font-black text-purple-800">📁 Carta de Custodia</p>
-                          <p className="text-[9px] text-purple-600">{per.custodia.fecha} · {per.custodia.medicoNombre}</p>
+                        <div className="bg-purple-50 border border-purple-100 rounded-lg p-2.5 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] font-black text-purple-800">📁 Carta de Custodia de HC</p>
+                            <p className="text-[9px] text-purple-600">{per.custodia.fecha} · {per.custodia.medicoNombre}</p>
+                          </div>
+                          <span className="text-[9px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">✅</span>
                         </div>
                       )}
                     </div>
@@ -38194,6 +38218,32 @@ th{background:#fee2e2;font-weight:900;text-align:left;color:#7f1d1d;}
         allNew.push(recurrenteNuevo);
       }
       saveAgendados(agendados.concat(allNew));
+      // ── Auto-crear paciente en patientsList si no existe ──
+      if (nuevo.docNumero && !patientsList.find(p => p.docNumero === nuevo.docNumero)) {
+        const isParticular = !nuevo.empresa || nuevo.empresa.toUpperCase().includes("PARTICULAR");
+        const empresaData = nuevo.empresa ? companies.find(c => c.nombre === nuevo.empresa || c.nit === nuevo.docNumero) : null;
+        const newPat = {
+          id: "pac_ag_" + Date.now(),
+          nombres: nuevo.nombre, docTipo: nuevo.docTipo || "CC", docNumero: nuevo.docNumero,
+          fechaNacimiento: nuevo.fechaNacimiento, edad: nuevo.edad, genero: nuevo.genero,
+          estadoCivil: nuevo.estadoCivil, escolaridad: nuevo.escolaridad,
+          grupoEtnico: nuevo.grupoEtnico, celular: nuevo.celular, email: nuevo.email,
+          direccion: nuevo.residencia, zonaResidencia: nuevo.zonaResidencia,
+          eps: nuevo.eps, arl: nuevo.arl, afp: nuevo.afp, estrato: nuevo.estrato,
+          cargo: nuevo.cargo, tipoContrato: nuevo.tipoContrato, turnoTrabajo: nuevo.turnoTrabajo,
+          antiguedadEmpresa: nuevo.antiguedadEmpresa,
+          empresaId: empresaData?.id || (isParticular ? "particular" : ""),
+          empresaNombre: nuevo.empresa || "PARTICULAR",
+          tipoExamen: nuevo.tipoConsulta || "INGRESO",
+          fechaRegistro: new Date().toISOString(),
+          estadoHistoria: "Pre-registrado",
+          _medicoId: nuevo.medicoId || currentUser?.user,
+          _fromAgenda: true,
+        };
+        const updPats = [...patientsList, newPat];
+        setPatientsList(updPats);
+        _syncPatients(updPats);
+      }
       setAgendaRecurrente(false);
       setAgendaRecurrenciaPeriodo("3m");
       setAgendaForm((p) => ({
@@ -43371,6 +43421,24 @@ ${
                   }} className="px-4 py-2 bg-indigo-700 text-white text-xs font-black rounded-xl hover:bg-indigo-800">
                     📥 Exportar Pacientes por Médico (CSV)
                   </button>
+                  {/* Botón envío integral por empresa */}
+                  {selectedCompanyReport && (
+                    <button onClick={() => {
+                      const comp = companies.find(c => c.id === selectedCompanyReport);
+                      const certsEmp = patientsList.filter(p => p.empresaId === selectedCompanyReport && p.estadoHistoria === "Cerrada");
+                      setEnvioIntegralEmpresa({
+                        empresaId: selectedCompanyReport,
+                        empresaNombre: comp?.nombre || "Empresa",
+                        empresaNit: comp ? `${comp.nit}${comp.dv ? "-" + comp.dv : ""}` : "",
+                        totalPacientes: certsEmp.length,
+                        periodo: new Date().toISOString().slice(0, 7),
+                        precioPaciente: comp?.tarifaIngreso || comp?.tarifaPeriodico || "35000",
+                      });
+                      setShowEnvioIntegral(true);
+                    }} className="px-4 py-2 bg-emerald-700 text-white text-xs font-black rounded-xl hover:bg-emerald-800 ml-2">
+                      📤 Enviar Documentación a Empresa
+                    </button>
+                  )}
                 </div>
               )}
             </div>
