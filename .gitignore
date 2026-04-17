@@ -1,9 +1,36 @@
-node_modules/
-dist/
+```
+# Directories
+repo_factorizado/
+repo_original/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+
+# Environment files
 .env
 .env.local
-.env.*.local
-*.log
-npm-debug.log*
-.DS_Store
-coverage/
+*.env.*
+
+# Editor/IDE files
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+.env
+
+# Build artifacts
+dist/
+build/
+target/
+```
