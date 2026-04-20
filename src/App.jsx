@@ -11518,8 +11518,16 @@ const _generarFacturaDIAN_UBL = (billData, doctorData, numero) => {
 
   // Helper: Obtener TODAS las atenciones disponibles del sistema (fallback multiple)
   const _getAllBillAtenciones = () => {
-    // Fuente 1: atencionesCerradas
-    let todas = [...(atencionesCerradas || [])];
+    // Fuente 1: pacsMed - historias cl?nicas cerradas (igual que dashboard)
+    let todas = [];
+    if (pacsMed && pacsMed.length > 0) {
+      todas = pacsMed.filter(p => p.estadoHistoria === "Cerrada" && p.empresa).map(p => ({
+        id: p.id, docNumero: p.docNumero, nombres: p.nombres, nombre: p.nombres,
+        docTipo: p.docTipo, empresa: p.empresa, empresaId: p.empresaId,
+        empresaNombre: p.empresa, fechaAtencion: p.fechaExamen || p.fecha,
+        tipo: p.tipoExamen || "Evaluaci?n"
+      }));
+    }
     
     // Fuente 2: Si no hay, usar agendaList (citas atendidas)
     if (todas.length === 0 && agendaList) {
