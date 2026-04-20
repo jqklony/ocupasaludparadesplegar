@@ -12453,10 +12453,10 @@ function _PortalCartaDoc({ docNombre, docTitulo, docLicencia, docCC, docCel, doc
     <div style={s.wrap}>
       <div style={s.headerRow}>
         <div style={s.logoWrap}>
-          <div style={s.logoBadge}><span style={{ color: "white", fontWeight: 900, fontSize: "15px", letterSpacing: "-0.5px" }}>JC</span></div>
+          <div style={s.logoBadge}><span style={{ color: "white", fontWeight: 900, fontSize: "15px", letterSpacing: "-0.5px" }}>{(safe(docNombre, "JC")).split(" ").slice(0, 2).map(w => w[0] || "").join("").slice(0, 2).toUpperCase() || "JC"}</span></div>
           <div>
-            <p style={{ fontSize: "13pt", fontWeight: 900, color: "#111", margin: 0, lineHeight: 1.25 }}>DR. JULIAN CUCALON</p>
-            <p style={{ fontSize: "7.5pt", color: "#4B5563", margin: 0, letterSpacing: "0.06em", marginTop: "3px" }}>MEDICO ESPECIALISTA EN SST</p>
+            <p style={{ fontSize: "13pt", fontWeight: 900, color: "#111", margin: 0, lineHeight: 1.25 }}>DR. {safe(docNombre, "JULIAN CUCALON")}</p>
+            <p style={{ fontSize: "7.5pt", color: "#4B5563", margin: 0, letterSpacing: "0.06em", marginTop: "3px" }}>{safe(docTitulo, "MEDICO ESPECIALISTA EN SST")}</p>
           </div>
         </div>
         <div style={{ textAlign: "right", fontSize: "8.5pt", color: "#374151", lineHeight: 1.55 }}>
@@ -12566,11 +12566,11 @@ function PortalCustodiaViewer({ custodia, empresaNombre, periodo, sbUrl, sbKey }
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
         <div style="display:flex;align-items:center;gap:10px;">
           <div style="width:50px;height:50px;background:linear-gradient(135deg,#065f46 0%,#0f766e 100%);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <span style="color:white;font-weight:900;font-size:15px;letter-spacing:-0.5px;">JC</span>
+            <span style="color:white;font-weight:900;font-size:15px;letter-spacing:-0.5px;">${(c.docNombre||"JC").split(" ").slice(0,2).map(function(w){return w[0]||"";}).join("").slice(0,2).toUpperCase()||"JC"}</span>
           </div>
           <div>
-            <p style="font-size:13pt;font-weight:900;color:#111;margin:0;line-height:1.25;">DR. JULIAN CUCALON</p>
-            <p style="font-size:7.5pt;color:#4B5563;margin:0;letter-spacing:0.06em;margin-top:3px;">MEDICO ESPECIALISTA EN SST</p>
+            <p style="font-size:13pt;font-weight:900;color:#111;margin:0;line-height:1.25;">DR. ${c.docNombre||"JULIAN CUCALON"}</p>
+            <p style="font-size:7.5pt;color:#4B5563;margin:0;letter-spacing:0.06em;margin-top:3px;">${c.docTitulo||"MEDICO ESPECIALISTA EN SST"}</p>
           </div>
         </div>
         <div style="text-align:right;font-size:8.5pt;color:#374151;line-height:1.55;">
@@ -13516,7 +13516,7 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
         )}
       </div>
 
-      <div className="flex-1 p-4 max-w-lg mx-auto w-full space-y-4 mt-2">
+      <div className={`flex-1 p-4 mx-auto w-full space-y-4 mt-2 ${(tipoBusqueda === "empresa" || resultadosEmpresa.length > 0) ? "max-w-5xl" : "max-w-lg"}`}>
         {/* ── Instrucciones ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-teal-100 p-4">
           <div className="flex items-start gap-3">
@@ -14432,18 +14432,20 @@ function AppInner() {
       : `1. Haga clic en el botón verde<br/>2. Seleccione "🪪 Cédula"<br/>3. Ingrese: <strong>${docNumero || ""}</strong><br/>4. Descargue su certificado en PDF`;
     return `<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;">` +
       `<div style="background:linear-gradient(135deg,#065f46,#0d9488);padding:24px 30px;border-radius:12px 12px 0 0;">` +
-      `<h1 style="color:#ffffff;margin:0;font-size:18px;font-weight:900;">📋 Certificado Médico Ocupacional</h1>` +
+      `<h1 style="color:#ffffff;margin:0;font-size:18px;font-weight:900;">${modoEmpresa ? "📦 Documentación Médica Ocupacional" : "📋 Certificado Médico Ocupacional"}</h1>` +
       `<p style="color:#a7f3d0;margin:4px 0 0;font-size:12px;">Servicio de Salud Ocupacional</p></div>` +
       `<div style="padding:24px 30px;border:1px solid #e5e7eb;border-top:none;">` +
-      `<p style="font-size:14px;color:#111;margin:0 0 16px;">Estimado/a <strong>${nombre || "trabajador/a"}</strong>,</p>` +
-      `<p style="font-size:13px;color:#374151;line-height:1.6;margin:0 0 20px;">Le informamos que su certificado de aptitud médica ocupacional ha sido emitido. Puede descargarlo a través de nuestro portal.</p>` +
+      `<p style="font-size:14px;color:#111;margin:0 0 16px;">Estimado/a <strong>${nombre || "encargado/a de SST"}</strong>,</p>` +
+      (modoEmpresa
+        ? `<p style="font-size:13px;color:#374151;line-height:1.6;margin:0 0 20px;">Le hacemos entrega de la documentación médica ocupacional completa correspondiente a su empresa. A continuación encontrará el informe epidemiológico, los certificados de aptitud laboral de sus trabajadores, la cuenta de cobro y la carta de custodia de historias clínicas.</p>`
+        : `<p style="font-size:13px;color:#374151;line-height:1.6;margin:0 0 20px;">Le informamos que su certificado de aptitud médica ocupacional ha sido emitido. Puede descargarlo a través de nuestro portal.</p>`) +
       (extra ? `<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 16px;margin:0 0 20px;">${extra}</div>` : "") +
       `<div style="background:#065f46;border-radius:10px;padding:20px;text-align:center;margin:0 0 20px;">` +
-      `<p style="color:#a7f3d0;font-size:11px;margin:0 0 8px;text-transform:uppercase;letter-spacing:2px;font-weight:700;">Descargue su certificado</p>` +
+      `<p style="color:#a7f3d0;font-size:11px;margin:0 0 8px;text-transform:uppercase;letter-spacing:2px;font-weight:700;">${modoEmpresa ? "Acceda a sus documentos" : "Descargue su certificado"}</p>` +
       `<a href="${portalUrl}" style="display:inline-block;background:#10b981;color:#ffffff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:900;font-size:14px;">📥 Abrir Portal de Certificados</a>` +
       `<p style="color:#d1fae5;font-size:11px;margin:10px 0 0;">${instrBusqueda}</p></div>` +
       `<div style="background:#f9fafb;border-radius:8px;padding:14px;margin:0 0 20px;">` +
-      `<p style="font-size:11px;color:#6b7280;margin:0;line-height:1.6;"><strong>¿Cómo descargar?</strong><br/>${instrPasos}</p></div>` +
+      `<p style="font-size:11px;color:#6b7280;margin:0;line-height:1.6;"><strong>${modoEmpresa ? "¿Cómo acceder?" : "¿Cómo descargar?"}</strong><br/>${instrPasos}</p></div>` +
       `<p style="font-size:13px;color:#374151;margin:0 0 12px;">Cordialmente,</p>` +
       `<div style="background:#f0fdf4;border:1px solid #d1fae5;border-radius:8px;padding:14px;">` +
       `<p style="font-size:15px;color:#065f46;font-weight:900;margin:0;text-transform:uppercase;">${docNombre}</p>` +
