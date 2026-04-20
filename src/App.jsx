@@ -12388,6 +12388,868 @@ const PORTAL_URL = (typeof window !== "undefined" ? window.location.origin + win
 // SEC-13: Nunca expone datos de otros pacientes
 // NORMATIVO: Res. 2346/2007 Art.14 · Ley 1581/2012 · Res. 1843/2025
 // ══════════════════════════════════════════════════════════════════════════
+// PORTAL EMPRESA — Componentes standalone (Rules of Hooks: FUERA de PortalPublicoTrabajador)
+// FIX React Error #310: hooks extraídos del IIFE ilegal al propio componente
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── Helper: Guardar en Supabase desde el portal ─────────────────────────────
+const _sbPortalSave = async (sbUrl, sbKey, key, value) => {
+  await fetch(`${sbUrl}/rest/v1/siso_store`, {
+    method: "POST",
+    headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ key, value }),
+  });
+};
+
+// ── Helper: Verificar comprobante de pago con Gemini Vision ─────────────────
+const _portalVerifyPayment = async (base64, mime, amount) => {
+  let cfg = {};
+  try { cfg = JSON.parse(localStorage.getItem("siso_ai_config_provider") || "{}"); } catch {}
+  const key = cfg.keys?.gemini;
+  if (!key) throw new Error("Configura una API Key de Gemini en ⚙️ IA para verificar comprobantes.");
+  const amountFmt = Number(amount || 0).toLocaleString("es-CO");
+  const prompt = `Analiza este comprobante de pago. Valor esperado: $${amountFmt} COP. Responde ÚNICAMENTE con JSON válido sin markdown: {"esPago":true,"montoCoincide":true,"montoPagado":"valor encontrado o N/A","confirmado":true,"observacion":"breve nota"}. confirmado=true solo si es comprobante válido Y monto coincide o es mayor.`;
+  const models = ["gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash-lite"];
+  let lastErr = "Sin key";
+  for (const model of models) {
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { mimeType: mime, data: base64 } }] }],
+          generationConfig: { maxOutputTokens: 300, temperature: 0.1 },
+        }),
+      });
+      if (!r.ok) { lastErr = `${model}: ${r.status}`; continue; }
+      const d = await r.json();
+      const txt = d.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      const match = txt.match(/\{[\s\S]*\}/);
+      if (!match) { lastErr = "Respuesta no válida"; continue; }
+      return JSON.parse(match[0]);
+    } catch (e) { lastErr = e.message; }
+  }
+  throw new Error("IA no disponible: " + lastErr);
+};
+
+// ── Carta de Custodia — réplica del documento (inline styles, sin Tailwind) ─
+const _MONTHS_PORTAL = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+
+function _PortalCartaDoc({ docNombre, docTitulo, docLicencia, docCC, docCel, docEmail, docCiudad, firmaSrc, fechaTexto, empresaNombre, ciudadDest, mesTexto, anioVal }) {
+  const s = {
+    wrap: { fontFamily: '"Arial","Helvetica",sans-serif', fontSize: "11pt", color: "#111", background: "white", width: "816px", minHeight: "1056px", padding: "56px 68px 48px", boxSizing: "border-box" },
+    headerRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" },
+    logoWrap: { display: "flex", alignItems: "center", gap: "10px" },
+    logoBadge: { width: "50px", height: "50px", background: "linear-gradient(135deg,#065f46 0%,#0f766e 100%)", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    sep: { height: "2px", background: "linear-gradient(90deg,#065f46 0%,#0f766e 60%,#0d9488 100%)", margin: "10px 0 24px", border: "none" },
+    p: { fontSize: "11pt", lineHeight: "1.65", marginBottom: "14px", textAlign: "justify" },
+    pClosing: { fontSize: "11pt", lineHeight: "1.65", marginBottom: "52px" },
+    subject: { textAlign: "center", fontWeight: 700, fontSize: "11pt", marginBottom: "26px" },
+    footerSep: { height: "1px", background: "#374151", margin: "12px 0 10px", border: "none" },
+    footerText: { textAlign: "center", fontSize: "8pt", color: "#374151", lineHeight: 1.8, margin: 0 },
+  };
+  const safe = (v, fb = "") => v || fb;
+  return (
+    <div style={s.wrap}>
+      <div style={s.headerRow}>
+        <div style={s.logoWrap}>
+          <div style={s.logoBadge}><span style={{ color: "white", fontWeight: 900, fontSize: "15px", letterSpacing: "-0.5px" }}>JC</span></div>
+          <div>
+            <p style={{ fontSize: "13pt", fontWeight: 900, color: "#111", margin: 0, lineHeight: 1.25 }}>DR. JULIAN CUCALON</p>
+            <p style={{ fontSize: "7.5pt", color: "#4B5563", margin: 0, letterSpacing: "0.06em", marginTop: "3px" }}>MEDICO ESPECIALISTA EN SST</p>
+          </div>
+        </div>
+        <div style={{ textAlign: "right", fontSize: "8.5pt", color: "#374151", lineHeight: 1.55 }}>
+          <p style={{ margin: 0, fontWeight: 700 }}>{safe(docNombre)}</p>
+          <p style={{ margin: 0 }}>Licencia: Resolución {safe(docLicencia, "14497-12-2019")} (Cauca)</p>
+          <p style={{ margin: 0 }}>{safe(docCiudad, "Popayán").toUpperCase()}</p>
+          <p style={{ margin: 0 }}>Cel: {safe(docCel, "3182213979")}</p>
+          <p style={{ margin: 0 }}>Email: {safe(docEmail, "dr.juliancucalon@gmail.com").toUpperCase()}</p>
+        </div>
+      </div>
+      <hr style={s.sep} />
+      <p style={{ textAlign: "right", marginBottom: "28px", fontSize: "11pt" }}>{fechaTexto}</p>
+      <div style={{ marginBottom: "28px" }}>
+        <p style={{ margin: 0, fontSize: "11pt" }}>Señores</p>
+        <p style={{ margin: 0, fontSize: "11pt", fontWeight: 700 }}>{empresaNombre}</p>
+        <p style={{ margin: 0, fontSize: "11pt" }}>{ciudadDest}</p>
+      </div>
+      <p style={s.subject}>ASUNTO: CARTA CUSTODIA DE LAS HISTORIAS CLÍNICAS OCUPACIONALES</p>
+      <p style={s.p}>Cordial Saludo,</p>
+      <p style={s.p}>Por medio de la presente se hace constar la custodia de las Historias Clínicas Ocupacionales del personal valorado durante el <strong>mes de {mesTexto} de {anioVal}.</strong></p>
+      <p style={s.p}>Dichas valoraciones fueron realizadas por el <strong>Dr. {safe(docNombre)}</strong>, identificado con cédula de ciudadanía número <strong>{safe(docCC, "1061750704")}</strong>, MEDICO ESPECIALISTA EN SST, con Licencia de Salud Ocupacional <strong>Resolución {safe(docLicencia, "14497-12-2019")} (Cauca).</strong></p>
+      <p style={s.p}>Doy garantía de que el archivo de las historias clínicas se encuentra bajo custodia electrónica en la ciudad de {safe(docCiudad, "Popayán")}, dando así estricto cumplimiento a lo establecido en la <strong>Resolución 1918 de 2009</strong> del Ministerio de la Protección Social. La custodia está garantizada por un periodo de <strong>15 años</strong> contados a partir de la fecha de la última atención, conforme a lo dispuesto en la <strong>Resolución 039 de 2017</strong> del Ministerio de Salud y Protección Social.</p>
+      <p style={s.p}>Asimismo, se certifica que se cuenta con un sistema de historia clínica sistematizado que cumple a cabalidad con los requisitos técnicos y de seguridad exigidos por la normatividad vigente para garantizar la confidencialidad e integridad de la información.</p>
+      <p style={s.pClosing}>Atentamente,</p>
+      <div style={{ textAlign: "center", marginBottom: "14px" }}>
+        {firmaSrc
+          ? <img src={firmaSrc} alt="Firma digital" style={{ maxHeight: "72px", maxWidth: "190px", objectFit: "contain", display: "block", margin: "0 auto 6px" }} />
+          : <div style={{ height: "64px", width: "190px", margin: "0 auto 6px", border: "1.5px dashed #9CA3AF", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: "8pt", color: "#9CA3AF" }}>Firma digital</span></div>}
+      </div>
+      <hr style={s.footerSep} />
+      <div style={s.footerText}>
+        <p style={{ margin: 0, fontWeight: 700 }}>{safe(docNombre)}</p>
+        <p style={{ margin: 0 }}>{safe(docTitulo, "MEDICO ESPECIALISTA EN SST")}</p>
+        <p style={{ margin: 0 }}>CC: {safe(docCC, "1061750704")}</p>
+        <p style={{ margin: 0 }}>Licencia SST: Resolución {safe(docLicencia, "14497-12-2019")} (Cauca)</p>
+        <p style={{ margin: 0 }}>Cel: {safe(docCel, "3182213979")}</p>
+        <p style={{ margin: 0 }}>Generado electrónicamente · {safe(docEmail, "dr.juliancucalon@gmail.com")} · Integral de Salud Ocupacional</p>
+        <p style={{ margin: 0 }}>{safe(docCiudad, "Popayán")} – Cauca</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Carta de Custodia Viewer (portal empresa) ────────────────────────────────
+function PortalCustodiaViewer({ custodia, empresaNombre, periodo, sbUrl, sbKey }) {
+  const [show, setShow] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
+  const [savedList, setSavedList] = React.useState([]);
+  const [showSaved, setShowSaved] = React.useState(false);
+  const [loadingSaved, setLoadingSaved] = React.useState(false);
+  const [viewSavedIdx, setViewSavedIdx] = React.useState(null);
+
+  if (!custodia) return null;
+
+  const fechaISO = custodia.fecha || new Date().toISOString().split("T")[0];
+  const [y, m] = fechaISO.split("-").map(Number);
+  const fechaTexto = (() => { const [yr, mo, dy] = fechaISO.split("-").map(Number); return `${dy} de ${_MONTHS_PORTAL[mo - 1]} de ${yr}`; })();
+  const mesRef = (m - 2 + 12) % 12;
+  const mesTexto = _MONTHS_PORTAL[mesRef];
+  const anioVal = mesRef === 11 && m === 1 ? y - 1 : y;
+  const docNombre = (custodia.medicoNombre || "JULIAN CUCALON").toUpperCase();
+  const docTitulo = (custodia.medicoTitulo || "MEDICO ESPECIALISTA EN SST").toUpperCase();
+  const docLicencia = custodia.medicoLicencia || "14497-12-2019";
+  const docCC = custodia.medicoCC || "1061750704";
+  const docCel = custodia.medicoTel || "3182213979";
+  const docEmail = custodia.medicoEmail || "dr.juliancucalon@gmail.com";
+  const docCiudad = custodia.medicoCiudad || "Popayán";
+  const firmaSrc = custodia.firma || null;
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const doc = { id: "cust_p_" + Date.now(), empresaNombre, periodo, docNombre, docTitulo, docLicencia, docCC, docCel, docEmail, docCiudad, firmaSrc, fechaTexto, mesTexto, anioVal, savedAt: new Date().toISOString() };
+      const r = await fetch(`${sbUrl}/rest/v1/siso_store?key=eq.siso_cartas_custodia&select=value`, { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } });
+      const existing = await r.json();
+      const arr = Array.isArray(existing[0]?.value) ? existing[0].value : [];
+      arr.push(doc);
+      await _sbPortalSave(sbUrl, sbKey, "siso_cartas_custodia", arr);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) { alert("Error al guardar: " + e.message); }
+    setSaving(false);
+  };
+
+  const handleLoadSaved = async () => {
+    setLoadingSaved(true);
+    setViewSavedIdx(null);
+    try {
+      const r = await fetch(`${sbUrl}/rest/v1/siso_store?key=eq.siso_cartas_custodia&select=value`, { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } });
+      const d = await r.json();
+      setSavedList((d[0]?.value || []).filter(c => c.empresaNombre === empresaNombre));
+    } catch {}
+    setLoadingSaved(false);
+    setShowSaved(true);
+  };
+
+  const printCarta = (c) => {
+    const tmpId = "tmp_carta_" + Date.now();
+    const div = document.createElement("div");
+    div.id = tmpId;
+    div.style.display = "none";
+    document.body.appendChild(div);
+    const root = window.ReactDOM?.createRoot ? window.ReactDOM.createRoot(div) : null;
+    // Fallback: build carta HTML directly using same inline-style structure
+    const cartaHtml = `<div style="font-family:'Arial','Helvetica',sans-serif;font-size:11pt;color:#111;background:white;width:816px;min-height:1056px;padding:56px 68px 48px;box-sizing:border-box;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:50px;height:50px;background:linear-gradient(135deg,#065f46 0%,#0f766e 100%);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span style="color:white;font-weight:900;font-size:15px;letter-spacing:-0.5px;">JC</span>
+          </div>
+          <div>
+            <p style="font-size:13pt;font-weight:900;color:#111;margin:0;line-height:1.25;">DR. JULIAN CUCALON</p>
+            <p style="font-size:7.5pt;color:#4B5563;margin:0;letter-spacing:0.06em;margin-top:3px;">MEDICO ESPECIALISTA EN SST</p>
+          </div>
+        </div>
+        <div style="text-align:right;font-size:8.5pt;color:#374151;line-height:1.55;">
+          <p style="margin:0;font-weight:700;">${c.docNombre}</p>
+          <p style="margin:0;">Licencia: Resolución ${c.docLicencia} (Cauca)</p>
+          <p style="margin:0;">${(c.docCiudad||"Popayán").toUpperCase()}</p>
+          <p style="margin:0;">Cel: ${c.docCel}</p>
+          <p style="margin:0;">Email: ${(c.docEmail||"").toUpperCase()}</p>
+        </div>
+      </div>
+      <hr style="height:2px;background:linear-gradient(90deg,#065f46 0%,#0f766e 60%,#0d9488 100%);margin:10px 0 24px;border:none;" />
+      <p style="text-align:right;margin-bottom:28px;font-size:11pt;">${c.fechaTexto}</p>
+      <div style="margin-bottom:28px;">
+        <p style="margin:0;font-size:11pt;">Señores</p>
+        <p style="margin:0;font-size:11pt;font-weight:700;">${c.empresaNombre}</p>
+        <p style="margin:0;font-size:11pt;">${c.docCiudad||"Popayán"}</p>
+      </div>
+      <p style="text-align:center;font-weight:700;font-size:11pt;margin-bottom:26px;">ASUNTO: CARTA CUSTODIA DE LAS HISTORIAS CLÍNICAS OCUPACIONALES</p>
+      <p style="font-size:11pt;line-height:1.65;margin-bottom:14px;text-align:justify;">Cordial Saludo,</p>
+      <p style="font-size:11pt;line-height:1.65;margin-bottom:14px;text-align:justify;">Por medio de la presente se hace constar la custodia de las Historias Clínicas Ocupacionales del personal valorado durante el <strong>mes de ${c.mesTexto} de ${c.anioVal}.</strong></p>
+      <p style="font-size:11pt;line-height:1.65;margin-bottom:14px;text-align:justify;">Dichas valoraciones fueron realizadas por el <strong>Dr. ${c.docNombre}</strong>, identificado con cédula de ciudadanía número <strong>${c.docCC}</strong>, MEDICO ESPECIALISTA EN SST, con Licencia de Salud Ocupacional <strong>Resolución ${c.docLicencia} (Cauca).</strong></p>
+      <p style="font-size:11pt;line-height:1.65;margin-bottom:14px;text-align:justify;">Doy garantía de que el archivo de las historias clínicas se encuentra bajo custodia electrónica en la ciudad de ${c.docCiudad||"Popayán"}, dando así estricto cumplimiento a lo establecido en la <strong>Resolución 1918 de 2009</strong> del Ministerio de la Protección Social. La custodia está garantizada por un periodo de <strong>15 años</strong> contados a partir de la fecha de la última atención, conforme a lo dispuesto en la <strong>Resolución 039 de 2017</strong> del Ministerio de Salud y Protección Social.</p>
+      <p style="font-size:11pt;line-height:1.65;margin-bottom:14px;text-align:justify;">Asimismo, se certifica que se cuenta con un sistema de historia clínica sistematizado que cumple a cabalidad con los requisitos técnicos y de seguridad exigidos por la normatividad vigente para garantizar la confidencialidad e integridad de la información.</p>
+      <p style="font-size:11pt;line-height:1.65;margin-bottom:52px;">Atentamente,</p>
+      <div style="text-align:center;margin-bottom:14px;">
+        ${c.firmaSrc ? `<img src="${c.firmaSrc}" alt="Firma" style="max-height:72px;max-width:190px;object-fit:contain;display:block;margin:0 auto 6px;" />` : `<div style="height:64px;width:190px;margin:0 auto 6px;border:1.5px dashed #9CA3AF;border-radius:6px;display:flex;align-items:center;justify-content:center;"><span style="font-size:8pt;color:#9CA3AF;">Firma digital</span></div>`}
+      </div>
+      <hr style="height:1px;background:#374151;margin:12px 0 10px;border:none;" />
+      <div style="text-align:center;font-size:8pt;color:#374151;line-height:1.8;margin:0;">
+        <p style="margin:0;font-weight:700;">${c.docNombre}</p>
+        <p style="margin:0;">${c.docTitulo||"MEDICO ESPECIALISTA EN SST"}</p>
+        <p style="margin:0;">CC: ${c.docCC}</p>
+        <p style="margin:0;">Licencia SST: Resolución ${c.docLicencia} (Cauca)</p>
+        <p style="margin:0;">Cel: ${c.docCel}</p>
+        <p style="margin:0;">Generado electrónicamente · ${c.docEmail} · Integral de Salud Ocupacional</p>
+        <p style="margin:0;">${c.docCiudad||"Popayán"} – Cauca</p>
+      </div>
+    </div>`;
+    const w = window.open("", "_blank", "width=900,height=1100");
+    if (!w) { alert("Permita ventanas emergentes para ver el documento."); return; }
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Carta Custodia — ${c.empresaNombre}</title><style>*{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{margin:0;padding:0;background:#e5e7eb;}@media print{body{background:white;}.no-print{display:none!important;}@page{size:letter portrait;margin:0;}}</style></head><body><div class="no-print" style="padding:10px 16px;background:#1e3a5f;display:flex;gap:10px;align-items:center;"><button onclick="window.print()" style="background:#10b981;color:white;border:none;padding:8px 20px;border-radius:6px;font-weight:900;cursor:pointer;font-size:12px;">📥 Imprimir / PDF</button><button onclick="window.close()" style="background:#ef4444;color:white;border:none;padding:8px 16px;border-radius:6px;font-weight:900;cursor:pointer;font-size:12px;">✕ Cerrar</button><span style="color:#94a3b8;font-size:11px;margin-left:8px;">Carta Custodia — ${c.empresaNombre}</span></div><div style="padding:24px;display:flex;justify-content:center;">${cartaHtml}</div></body></html>`);
+    w.document.close();
+    document.body.removeChild(div);
+  };
+
+  return (
+    <div className="bg-purple-50 border border-purple-200 rounded-xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between p-3">
+        <div>
+          <p className="text-sm font-black text-purple-800">📁 Carta de Custodia</p>
+          <p className="text-[10px] text-purple-600">{custodia.fecha} · {custodia.medicoNombre}</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={handleLoadSaved} className="px-2 py-1 bg-gray-100 text-gray-600 text-[10px] font-black rounded-lg hover:bg-gray-200 transition">
+            📂 Ver guardadas
+          </button>
+          <button onClick={() => setShow(s => !s)} className="px-2 py-1 bg-purple-700 text-white text-[10px] font-black rounded-lg hover:bg-purple-800 transition">
+            {show ? "▲ Cerrar" : "👁 Ver documento"}
+          </button>
+        </div>
+      </div>
+
+      {/* Lista cartas guardadas */}
+      {showSaved && (
+        <div className="bg-white border-t border-purple-200 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-black text-gray-700">📂 Cartas guardadas — {empresaNombre}</p>
+            <button onClick={() => { setShowSaved(false); setViewSavedIdx(null); }} className="text-gray-400 hover:text-red-500 font-black text-lg leading-none">✕</button>
+          </div>
+          {loadingSaved ? (
+            <p className="text-xs text-gray-400 py-2 text-center">⏳ Cargando...</p>
+          ) : savedList.length === 0 ? (
+            <p className="text-xs text-gray-400 py-2 text-center italic">No hay cartas guardadas para esta empresa aún.</p>
+          ) : (
+            <div className="space-y-2">
+              {savedList.map((c, i) => (
+                <div key={i} className="flex items-center justify-between bg-purple-50 border border-purple-100 rounded-lg p-2.5">
+                  <div>
+                    <p className="text-xs font-bold text-gray-800">{c.empresaNombre} · {c.periodo}</p>
+                    <p className="text-[10px] text-gray-500">Guardada: {c.savedAt?.split("T")[0]} · Dr. {c.docNombre}</p>
+                  </div>
+                  <button onClick={() => printCarta(c)} className="px-2 py-1 bg-purple-600 text-white text-[10px] font-black rounded-lg hover:bg-purple-700 flex-shrink-0">
+                    📥 Ver/PDF
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Documento en pantalla */}
+      {show && (
+        <div className="bg-gray-200 border-t border-purple-200 p-4">
+          <div className="flex justify-between items-center mb-3">
+            <p className="text-xs font-black text-gray-600">Carta de Custodia — {empresaNombre}</p>
+            <div className="flex gap-2">
+              <button onClick={handleSave} disabled={saving}
+                className={`px-3 py-1.5 text-xs font-black rounded-lg transition border-2 ${saved ? "bg-emerald-50 border-emerald-400 text-emerald-700" : "bg-white border-emerald-300 text-emerald-700 hover:bg-emerald-50"}`}>
+                {saving ? "⏳ Guardando..." : saved ? "✅ Guardada" : "💾 Guardar carta"}
+              </button>
+              <button onClick={() => printCarta({ docNombre, docTitulo, docLicencia, docCC, docCel, docEmail, docCiudad, firmaSrc, fechaTexto, empresaNombre, periodo, mesTexto, anioVal, savedAt: "" })}
+                className="px-3 py-1.5 bg-purple-700 text-white text-xs font-black rounded-lg hover:bg-purple-800">
+                📥 PDF / Imprimir
+              </button>
+            </div>
+          </div>
+          {/* Documento escalado */}
+          <div className="overflow-x-auto flex justify-center">
+            <div style={{ transform: "scale(0.72)", transformOrigin: "top left", width: "816px", marginBottom: "-292px" }}>
+              <_PortalCartaDoc
+                docNombre={docNombre} docTitulo={docTitulo} docLicencia={docLicencia}
+                docCC={docCC} docCel={docCel} docEmail={docEmail} docCiudad={docCiudad}
+                firmaSrc={firmaSrc} fechaTexto={fechaTexto} empresaNombre={empresaNombre}
+                ciudadDest={docCiudad} mesTexto={mesTexto} anioVal={anioVal}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Cuenta de Cobro — comprobante de pago + verificación IA ─────────────────
+function PortalCuentaCobroCard({ cuenta, empresaNombre, periodo, sbUrl, sbKey, nitBusq }) {
+  const [comprobante, setComprobante] = React.useState(cuenta?.comprobante || null);
+  const [pagado, setPagado] = React.useState(cuenta?.pagado || false);
+  const [uploading, setUploading] = React.useState(false);
+  const [iaResult, setIaResult] = React.useState(cuenta?.comprobante?.iaResult || null);
+  const [checking, setChecking] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const monto = Number(cuenta?.amount || 0).toLocaleString("es-CO");
+
+  const updateSupa = async (newComp, confirmed) => {
+    try {
+      const tryNits = [nitBusq];
+      for (let dv = 0; dv <= 9; dv++) tryNits.push(nitBusq + dv);
+      if (nitBusq.length > 6) tryNits.push(nitBusq.slice(0, -1));
+      for (const nit of tryNits) {
+        const r = await fetch(`${sbUrl}/rest/v1/siso_store?key=eq.siso_portal_empresa_docs_${nit}&select=value`, { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } });
+        const d = await r.json();
+        if (d[0]?.value) {
+          const docs = d[0].value;
+          docs.periodos = (docs.periodos || []).map(p =>
+            p.periodo !== periodo ? p : { ...p, cuenta: { ...p.cuenta, comprobante: newComp, pagado: confirmed } }
+          );
+          await _sbPortalSave(sbUrl, sbKey, `siso_portal_empresa_docs_${nit}`, docs);
+          break;
+        }
+      }
+    } catch {}
+  };
+
+  const handleFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    if (!allowed.includes(file.type)) { setError("Solo se aceptan JPG, PNG, WEBP o PDF"); return; }
+    if (file.size > 5 * 1024 * 1024) { setError("El archivo no puede superar 5 MB"); return; }
+    setError("");
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const full = ev.target.result;
+      const b64 = full.split(",")[1];
+      const mime = file.type === "application/pdf" ? "image/jpeg" : file.type;
+      setChecking(true);
+      setIaResult(null);
+      let iaRes;
+      try {
+        iaRes = await _portalVerifyPayment(b64, mime, cuenta.amount);
+      } catch (e) {
+        iaRes = { esPago: false, montoCoincide: false, confirmado: false, observacion: "Verificación automática no disponible: " + e.message + ". El comprobante fue recibido para revisión manual." };
+      }
+      const newComp = { nombre: file.name, mime, fecha: new Date().toISOString(), iaResult: iaRes };
+      setIaResult(iaRes);
+      setComprobante(newComp);
+      setPagado(iaRes.confirmado);
+      setChecking(false);
+      await updateSupa(newComp, iaRes.confirmado);
+    };
+    reader.readAsDataURL(file);
+    setUploading(true);
+    setTimeout(() => setUploading(false), 500);
+  };
+
+  if (!cuenta) return null;
+
+  return (
+    <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-black text-orange-800">💰 Cuenta de Cobro No. {cuenta.number}</p>
+          <p className="text-[10px] text-orange-600">${monto} COP · {cuenta.date}</p>
+          {cuenta.concept && <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">{cuenta.concept}</p>}
+        </div>
+        <span className={`text-[10px] font-black px-2.5 py-1 rounded-full flex-shrink-0 ml-2 ${pagado ? "bg-emerald-100 text-emerald-800 border border-emerald-300" : "bg-red-100 text-red-700 border border-red-200"}`}>
+          {pagado ? "✅ PAGADA" : "⏳ PENDIENTE"}
+        </span>
+      </div>
+
+      {/* Estado comprobante */}
+      {checking && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p className="text-[10px] text-blue-700 font-black">⏳ Verificando comprobante con IA...</p>
+        </div>
+      )}
+
+      {!checking && comprobante && iaResult && (
+        <div className={`rounded-lg p-3 border ${iaResult.confirmado ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
+          <p className={`text-[10px] font-black mb-1 ${iaResult.confirmado ? "text-emerald-800" : "text-amber-800"}`}>
+            {iaResult.confirmado ? "✅ Pago verificado por IA" : "⚠️ Verificado con observaciones"}
+          </p>
+          <p className="text-[10px] text-gray-600">Archivo: {comprobante.nombre}</p>
+          {iaResult.montoPagado && iaResult.montoPagado !== "N/A" && (
+            <p className="text-[10px] text-gray-600">Monto detectado: <strong>{iaResult.montoPagado}</strong></p>
+          )}
+          {iaResult.observacion && <p className="text-[10px] text-gray-500 mt-1 italic">{iaResult.observacion}</p>}
+        </div>
+      )}
+
+      {!checking && !comprobante && (
+        <div>
+          {error && <p className="text-[10px] text-red-600 mb-2 font-bold">⚠️ {error}</p>}
+          <label className="flex items-center justify-center gap-2 cursor-pointer px-3 py-2.5 rounded-xl border-2 border-dashed border-orange-300 text-xs font-black text-orange-700 hover:bg-orange-100 transition">
+            <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={handleFile} disabled={uploading} />
+            📎 Adjuntar comprobante de pago
+          </label>
+          <p className="text-[9px] text-gray-400 mt-1 text-center">JPG, PNG, WEBP o PDF · Máx 5 MB · Un comprobante por cuenta · La IA verificará el monto</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Informe Epidemiológico Viewer (portal empresa) ───────────────────────────
+function PortalInformeViewer({ informe, empresaNombre, sbUrl, sbKey }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [fullData, setFullData] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+
+  if (!informe) return null;
+  const total = informe.totalPacientes || 0;
+
+  const loadFull = async () => {
+    if (fullData || !informe.statsKey) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`${sbUrl}/rest/v1/siso_store?key=eq.${informe.statsKey}&select=value`, { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } });
+      const d = await r.json();
+      if (d[0]?.value) setFullData(d[0].value);
+    } catch {}
+    setLoading(false);
+  };
+
+  const d = fullData || {};
+  const stats = d.stats || {};
+  const aiResult = d.aiResult || null;
+  const pacientes = d.pacientes || [];
+
+  const StatBar = ({ dat, color }) => (
+    <div className="space-y-1">
+      {Object.entries(dat || {}).sort(([,a],[,b]) => b - a).slice(0, 6).map(([k, v]) => (
+        <div key={k} className="flex items-center gap-1.5">
+          <span className="text-[9px] text-gray-600 truncate flex-1" title={k}>{k || "N/R"}</span>
+          <div className="w-14 bg-gray-100 rounded-full h-1.5 overflow-hidden flex-shrink-0">
+            <div className={`bg-${color}-500 h-full rounded-full`} style={{ width: `${Math.round((v / Math.max(1, total)) * 100)}%` }} />
+          </div>
+          <span className={`text-[9px] font-bold text-${color}-700 flex-shrink-0`} style={{ minWidth: "24px", textAlign: "right" }}>
+            {Math.round((v / Math.max(1, total)) * 100)}%
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+
+  const handlePrint = () => {
+    const el = document.getElementById("portal-informe-content");
+    if (!el) return;
+    const w = window.open("", "_blank", "width=1100,height=850");
+    if (!w) { alert("Permita ventanas emergentes para imprimir."); return; }
+    w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe Epidemiológico — ${empresaNombre}</title><script src="https://cdn.tailwindcss.com"><\/script><style>*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{font-family:sans-serif;padding:0;margin:0;}@media print{.no-print{display:none!important;}body{padding:8mm 10mm;}}@page{size:letter landscape;margin:0.8cm 1cm;}</style></head><body><div class="no-print" style="background:#1e3a5f;padding:10px 16px;display:flex;gap:10px;margin-bottom:16px;"><button onclick="window.print()" style="background:#10b981;color:white;border:none;padding:8px 20px;border-radius:6px;font-weight:900;cursor:pointer;">📥 Imprimir / PDF</button><button onclick="window.close()" style="background:#ef4444;color:white;border:none;padding:8px 14px;border-radius:6px;font-weight:900;cursor:pointer;">✕ Cerrar</button></div><div style="padding:16px;">${el.innerHTML}</div></body></html>`);
+    w.document.close();
+  };
+
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-blue-100 transition"
+        onClick={() => { setExpanded(e => !e); if (!expanded) loadFull(); }}>
+        <div>
+          <p className="text-sm font-black text-blue-800">📋 Informe Epidemiológico</p>
+          <p className="text-[10px] text-blue-600">{total} trabajadores · {informe.fecha}</p>
+        </div>
+        <span className="text-blue-600 font-black text-base">{expanded ? "▲" : "▼"}</span>
+      </div>
+
+      {expanded && (
+        <div className="bg-white border-t border-blue-200 p-4">
+          {loading && <p className="text-xs text-blue-500 py-6 text-center">⏳ Cargando informe completo...</p>}
+
+          <div id="portal-informe-content">
+            {/* Encabezado idéntico a la plataforma */}
+            <div className="text-center mb-6">
+              <h1 className="text-xl font-black text-blue-900">DIAGNÓSTICO DE CONDICIONES DE SALUD</h1>
+              <div className="mt-2 inline-block p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <p className="font-bold text-blue-800 text-lg">{empresaNombre}</p>
+                <p className="text-xs text-gray-500 mt-1">Población evaluada: <strong>{total} trabajadores</strong></p>
+                {informe.fecha && <p className="text-xs text-gray-400">Período: {informe.fecha}</p>}
+              </div>
+            </div>
+
+            {/* Resumen ejecutivo */}
+            {informe.resumen && (
+              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
+                <p className="text-[10px] font-black text-indigo-800 uppercase mb-2">📝 Resumen Ejecutivo</p>
+                <p className="text-xs text-indigo-900 leading-relaxed">{informe.resumen}</p>
+              </div>
+            )}
+
+            {/* KPIs */}
+            {total > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 text-center">
+                {[
+                  { l: "Total evaluados", v: total, c: "blue" },
+                  { l: "Aptos", v: Object.entries(stats.conceptoAptitud || {}).filter(([k]) => k.toLowerCase().includes("apto") && !k.toLowerCase().includes("no")).reduce((s,[,n]) => s + n, 0), c: "emerald" },
+                  { l: "Con restricciones", v: Object.entries(stats.conceptoAptitud || {}).filter(([k]) => k.toLowerCase().includes("condic") || k.toLowerCase().includes("restricc")).reduce((s,[,n]) => s + n, 0), c: "amber" },
+                  { l: "No aptos", v: Object.entries(stats.conceptoAptitud || {}).filter(([k]) => k.toLowerCase().includes("no apto")).reduce((s,[,n]) => s + n, 0), c: "red" },
+                ].map(s => (
+                  <div key={s.l} className={`bg-${s.c}-50 border border-${s.c}-200 rounded-xl p-3`}>
+                    <p className="text-[10px] text-gray-500 uppercase font-bold">{s.l}</p>
+                    <p className={`text-3xl font-black text-${s.c}-600 mt-1`}>{s.v}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Sección 1: Perfil demográfico */}
+            {Object.keys(stats).length > 0 && total > 0 && (
+              <>
+                <div className="mb-5">
+                  <h3 className="font-black text-gray-700 uppercase text-xs mb-3 border-b pb-1">1. Perfil Demográfico y Ocupacional</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                    {[
+                      { title: "Género", data: stats.genero, color: "pink" },
+                      { title: "Rango de Edad", data: stats.edad, color: "purple" },
+                      { title: "Cargo", data: stats.cargo, color: "orange" },
+                      { title: "Tipo Examen", data: stats.tipoExamen, color: "green" },
+                      { title: "Tipo Contrato", data: stats.tipoContrato, color: "amber" },
+                      { title: "Antigüedad", data: stats.antiguedad, color: "lime" },
+                    ].filter(t => t.data && Object.keys(t.data).length > 0).map(t => (
+                      <div key={t.title} className={`bg-${t.color}-50 rounded-xl p-3 border border-${t.color}-100`}>
+                        <h4 className={`font-bold text-${t.color}-800 mb-2 uppercase text-[10px]`}>{t.title}</h4>
+                        <StatBar dat={t.data} color={t.color} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sección 2: Perfil clínico */}
+                <div className="mb-5">
+                  <h3 className="font-black text-gray-700 uppercase text-xs mb-3 border-b pb-1">2. Perfil Clínico y de Salud</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                    {[
+                      { title: "Concepto Aptitud", data: stats.conceptoAptitud, color: "emerald" },
+                      { title: "IMC", data: stats.imc, color: "blue" },
+                      { title: "Tensión Arterial", data: stats.ta, color: "red" },
+                      { title: "Diagnóstico CIE-10", data: stats.diagnosticos, color: "indigo" },
+                    ].filter(t => t.data && Object.keys(t.data).length > 0).map(t => (
+                      <div key={t.title} className={`bg-${t.color}-50 rounded-xl p-3 border border-${t.color}-100`}>
+                        <h4 className={`font-bold text-${t.color}-800 mb-2 uppercase text-[10px]`}>{t.title}</h4>
+                        <StatBar dat={t.data} color={t.color} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Sección 3: Matriz trabajadores */}
+            {pacientes.length > 0 && (
+              <div className="mb-5">
+                <h3 className="font-black text-gray-700 uppercase text-xs mb-3 border-b pb-1">3. Matriz Legal — Condiciones de Salud</h3>
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-blue-900 text-white">
+                        <th className="p-2 text-left font-bold">Trabajador</th>
+                        <th className="p-2 font-bold">Edad</th>
+                        <th className="p-2 text-left font-bold">Diagnóstico</th>
+                        <th className="p-2 text-left font-bold">Concepto</th>
+                        <th className="p-2 text-left font-bold">Restricciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pacientes.map((p, i) => (
+                        <tr key={i} className={`border-b ${i % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50 align-top`}>
+                          <td className="p-2">
+                            <p className="font-bold text-blue-900">{p.docNumero}</p>
+                            <p className="text-gray-600 text-[10px]">{(p.nombres || "").substring(0, 28)}</p>
+                          </td>
+                          <td className="p-2 text-center">{p.edad || "--"}</td>
+                          <td className="p-2 text-gray-700">{p.diagnosticoPrincipal || "Z10.0"}</td>
+                          <td className="p-2">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${(p.conceptoAptitud || "").toLowerCase().includes("no apto") ? "bg-red-100 text-red-800 border-red-300" : (p.conceptoAptitud || "").toLowerCase().includes("condic") ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-emerald-100 text-emerald-800 border-emerald-300"}`}>
+                              {p.conceptoAptitud || "--"}
+                            </span>
+                          </td>
+                          <td className="p-2 text-gray-600 text-[10px]">{p.restricciones || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Sección 4: Análisis IA — idéntico a la plataforma */}
+            {aiResult && (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-4">
+                <h3 className="font-black text-indigo-900 text-xs uppercase mb-3">🤖 Análisis Inteligente IA</h3>
+                {aiResult.resumenEjecutivo && (
+                  <div className="bg-white p-3 rounded-lg border border-indigo-200 mb-3 text-xs font-bold text-indigo-900">{aiResult.resumenEjecutivo}</div>
+                )}
+                {aiResult.conclusiones && (
+                  <div className="text-xs text-justify text-gray-700 leading-relaxed whitespace-pre-wrap mb-3">{aiResult.conclusiones}</div>
+                )}
+                {aiResult.analisisJustificado && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-3">
+                    <p className="font-black text-amber-900 text-xs uppercase mb-2">Análisis Justificado — Interpretación Epidemiológica</p>
+                    <div className="text-xs text-justify text-amber-900 leading-relaxed whitespace-pre-wrap">{aiResult.analisisJustificado}</div>
+                  </div>
+                )}
+                {aiResult.recomendacionesInforme && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-3">
+                    <p className="font-black text-emerald-900 text-xs uppercase mb-2">Recomendaciones — Acciones Correctivas y PVE</p>
+                    <div className="text-xs text-justify text-emerald-900 leading-relaxed whitespace-pre-wrap">{aiResult.recomendacionesInforme}</div>
+                  </div>
+                )}
+                {aiResult.tabla?.length > 0 && (
+                  <div className="overflow-x-auto mb-3">
+                    <p className="font-black text-gray-700 text-xs uppercase mb-2">📊 Morbilidad Prevalente</p>
+                    <table className="w-full text-xs border border-gray-300">
+                      <thead>
+                        <tr className="bg-slate-800 text-white">
+                          <th className="py-2.5 px-3 text-left font-bold">Diagnóstico (CIE-10)</th>
+                          <th className="py-2.5 px-3 text-center font-bold w-20">Casos</th>
+                          <th className="py-2.5 px-3 text-center font-bold w-20">%</th>
+                          <th className="py-2.5 px-3 text-left font-bold w-32">Relación</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {aiResult.tabla.map((r, i) => (
+                          <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                            <td className="py-2 px-3 border-b border-gray-200 font-semibold">{r.diagnostico}</td>
+                            <td className="py-2 px-3 border-b border-gray-200 text-center font-bold">{r.cantidad}</td>
+                            <td className="py-2 px-3 border-b border-gray-200 text-center font-bold text-indigo-700">{r.porcentaje}</td>
+                            <td className="py-2 px-3 border-b border-gray-200 text-gray-600">{r.relacion || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {aiResult.matrizLegalNormativa && (
+                  <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-4 text-xs text-blue-900">
+                    <p className="font-black mb-2 uppercase text-blue-800">Cumplimiento Normativo</p>
+                    <p className="text-justify leading-relaxed">{aiResult.matrizLegalNormativa}</p>
+                  </div>
+                )}
+                {aiResult.pveRecomendados?.length > 0 && (
+                  <div className="mt-3 bg-teal-50 border border-teal-200 rounded-lg p-4 text-xs">
+                    <p className="font-black text-teal-900 uppercase mb-2">Programas de Vigilancia Epidemiológica Recomendados</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {aiResult.pveRecomendados.map((pve, i) => (
+                        <div key={i} className="flex items-center gap-2 bg-white border border-teal-100 rounded-lg px-3 py-2">
+                          <span className="text-teal-600 font-bold">✓</span>
+                          <span className="text-teal-900 font-semibold">{pve}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {!informe.statsKey && !loading && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 text-xs text-amber-700">
+              ⚠️ Este informe fue generado antes de la actualización. Contiene solo el resumen ejecutivo. Para ver el informe completo con estadísticas, guarda un nuevo informe desde la plataforma.
+            </div>
+          )}
+
+          <button onClick={handlePrint} className="w-full py-2.5 bg-blue-700 text-white text-xs font-black rounded-xl hover:bg-blue-800 flex items-center justify-center gap-2 mt-2">
+            📥 Descargar / Imprimir Informe Completo
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── FIX React #310: PortalEmpresaDocsPeriodos — componente real ──────────────
+function PortalEmpresaDocsPeriodos({ nitBusq, sbUrl, sbKey, resultadosEmpresa }) {
+  const [portalDocs, setPortalDocs] = React.useState(null);
+  const [docsLoaded, setDocsLoaded] = React.useState(false);
+  const [activePi, setActivePi] = React.useState(null);
+
+  React.useEffect(() => {
+    if (!nitBusq || nitBusq.length < 4 || docsLoaded) return;
+    const tryNits = [nitBusq];
+    for (let dv = 0; dv <= 9; dv++) tryNits.push(nitBusq + dv);
+    if (nitBusq.length > 6) tryNits.push(nitBusq.slice(0, -1));
+    (async () => {
+      for (const n of tryNits) {
+        try {
+          const r = await fetch(`${sbUrl}/rest/v1/siso_store?key=eq.siso_portal_empresa_docs_${n}&select=value`, {
+            headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+          });
+          const d = await r.json();
+          if (d[0]?.value) { setPortalDocs(d[0].value); break; }
+        } catch {}
+      }
+      setDocsLoaded(true);
+    })();
+  }, [nitBusq, docsLoaded]);
+
+  if (!portalDocs?.periodos?.length) return null;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 overflow-hidden mb-3">
+      <div className="bg-emerald-700 px-4 py-3">
+        <p className="text-white font-black text-sm">📦 Documentación por Periodo — {portalDocs.nombre}</p>
+        <p className="text-emerald-200 text-[10px]">NIT: {portalDocs.nit}</p>
+      </div>
+      <div className="p-3 space-y-2">
+        {portalDocs.periodos.map((per, pi) => (
+          <div key={pi} className="border border-gray-200 rounded-xl overflow-hidden">
+            {/* Header periodo (toggle) */}
+            <div
+              className={`flex items-center justify-between p-3 cursor-pointer transition ${activePi === pi ? "bg-emerald-50 border-b border-emerald-100" : "hover:bg-gray-50"}`}
+              onClick={() => setActivePi(activePi === pi ? null : pi)}
+            >
+              <p className="text-xs font-black text-gray-800">
+                📅 {per.periodo} <span className="text-gray-400 font-normal text-[10px]">({per.fecha})</span>
+              </p>
+              <div className="flex items-center gap-1 flex-wrap justify-end">
+                {per.informe    && <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">📋 Informe</span>}
+                {per.certificados && <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">📄 {per.certificados.count} cert.</span>}
+                {per.cuenta     && <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-bold">💰 Cuenta</span>}
+                {per.custodia   && <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-bold">📁 Custodia</span>}
+                <span className="text-gray-400 font-black ml-1 text-sm">{activePi === pi ? "▲" : "▼"}</span>
+              </div>
+            </div>
+
+            {activePi === pi && (
+              <div className="p-3 space-y-3">
+                {/* 1. Informe epidemiológico */}
+                {per.informe && (
+                  <PortalInformeViewer
+                    informe={per.informe}
+                    empresaNombre={portalDocs.nombre}
+                    sbUrl={sbUrl}
+                    sbKey={sbKey}
+                  />
+                )}
+
+                {/* 2. Certificados — individual + bulk */}
+                {per.certificados && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl overflow-hidden">
+                    <div className="p-3">
+                      <p className="text-sm font-black text-emerald-800 mb-1">📄 Certificados de Aptitud Laboral</p>
+                      <p className="text-[10px] text-emerald-600 mb-2">{per.certificados.count} trabajador(es)</p>
+                      <button
+                        onClick={() => {
+                          const pacs = resultadosEmpresa || [];
+                          if (!pacs.length) { alert("Consulta primero la empresa en el buscador para cargar los certificados."); return; }
+                          const w = window.open("", "_blank", "width=900,height=700");
+                          if (!w) { alert("Permite ventanas emergentes para descargar."); return; }
+                          const certs = pacs.map((p, i) => {
+                            const certHtml = _generarCertificadoDesdePortal(p);
+                            const bodyMatch = certHtml.match(/<body[^>]*>([\s\S]*)<\/body>/);
+                            const bodyContent = bodyMatch ? bodyMatch[1] : certHtml;
+                            return `<div style="${i > 0 ? "page-break-before:always;padding-top:10mm;" : ""}">${bodyContent}</div>`;
+                          }).join("");
+                          const firstCert = _generarCertificadoDesdePortal(pacs[0]);
+                          const styleMatch = firstCert.match(/<style>([\s\S]*?)<\/style>/);
+                          const styles = styleMatch ? styleMatch[1] : "";
+                          w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Certificados — ${portalDocs.nombre}</title><style>${styles}.np-dl{position:fixed;top:10px;right:10px;z-index:9999;}@media print{.np-dl{display:none!important;}}</style></head><body><div class="np-dl"><button onclick="window.print()" style="background:#065f46;color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:900;cursor:pointer;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.2);">📥 Guardar PDF / Imprimir (${pacs.length} certificados)</button></div>${certs}</body></html>`);
+                          w.document.close();
+                        }}
+                        className="w-full py-2 bg-emerald-700 text-white text-xs font-black rounded-xl hover:bg-emerald-800 flex items-center justify-center gap-2"
+                      >
+                        📥 Descargar todos ({per.certificados.count})
+                      </button>
+                    </div>
+
+                    {/* Tabla individual */}
+                    {(resultadosEmpresa?.length > 0) && (
+                      <div className="border-t border-emerald-200 max-h-72 overflow-y-auto">
+                        <table className="w-full text-xs">
+                          <thead className="bg-emerald-100 sticky top-0">
+                            <tr>
+                              <th className="p-2 text-left font-bold text-emerald-800">Trabajador</th>
+                              <th className="p-2 text-left font-bold text-emerald-800">Concepto</th>
+                              <th className="p-2 font-bold text-emerald-800 w-12 text-center">PDF</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {resultadosEmpresa.map((p, i) => {
+                              const cApt = (p.conceptoAptitud || "").toLowerCase();
+                              const badgeCls = cApt.includes("no apto") ? "bg-red-100 text-red-800 border-red-300" : cApt.includes("condic") || cApt.includes("restricc") ? "bg-amber-100 text-amber-800 border-amber-300" : cApt.includes("apto") ? "bg-emerald-100 text-emerald-800 border-emerald-300" : "bg-gray-100 text-gray-700 border-gray-200";
+                              return (
+                                <tr key={i} className="border-b border-emerald-50 hover:bg-emerald-50">
+                                  <td className="p-2">
+                                    <p className="font-bold text-gray-800">{p.nombres || "--"}</p>
+                                    <p className="text-[9px] font-mono text-gray-500">{p.docNumero}</p>
+                                  </td>
+                                  <td className="p-2">
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${badgeCls}`}>{p.conceptoAptitud || "--"}</span>
+                                  </td>
+                                  <td className="p-2 text-center">
+                                    <button
+                                      title="Descargar certificado individual"
+                                      onClick={() => {
+                                        const html = _generarCertificadoDesdePortal(p);
+                                        const w = window.open("", "_blank", "width=920,height=1150");
+                                        if (!w) { alert("Permite ventanas emergentes para descargar."); return; }
+                                        const htmlConBtn = html.replace("</body>", `<div style="position:fixed;top:10px;right:10px;z-index:9999;"><button onclick="window.print()" style="background:#065f46;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:900;cursor:pointer;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.2);">📥 PDF / Imprimir</button></div></body>`);
+                                        w.document.write(htmlConBtn);
+                                        w.document.close();
+                                      }}
+                                      className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm"
+                                    >
+                                      📄
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 3. Cuenta de cobro */}
+                {per.cuenta && (
+                  <PortalCuentaCobroCard
+                    cuenta={per.cuenta}
+                    empresaNombre={portalDocs.nombre}
+                    periodo={per.periodo}
+                    sbUrl={sbUrl}
+                    sbKey={sbKey}
+                    nitBusq={nitBusq}
+                  />
+                )}
+
+                {/* 4. Carta de custodia */}
+                {per.custodia && (
+                  <PortalCustodiaViewer
+                    custodia={per.custodia}
+                    empresaNombre={portalDocs.nombre}
+                    periodo={per.periodo}
+                    sbUrl={sbUrl}
+                    sbKey={sbKey}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
   const { useState, useCallback, useRef } = React;
   const [busqueda, setBusqueda] = React.useState("");
@@ -12755,69 +13617,15 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
         </div>
 
         {/* ── Documentación por periodo (Portal Empresa Completo) ── */}
-        {resultadosEmpresa.length > 0 && (() => {
-          const nitBusq = busqueda.replace(/[^0-9]/g, "");
-          const [portalDocs, setPortalDocs] = React.useState(null);
-          const [docsLoaded, setDocsLoaded] = React.useState(false);
-          React.useEffect(() => {
-            if (!nitBusq || nitBusq.length < 4 || docsLoaded) return;
-            // Try multiple NIT variants
-            const tryNits = [nitBusq];
-            for (let d = 0; d <= 9; d++) tryNits.push(nitBusq + d);
-            if (nitBusq.length > 6) tryNits.push(nitBusq.slice(0, -1));
-            (async () => {
-              for (const n of tryNits) {
-                try {
-                  const r = await fetch(`${sbUrl}/rest/v1/siso_store?key=eq.siso_portal_empresa_docs_${n}&select=value`, { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } });
-                  const d = await r.json();
-                  if (d[0]?.value) { setPortalDocs(d[0].value); break; }
-                } catch {}
-              }
-              setDocsLoaded(true);
-            })();
-          }, [nitBusq, docsLoaded]);
-          return portalDocs?.periodos?.length > 0 ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 overflow-hidden mb-3">
-              <div className="bg-emerald-700 px-4 py-3">
-                <p className="text-white font-black text-sm">📦 Documentación por Periodo — {portalDocs.nombre}</p>
-                <p className="text-emerald-200 text-[10px]">NIT: {portalDocs.nit}</p>
-              </div>
-              <div className="p-3 space-y-3">
-                {portalDocs.periodos.map((per, pi) => (
-                  <div key={pi} className="border border-gray-200 rounded-xl p-3">
-                    <p className="text-xs font-black text-gray-800 mb-2">📅 {per.periodo} <span className="text-gray-400 font-normal">({per.fecha})</span></p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {per.informe && (
-                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-2">
-                          <p className="text-[10px] font-black text-blue-800">📋 Informe Epidemiológico</p>
-                          <p className="text-[9px] text-blue-600">{per.informe.totalPacientes} trabajadores</p>
-                        </div>
-                      )}
-                      {per.certificados && (
-                        <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-2 cursor-pointer hover:bg-emerald-100" onClick={() => {/* certificados ya se muestran abajo */}}>
-                          <p className="text-[10px] font-black text-emerald-800">📄 Certificados</p>
-                          <p className="text-[9px] text-emerald-600">{per.certificados.count} disponibles ↓</p>
-                        </div>
-                      )}
-                      {per.cuenta && (
-                        <div className="bg-orange-50 border border-orange-100 rounded-lg p-2">
-                          <p className="text-[10px] font-black text-orange-800">💰 Cuenta de Cobro No. {per.cuenta.number}</p>
-                          <p className="text-[9px] text-orange-600">${Number(per.cuenta.amount || 0).toLocaleString("es-CO")}</p>
-                        </div>
-                      )}
-                      {per.custodia && (
-                        <div className="bg-purple-50 border border-purple-100 rounded-lg p-2">
-                          <p className="text-[10px] font-black text-purple-800">📁 Carta de Custodia</p>
-                          <p className="text-[9px] text-purple-600">{per.custodia.fecha} · {per.custodia.medicoNombre}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null;
-        })()}
+        {/* FIX React #310: componente real en lugar de IIFE con hooks ilegales */}
+        {resultadosEmpresa.length > 0 && (
+          <PortalEmpresaDocsPeriodos
+            nitBusq={busqueda.replace(/[^0-9]/g, "")}
+            sbUrl={sbUrl}
+            sbKey={sbKey}
+            resultadosEmpresa={resultadosEmpresa}
+          />
+        )}
 
         {/* ── Resultados Empresa (múltiples certificados) ── */}
         {resultadosEmpresa.length > 0 && (
@@ -24329,8 +25137,29 @@ Esta historia clínica debe conservarse mínimo 20 años.
             {/* Guardar informe */}
             {reportAIResult && selectedCompanyReport && (
               <button
-                onClick={() => {
+                onClick={async () => {
                   const periodo = (reportStartDate || new Date().toISOString().slice(0, 7)) + " — " + (reportEndDate || new Date().toISOString().slice(0, 10));
+                  const statsKey = "siso_informe_stats_" + selectedCompanyReport + "_" + Date.now();
+                  // Guardar stats completos + AI + pacientes en Supabase para el portal
+                  const fullData = {
+                    stats,
+                    total,
+                    empresaNombre: compName,
+                    aiResult: reportAIResult,
+                    pacientes: filtered.map(p => ({
+                      docNumero: p.docNumero, nombres: p.nombres, edad: p.edad,
+                      cargo: p.cargo, diagnosticoPrincipal: p.diagnosticoPrincipal,
+                      conceptoAptitud: p.conceptoAptitud, restricciones: p.restricciones,
+                      tipoExamen: p.tipoExamen,
+                    })),
+                  };
+                  try {
+                    await fetch(`${_SB_URL}/rest/v1/siso_store`, {
+                      method: "POST",
+                      headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates" },
+                      body: JSON.stringify({ key: statsKey, value: fullData }),
+                    });
+                  } catch {}
                   const informe = {
                     id: "inf_" + Date.now(),
                     empresaId: selectedCompanyReport,
@@ -24339,6 +25168,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     fecha: new Date().toISOString().split("T")[0],
                     totalPacientes: total,
                     resumen: reportAIResult.resumenEjecutivo || "",
+                    statsKey,
                     savedAt: new Date().toISOString(),
                   };
                   saveInforme(informe);
@@ -49445,7 +50275,7 @@ body{padding-top:52px;}
                     <p className="text-[10px] text-gray-500">{hasCustodia ? "Guardada" : "No creada"}</p></div>
                   </div>
                   {!hasCustodia && <button onClick={() => {
-                    // Guardar carta de custodia pre-llenada directamente
+                    // Guardar carta de custodia pre-llenada con todos los datos del médico (para portal)
                     const custodia = {
                       id: "inf_cust_" + Date.now(),
                       empresaId: emp.empresaId,
@@ -49454,8 +50284,14 @@ body{padding-top:52px;}
                       tipo: "custodia",
                       periodo: emp.periodo,
                       totalPacientes: emp.totalPacientes,
-                      medicoNombre: activeDoctorData?.nombre || "",
-                      medicoLicencia: activeDoctorData?.licencia || "",
+                      medicoNombre: (activeDoctorData?.nombre || "JULIAN CUCALON").toUpperCase(),
+                      medicoLicencia: activeDoctorData?.licencia || "14497-12-2019",
+                      medicoCC: activeDoctorData?.cedula || activeDoctorData?.rut || "1061750704",
+                      medicoTitulo: (activeDoctorData?.titulo || "MEDICO ESPECIALISTA EN SST").toUpperCase(),
+                      medicoEmail: activeDoctorData?.email || "dr.juliancucalon@gmail.com",
+                      medicoTel: activeDoctorData?.celular || "3182213979",
+                      medicoCiudad: activeDoctorData?.ciudad || "Popayán",
+                      firma: activeSignature || activeDoctorData?.signature || activeDoctorData?.firma || null,
                       fecha: new Date().toISOString().split("T")[0],
                       savedAt: new Date().toISOString(),
                     };
@@ -49486,10 +50322,20 @@ body{padding-top:52px;}
                     periodos: [{
                       periodo: mesActual,
                       fecha: new Date().toISOString().split("T")[0],
-                      informe: informeData ? { totalPacientes: informeData.totalPacientes || emp.totalPacientes, resumen: informeData.resumen || "", fecha: informeData.fecha } : null,
+                      informe: informeData ? { totalPacientes: informeData.totalPacientes || emp.totalPacientes, resumen: informeData.resumen || "", fecha: informeData.fecha, statsKey: informeData.statsKey || null } : null,
                       certificados: { count: certCount, documentos: certsEmpresa.map(p => (p.docNumero || "").replace(/\s/g, "")) },
-                      cuenta: cuentaData ? { number: cuentaData.number, amount: cuentaData.amount, date: cuentaData.date, concept: cuentaData.concept } : null,
-                      custodia: custodiaData ? { fecha: custodiaData.fecha, medicoNombre: custodiaData.medicoNombre } : null,
+                      cuenta: cuentaData ? { number: cuentaData.number, amount: cuentaData.amount, date: cuentaData.date, concept: cuentaData.concept, pagado: false, comprobante: null } : null,
+                      custodia: custodiaData ? {
+                        fecha: custodiaData.fecha,
+                        medicoNombre: custodiaData.medicoNombre,
+                        medicoLicencia: custodiaData.medicoLicencia || "14497-12-2019",
+                        medicoCC: custodiaData.medicoCC || "1061750704",
+                        medicoTitulo: custodiaData.medicoTitulo || "MEDICO ESPECIALISTA EN SST",
+                        medicoEmail: custodiaData.medicoEmail || "dr.juliancucalon@gmail.com",
+                        medicoTel: custodiaData.medicoTel || "3182213979",
+                        medicoCiudad: custodiaData.medicoCiudad || "Popayán",
+                        firma: custodiaData.firma || null,
+                      } : null,
                     }],
                   };
                   // Merge with existing data (add new periodo, don't overwrite old ones)

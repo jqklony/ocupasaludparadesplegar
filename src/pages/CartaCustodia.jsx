@@ -206,13 +206,20 @@ export default function CartaCustodia({
       anio: anioVal,
       medicoNombre: docNombre,
       medicoLicencia: docLicencia,
+      // Datos completos para renderizar en el portal
+      medicoCC: docCC,
+      medicoTitulo: docTitulo,
+      medicoEmail: docEmail,
+      medicoTel: docCel,
+      medicoCiudad: docCiudad,
+      firma: firmaSrc,
       savedAt: new Date().toISOString(),
     };
     saveInforme(custodia);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
     showAlert("✅ Carta de Custodia guardada para " + empresaNombre);
-  }, [selectedCompanyId, empresaNombre, fechaCarta, mesVal, anioVal, docNombre, docLicencia, saveInforme, showAlert]);
+  }, [selectedCompanyId, empresaNombre, fechaCarta, mesVal, anioVal, docNombre, docLicencia, docCC, docTitulo, docEmail, docCel, docCiudad, firmaSrc, saveInforme, showAlert]);
 
   const handleEmail = () => {
     const to  = selectedCompany?.email || selectedCompany?.correo || "";
