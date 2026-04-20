@@ -28155,67 +28155,67 @@ Esta historia clínica debe conservarse mínimo 20 años.
         <div className="max-w-4xl mx-auto">
 
           { /* FILTROS: Empresa y Mes */ }
-          <div className=\"bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4\">
-            <div className=\"flex items-center gap-2 mb-3\">
-              <Filter className=\"w-4 h-4 text-blue-600\" />
-              <p className=\"text-xs font-black text-blue-800 uppercase\">Paso 1: Seleccionar periodo</p>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Filter className="w-4 h-4 text-blue-600" />
+              <p className="text-xs font-black text-blue-800 uppercase">Paso 1: Seleccionar periodo</p>
             </div>
-            <div className=\"flex flex-wrap -mx-1.5\">
-              <div className=\"w-1/2 px-1.5 mb-2\">
-                <label className=\"block text-[10px] font-black text-gray-600 mb-0.5 uppercase\">Empresa</label>
+            <div className="flex flex-wrap -mx-1.5">
+              <div className="w-1/2 px-1.5 mb-2">
+                <label className="block text-[10px] font-black text-gray-600 mb-0.5 uppercase">Empresa</label>
                 <select value={billFilterEmp} onChange={(e) => { setBillFilterEmp(e.target.value); const c = companiesList.find(x => x.id === e.target.value); if(c) setBillData(p => ({...p, companyId: c.id, clientName: c.nombre, clientNit: c.nit || ''})); }}
-                  className=\"w-full p-2 border border-gray-200 rounded text-xs font-bold bg-white\">
-                  <option value=\"\">Seleccionar empresa...</option>
+                  className="w-full p-2 border border-gray-200 rounded text-xs font-bold bg-white">
+                  <option value="">Seleccionar empresa...</option>
                   {companiesList.map((c) => <option key={c.id} value={c.id}>{c.nombre} (NIT: {c.nit || '--'})</option>)}
                 </select>
               </div>
-              <div className=\"w-1/2 px-1.5 mb-2\">
-                <label className=\"block text-[10px] font-black text-gray-600 mb-0.5 uppercase\">Mes / Periodo</label>
-                <input type=\"month\" value={billFilterMes} onChange={(e) => setBillFilterMes(e.target.value)}
-                  className=\"w-full p-2 border border-gray-200 rounded text-xs font-bold bg-white\" />
+              <div className="w-1/2 px-1.5 mb-2">
+                <label className="block text-[10px] font-black text-gray-600 mb-0.5 uppercase">Mes / Periodo</label>
+                <input type="month" value={billFilterMes} onChange={(e) => setBillFilterMes(e.target.value)}
+                  className="w-full p-2 border border-gray-200 rounded text-xs font-bold bg-white" />
               </div>
             </div>
-            <p className=\"text-[10px] text-blue-600\">{_getBillTrabajadores().length} trabajador(es) encontrado(s)</p>
+            <p className="text-[10px] text-blue-600">{_getBillTrabajadores().length} trabajador(es) encontrado(s)</p>
           </div>
 
           { /* MODO DE COBRO */ }
           {_getBillTrabajadores().length > 0 && (
-            <div className=\"bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4\">
-              <div className=\"flex items-center gap-2 mb-3\">
-                <DollarSign className=\"w-4 h-4 text-amber-600\" />
-                <p className=\"text-xs font-black text-amber-800 uppercase\">Paso 2: Modalidad de cobro</p>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <DollarSign className="w-4 h-4 text-amber-600" />
+                <p className="text-xs font-black text-amber-800 uppercase">Paso 2: Modalidad de cobro</p>
               </div>
-              <div className=\"flex gap-4 mb-3\">
-                <label className=\"flex items-center gap-2 cursor-pointer\">
-                  <input type=\"radio\" name=\"modoCobro\" checked={billModoCobro === 'por_trabajador'} 
+              <div className="flex gap-4 mb-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="modoCobro" checked={billModoCobro === 'por_trabajador'} 
                     onChange={() => setBillModoCobro('por_trabajador')} />
-                  <span className=\"text-xs font-bold text-gray-700\">Por trabajador</span>
+                  <span className="text-xs font-bold text-gray-700">Por trabajador</span>
                 </label>
-                <label className=\"flex items-center gap-2 cursor-pointer\">
-                  <input type=\"radio\" name=\"modoCobro\" checked={billModoCobro === 'por_atencion'} 
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="modoCobro" checked={billModoCobro === 'por_atencion'} 
                     onChange={() => setBillModoCobro('por_atencion')} />
-                  <span className=\"text-xs font-bold text-gray-700\">Por atencion</span>
+                  <span className="text-xs font-bold text-gray-700">Por atencion</span>
                 </label>
               </div>
-              <div className=\"flex items-center gap-2\">
-                <label className=\"text-xs font-bold text-gray-600\">Valor unitario:</label>
-                <input type=\"number\" value={billValorUnitario} 
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-gray-600">Valor unitario:</label>
+                <input type="number" value={billValorUnitario} 
                   onChange={(e) => setBillValorUnitario(parseFloat(e.target.value) || 0)}
-                  className=\"w-32 p-1.5 border border-gray-200 rounded text-xs text-right font-bold\" />
+                  className="w-32 p-1.5 border border-gray-200 rounded text-xs text-right font-bold" />
               </div>
             </div>
           )}
 
           { /* CHECKLIST TRABAJADORES */ }
           {_getBillTrabajadores().length > 0 && (
-            <div className=\"bg-white border border-gray-200 rounded-xl p-4 mb-4\">
-              <div className=\"flex justify-between items-center mb-3\">
-                <div className=\"flex items-center gap-2\">
-                  <CheckSquare className=\"w-4 h-4 text-emerald-600\" />
-                  <p className=\"text-xs font-black text-gray-700 uppercase\">Trabajadores a facturar</p>
+            <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+              <div className="flex justify-between items-center mb-3">
+                <div className="flex items-center gap-2">
+                  <CheckSquare className="w-4 h-4 text-emerald-600" />
+                  <p className="text-xs font-black text-gray-700 uppercase">Trabajadores a facturar</p>
                 </div>
-                <label className=\"flex items-center gap-2 cursor-pointer\">
-                  <input type=\"checkbox\" checked={billMarcarTodos} 
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={billMarcarTodos} 
                     onChange={() => {
                       const nuevo = !billMarcarTodos;
                       setBillMarcarTodos(nuevo);
@@ -28226,10 +28226,10 @@ Esta historia clínica debe conservarse mínimo 20 años.
                       setBillSelectedWorkers(nuevosSel);
                       setBillWorkerValues(nuevosVal);
                     }} />
-                  <span className=\"text-xs font-bold text-gray-600\">Seleccionar todos</span>
+                  <span className="text-xs font-bold text-gray-600">Seleccionar todos</span>
                 </label>
               </div>
-              <div className=\"space-y-2 max-h-64 overflow-y-auto\">
+              <div className="space-y-2 max-h-64 overflow-y-auto">
                 {_getBillTrabajadores().map((trabajador) => {
                   const cantidad = trabajador.atenciones?.length || 0;
                   const esSeleccionado = billSelectedWorkers[trabajador.docNumero];
@@ -28237,21 +28237,21 @@ Esta historia clínica debe conservarse mínimo 20 años.
                   const subtotalFila = billModoCobro === 'por_trabajador' ? valor : valor * cantidad;
                   return (
                     <div key={trabajador.docNumero} className={'flex items-center gap-2 p-2 rounded-lg border ' + (esSeleccionado ? 'bg-emerald-50 border-emerald-300' : 'bg-gray-50 border-gray-200')}>
-                      <button type=\"button\" onClick={() => { setBillSelectedWorkers(p => ({...p, [trabajador.docNumero]: !p[trabajador.docNumero]})); }}
-                        className=\"text-emerald-600\">
-                        {esSeleccionado ? <CheckSquare className=\"w-5 h-5\" /> : <Square className=\"w-5 h-5 text-gray-400\" />}
+                      <button type="button" onClick={() => { setBillSelectedWorkers(p => ({...p, [trabajador.docNumero]: !p[trabajador.docNumero]})); }}
+                        className="text-emerald-600">
+                        {esSeleccionado ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5 text-gray-400" />}
                       </button>
-                      <div className=\"flex-1\"><p className=\"text-xs font-bold text-gray-800\">{trabajador.nombres}</p><p className=\"text-[10px] text-gray-500\">{trabajador.docTipo} {trabajador.docNumero}</p></div>
-                      <div className=\"text-center px-2\"><p className=\"text-[10px] text-gray-500\">Cant</p><p className=\"text-xs font-bold\">{cantidad}</p></div>
-                      <div className=\"w-24\"><input type=\"number\" value={valor} 
+                      <div className="flex-1"><p className="text-xs font-bold text-gray-800">{trabajador.nombres}</p><p className="text-[10px] text-gray-500">{trabajador.docTipo} {trabajador.docNumero}</p></div>
+                      <div className="text-center px-2"><p className="text-[10px] text-gray-500">Cant</p><p className="text-xs font-bold">{cantidad}</p></div>
+                      <div className="w-24"><input type="number" value={valor} 
                         onChange={(e) => setBillWorkerValues(p => ({...p, [trabajador.docNumero]: parseFloat(e.target.value) || 0}))}
-                        className=\"w-full p-1 border rounded text-xs text-right\" disabled={!esSeleccionado} /></div>
-                      <div className=\"w-24 text-right\"><p className=\"text-[10px] text-gray-500\">Subtotal</p><p className=\"text-xs font-black text-emerald-700\">{subtotalFila.toLocaleString('es-CO')}</p></div>
+                        className="w-full p-1 border rounded text-xs text-right" disabled={!esSeleccionado} /></div>
+                      <div className="w-24 text-right"><p className="text-[10px] text-gray-500">Subtotal</p><p className="text-xs font-black text-emerald-700">{subtotalFila.toLocaleString('es-CO')}</p></div>
                     </div>
                   );
                 })}
               </div>
-              <div className=\"mt-4 pt-3 border-t flex justify-end\"><div className=\"text-right\"><p className=\"text-xs text-gray-600\">Total seleccionado:</p><p className=\"text-lg font-black text-emerald-600\">{_getBillTotalSeleccionado().toLocaleString('es-CO')}</p></div></div>
+              <div className="mt-4 pt-3 border-t flex justify-end"><div className="text-right"><p className="text-xs text-gray-600">Total seleccionado:</p><p className="text-lg font-black text-emerald-600">{_getBillTotalSeleccionado().toLocaleString('es-CO')}</p></div></div>
             </div>
           )}
 
