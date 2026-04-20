@@ -50,7 +50,7 @@ function CartaDocumento({
   };
 
   return (
-    <div className="carta-doc carta-visual carta-wrap bg-white shadow-2xl print:shadow-none mx-auto" style={s.wrap}>
+    <div className="carta-doc carta-visual carta-wrap carta-wrap bg-white shadow-2xl print:shadow-none mx-auto" style={s.wrap}>
       {/* ENCABEZADO */}
       <div style={s.headerRow}>
         <div style={s.logoWrap}>
@@ -229,7 +229,7 @@ export default function CartaCustodia({
   return (
     <div className="min-h-screen bg-gray-100 flex">
       <style>{`
-        @media print {.carta-wrap { padding: 0 !important; background: white !important; }
+        @media print {.min-h-screen { display: none !important; } .carta-wrap { padding: 0 !important; background: white !important; }
           .no-print { display: none !important; }
           .carta-doc { box-shadow: none !important; margin: 0 !important; width: 100% !important; }
           @page { margin: 0; size: letter portrait; }
