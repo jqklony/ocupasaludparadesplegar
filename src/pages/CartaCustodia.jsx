@@ -25,7 +25,7 @@ function CartaDocumento({
       background: "white",
       width: "816px",
       minHeight: "1056px",
-      padding: "56px 68px 48px",
+      padding: "40px 60px 40px",
       boxSizing: "border-box",
     },
     headerRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" },
