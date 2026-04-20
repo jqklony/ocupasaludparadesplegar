@@ -7660,9 +7660,10 @@ const initialUsers = [
   {
     id: 1,
     user: "drcucalon",
+    // SHA-256("cucalon2026") — contraseña de recuperación maestra
     passHash:
-      "49679f37304820e18bae7ed12292e42a7722a7d1a55f12e41b1abca5cc5162fd",
-    mustChangePassword: false, // FIX: no forzar cambio — Supabase tiene la contraseña real
+      "11177743b7227bd517fd7a05e0c9576b3497830f72ccfec4a5a0e1c9f65d9892",
+    mustChangePassword: false,
     name: "Dr. Julian Cucalon",
     role: "super_admin", // FASE 2: promovido a super_admin (puede crear orgs + HC)
     orgId: ORG_DEFAULT_ID, // FASE 2: organización principal
@@ -15539,6 +15540,16 @@ const handleLogin = (u, p) => {
           }
         } catch (err) {
           console.warn("[SISO] Error en fallback Supabase login:", err);
+        }
+      }
+      // ── RECUPERACIÓN DE EMERGENCIA: siempre intenta initialUsers como último recurso ──
+      // Garantiza acceso aunque Supabase tenga hashes desactualizados (ej. backup importado)
+      if (!found) {
+        for (const x of initialUsers) {
+          if (x.user === u) {
+            const ok = await _verifyPassword(p, x.passHash, x.passSalt);
+            if (ok) { found = x; break; }
+          }
         }
       }
       if (found && found.activo === false) {
