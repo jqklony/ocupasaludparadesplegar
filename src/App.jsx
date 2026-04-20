@@ -13261,6 +13261,7 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
   const [cargando, setCargando] = React.useState(false);
   const [intentos, setIntentos] = React.useState(0);
   const [bloqueadoHasta, setBloqueadoHasta] = React.useState(0);
+  const [codigoPortal, setCodigoPortal] = React.useState(""); // código de acceso empresa
   const MAX_INTENTOS = 6;
   const BLOQUEO_MS = 5 * 60 * 1000; // 5 minutos
 
@@ -13360,6 +13361,34 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
         // Búsqueda por NIT de empresa: usar índice siso_portal_empresa_{nit}
         const nitClean = q.replace(/[^0-9]/g, "");
         const qLower = q.trim().toLowerCase();
+        const codIngresado = (codigoPortal || "").trim().toUpperCase();
+
+        // ── Validar código de acceso contra siso_portal_empresa_docs_{nit} ──
+        // Probar NIT exacto y variantes con DV
+        const nitVariants = [nitClean];
+        for (let dv = 0; dv <= 9; dv++) nitVariants.push(nitClean + dv);
+        if (nitClean.length > 6) nitVariants.push(nitClean.slice(0, -1));
+
+        let codigoValido = false;
+        let docsKeyFound = false;
+        for (const nv of nitVariants) {
+          const rd = await fetchKey("siso_portal_empresa_docs_" + nv);
+          if (rd.ok && rd.data?.codigoAcceso) {
+            docsKeyFound = true;
+            if (rd.data.codigoAcceso.trim().toUpperCase() === codIngresado) {
+              codigoValido = true;
+            }
+            break;
+          }
+        }
+        // Si existe registro con código y no coincide → bloquear
+        if (docsKeyFound && !codigoValido) {
+          setError("🔐 Código de acceso incorrecto.\n\nVerifique el código enviado al correo de la empresa.\nFormato: EMP-XXXX-XXXX");
+          setCargando(false);
+          setIntentos(prev => { const n = prev + 1; if (n >= MAX_INTENTOS) setBloqueadoHasta(Date.now() + BLOQUEO_MS); return n; });
+          return;
+        }
+
         try {
           // 1) Buscar por NIT en índice — probar variantes (con/sin DV)
           let empresaIdx = null;
@@ -13547,8 +13576,10 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
                 onClick={() => {
                   setTipoBusqueda(opt.v);
                   setBusqueda("");
+                  setCodigoPortal("");
                   setError("");
                   setResultado(null);
+                  setResultadosEmpresa([]);
                 }}
                 className={`flex-1 py-2 text-xs font-black rounded-lg transition ${
                   tipoBusqueda === opt.v
@@ -13560,11 +13591,13 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
               </button>
             ))}
           </div>
-          {/* Input */}
+          {/* Input principal */}
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">
               {tipoBusqueda === "codigo"
                 ? "Código de verificación"
+                : tipoBusqueda === "empresa"
+                ? "NIT de la empresa (sin dígito verificador)"
                 : "Número de cédula (sin puntos ni espacios)"}
             </label>
             <input
@@ -13581,6 +13614,8 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
               placeholder={
                 tipoBusqueda === "codigo"
                   ? "Ej: SISO-2025-XXXX"
+                  : tipoBusqueda === "empresa"
+                  ? "Ej: 900123456"
                   : "Ej: 1234567890"
               }
               maxLength={50}
@@ -13588,6 +13623,28 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
               autoComplete="off"
             />
           </div>
+
+          {/* Campo código de acceso — solo empresa */}
+          {tipoBusqueda === "empresa" && (
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">
+                🔐 Código de acceso
+              </label>
+              <input
+                value={codigoPortal}
+                onChange={(e) => setCodigoPortal(e.target.value.toUpperCase().trim())}
+                onKeyDown={(e) => e.key === "Enter" && !cargando && buscar()}
+                className="w-full p-3 border-2 border-gray-200 focus:border-teal-400 rounded-xl text-sm font-mono font-bold tracking-widest focus:outline-none transition"
+                placeholder="Ej: EMP-4567-AB3X"
+                maxLength={20}
+                autoComplete="off"
+              />
+              <p className="text-[9px] text-gray-400 mt-1">
+                Código enviado al email de la empresa con la documentación
+              </p>
+            </div>
+          )}
+
           {/* Error */}
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700">
@@ -13598,7 +13655,8 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
           <button
             onClick={buscar}
             disabled={
-              cargando || !busqueda.trim() || Date.now() < bloqueadoHasta
+              cargando || !busqueda.trim() || Date.now() < bloqueadoHasta ||
+              (tipoBusqueda === "empresa" && !codigoPortal.trim())
             }
             className="w-full py-3 bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-700 hover:to-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm rounded-xl transition shadow-sm flex items-center justify-center gap-2"
           >
@@ -14425,10 +14483,10 @@ function AppInner() {
     const docCelular = doc.celular || "";
     const docEmailAddr = doc.email || emailConfig.email || "";
     const instrBusqueda = modoEmpresa
-      ? `Seleccione "🏢 Empresa" e ingrese el NIT: <strong>${docNumero || ""}</strong>`
+      ? `Seleccione "🏢 Empresa" · NIT: <strong>${docNumero || ""}</strong> · use el código de acceso de este email`
       : `Seleccione "🪪 Cédula" e ingrese: <strong>${docNumero || ""}</strong>`;
     const instrPasos = modoEmpresa
-      ? `1. Haga clic en el botón verde<br/>2. Seleccione "🏢 Empresa"<br/>3. Ingrese el NIT: <strong>${docNumero || ""}</strong><br/>4. Seleccione los certificados y descárguelos en PDF`
+      ? `1. Haga clic en el botón verde<br/>2. Seleccione "🏢 Empresa"<br/>3. Ingrese el NIT: <strong>${docNumero || ""}</strong><br/>4. Ingrese el <strong>código de acceso</strong> indicado en este email<br/>5. Descargue todos los documentos`
       : `1. Haga clic en el botón verde<br/>2. Seleccione "🪪 Cédula"<br/>3. Ingrese: <strong>${docNumero || ""}</strong><br/>4. Descargue su certificado en PDF`;
     return `<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;">` +
       `<div style="background:linear-gradient(135deg,#065f46,#0d9488);padding:24px 30px;border-radius:12px 12px 0 0;">` +
