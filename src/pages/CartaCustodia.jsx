@@ -50,7 +50,7 @@ function CartaDocumento({
   };
 
   return (
-    <div className="carta-doc carta-visual bg-white shadow-2xl print:shadow-none mx-auto" style={s.wrap}>
+    <div className="carta-doc carta-visual carta-wrap bg-white shadow-2xl print:shadow-none mx-auto" style={s.wrap}>
       {/* ENCABEZADO */}
       <div style={s.headerRow}>
         <div style={s.logoWrap}>
