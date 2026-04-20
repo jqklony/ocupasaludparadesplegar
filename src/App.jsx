@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import CartaCustodia from "./pages/CartaCustodia";
 import {
   User,
   FileText,
@@ -18624,6 +18625,21 @@ Esta historia clínica debe conservarse mínimo 20 años.
               title="Habeas Data - Ley 1581/2012"
             >
               🔐 Privacidad
+            </button>
+          )}
+          {["administrador", "medico", "super_admin"].includes(
+            currentUser?.role
+          ) && (
+            <button
+              onClick={() => goTo("custodia")}
+              className={
+                view === "custodia"
+                  ? "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-600 text-white"
+                  : "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200"
+              }
+              title="Carta de Custodia - Res. 1918/2009"
+            >
+              📁 Custodia
             </button>
           )}
           {(_isAdmin(currentUser?.role) ||
@@ -47403,6 +47419,22 @@ body{font-family:Arial,sans-serif;margin:0;background:#f5f5f5}
       w.document.close();
     }
   };
+  // ══════════════════════════════════════════════════════════════
+  // CARTA DE CUSTODIA — Historias Clínicas Ocupacionales
+  // ══════════════════════════════════════════════════════════════
+  const renderCartaCustodia = () => (
+    <CartaCustodia
+      activeDoctorData={activeDoctorData}
+      activeSignature={activeSignature}
+      companies={companies}
+      saveInforme={saveInforme}
+      savedInformes={savedInformes}
+      goTo={goTo}
+      showAlert={showAlert}
+      currentUser={currentUser}
+    />
+  );
+
   const renderCurrentView = () => {
     // NORMATIVO: Ley 1581/2012 - mostrar aviso si no ha sido aceptado
     if (!privacidadAceptada)
@@ -47533,6 +47565,7 @@ body{font-family:Arial,sans-serif;margin:0;background:#f5f5f5}
       return renderPropuestas();
     }
     if (view === "propuestas") return renderPropuestas();
+    if (view === "custodia") return renderCartaCustodia();
     if (view === "historia") {
       // FIX: _billDocData necesario para incapacidad, fórmula, derivación
       const _billDocUser = billData.billDoctorId
