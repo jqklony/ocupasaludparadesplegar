@@ -31,7 +31,7 @@ function CartaDocumento({
     headerRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" },
     logoWrap:  { display: "flex", alignItems: "center", gap: "10px" },
     logoBadge: {
-      width: "50px", height: "50px",
+      width: "60px", height: "60px",
       background: "linear-gradient(135deg,#065f46 0%,#0f766e 100%)",
       borderRadius: "10px",
       display: "flex", alignItems: "center", justifyContent: "center",
