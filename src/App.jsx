@@ -11519,7 +11519,10 @@ const _generarFacturaDIAN_UBL = (billData, doctorData, numero) => {
   // Helper: Filtrar atenciones para billing
   const _getBillAtencionesFiltradas = () => {
     return (atencionesCerradas || []).filter(a => {
-      if (billFilterEmp && a.empresaId !== billFilterEmp) return false;
+      // Soportar empresa o empresaId
+      const empId = a.empresaId || a.empresa;
+      const empNombre = a.empresaNombre || a.empresa;
+      if (billFilterEmp && empId !== billFilterEmp && empNombre !== billFilterEmp) return false;
       if (billFilterMes && a.fechaAtencion && !a.fechaAtencion.startsWith(billFilterMes)) return false;
       return true;
     });
@@ -11531,7 +11534,7 @@ const _generarFacturaDIAN_UBL = (billData, doctorData, numero) => {
     const map = new Map();
     atencionesFiltradas.forEach(a => {
       if (!map.has(a.docNumero)) {
-        map.set(a.docNumero, {docNumero: a.docNumero, nombres: a.nombres || a.pacienteNombre || 'Sin nombre', docTipo: a.docTipo || 'CC', atenciones: []});
+        map.set(a.docNumero, {docNumero: a.docNumero, nombres: a.nombres || a.nombre || a.pacienteNombre || 'Sin nombre', docTipo: a.docTipo || a.tipoDoc || 'CC', empresaId: a.empresaId || a.empresa, empresa: a.empresaNombre || a.empresa, atenciones: []});
       }
       map.get(a.docNumero).atenciones.push(a);
     });
@@ -28163,7 +28166,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
             <div className="flex flex-wrap -mx-1.5">
               <div className="w-1/2 px-1.5 mb-2">
                 <label className="block text-[10px] font-black text-gray-600 mb-0.5 uppercase">Empresa</label>
-                <select value={billFilterEmp} onChange={(e) => { setBillFilterEmp(e.target.value); const c = companiesList.find(x => x.id === e.target.value); if(c) setBillData(p => ({...p, companyId: c.id, clientName: c.nombre, clientNit: c.nit || ''})); }}
+                <select value={billFilterEmp} onChange={(e) => { setBillFilterEmp(e.target.value); const c = companiesList.find(x => x.id === e.target.value || x.nombre === e.target.value); if(c) setBillData(p => ({...p, companyId: c.id, clientName: c.nombre, clientNit: c.nit || ''})); }}
                   className="w-full p-2 border border-gray-200 rounded text-xs font-bold bg-white">
                   <option value="">Seleccionar empresa...</option>
                   {companiesList.map((c) => <option key={c.id} value={c.id}>{c.nombre} (NIT: {c.nit || '--'})</option>)}
