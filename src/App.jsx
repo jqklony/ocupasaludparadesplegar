@@ -7656,30 +7656,136 @@ const initialGeneralPatientState = {
     origen: "Enfermedad General",
   },
 };
+// ══ USUARIOS INICIALES ════════════════════════════════════════════
+// Usados como recuperación de emergencia si Supabase falla o tiene hashes incorrectos.
+// Para crear usuarios adicionales usar el panel Usuarios dentro de la app.
+//
+// CREDENCIALES DE PRUEBA:
+//   drcucalon   / cucalon2026   → super_admin
+//   dr.garcia   / medico2026    → medico
+//   admin.ips   / admin2026     → administrador
+//   secre.maria / secre2026     → secretaria  (agenda, pacientes, adjuntos)
+//   secre.ana   / secre2026     → secretaria  (agenda, caja, crear pacientes)
+//   empresa.abc / empresa2026   → admin_empresa
+//   empresa.xyz / empresa2026   → admin_empresa
+//   empresa.qrs / empresa2026   → admin_empresa
 const initialUsers = [
   {
     id: 1,
     user: "drcucalon",
-    // SHA-256("cucalon2026") — contraseña de recuperación maestra
-    passHash:
-      "11177743b7227bd517fd7a05e0c9576b3497830f72ccfec4a5a0e1c9f65d9892",
+    // SHA-256("cucalon2026")
+    passHash: "11177743b7227bd517fd7a05e0c9576b3497830f72ccfec4a5a0e1c9f65d9892",
     mustChangePassword: false,
-    name: "Dr. Julian Cucalon",
-    role: "super_admin", // FASE 2: promovido a super_admin (puede crear orgs + HC)
-    orgId: ORG_DEFAULT_ID, // FASE 2: organización principal
-    license: "clinica",
-    licenseExpiry: "2099-12-31",
-    licenseStarted: "2026-01-01",
-    porcentajeHonorarios: 100, // FASE 2: hook distribución futura (Componente 10)
+    name: "Dr. Julian Cucalon", nombre: "Dr. Julian Cucalon",
+    role: "super_admin",
+    orgId: ORG_DEFAULT_ID,
+    license: "clinica", licenseExpiry: "2099-12-31", licenseStarted: "2026-01-01",
+    porcentajeHonorarios: 100,
     secretariaPermisos: { ...SECRETARIA_PERMISOS_DEFAULT },
-    // Perfil del super_admin - aparece en navbar, certificados y firmas
+    activo: true,
     doctorData: {
       ...DEFAULT_DOCTOR_DATA,
       nombre: "Dr. Julian Cucalon",
       titulo: "Médico Especialista en Salud Ocupacional",
       ciudad: "Popayán",
-      // licencia, cedula, celular, email: se configuran en Ajustes → Firma
     },
+  },
+  {
+    id: 2,
+    user: "dr.garcia",
+    // SHA-256("medico2026")
+    passHash: "ff75db5104f87b85a8f9a58731aa51313233cae9534d3b44c18bcea2c01bfe7d",
+    name: "Dr. Carlos García", nombre: "Dr. Carlos García",
+    role: "medico",
+    orgId: ORG_DEFAULT_ID,
+    license: "clinica", licenseExpiry: "2099-12-31",
+    secretariaPermisos: { ...SECRETARIA_PERMISOS_DEFAULT },
+    activo: true,
+    doctorData: {
+      ...DEFAULT_DOCTOR_DATA,
+      nombre: "Dr. Carlos García",
+      titulo: "Médico Ocupacional",
+      ciudad: "Popayán",
+    },
+  },
+  {
+    id: 3,
+    user: "admin.ips",
+    // SHA-256("admin2026")
+    passHash: "6051fc84a7a0d74c225fb18a496b09952da5642e60723ecae543298edd7d82d6",
+    name: "Administrador IPS", nombre: "Administrador IPS",
+    role: "administrador",
+    orgId: ORG_DEFAULT_ID,
+    license: "clinica", licenseExpiry: "2099-12-31",
+    secretariaPermisos: { ...SECRETARIA_PERMISOS_DEFAULT },
+    activo: true,
+  },
+  {
+    id: 4,
+    user: "secre.maria",
+    // SHA-256("secre2026")
+    passHash: "0723f257f0b360e57fc499c1fdd809f4cb922ba52b861166f6df91fbe42be363",
+    name: "María López", nombre: "María López (Secretaria)",
+    role: "secretaria",
+    orgId: ORG_DEFAULT_ID,
+    license: "libre", licenseExpiry: "2099-12-31",
+    activo: true,
+    secretariaPermisos: {
+      ...SECRETARIA_PERMISOS_DEFAULT,
+      agenda: true, pacientes_lista: true, adjuntos: true,
+    },
+  },
+  {
+    id: 5,
+    user: "secre.ana",
+    // SHA-256("secre2026")
+    passHash: "0723f257f0b360e57fc499c1fdd809f4cb922ba52b861166f6df91fbe42be363",
+    name: "Ana Martínez", nombre: "Ana Martínez (Secretaria)",
+    role: "secretaria",
+    orgId: ORG_DEFAULT_ID,
+    license: "libre", licenseExpiry: "2099-12-31",
+    activo: true,
+    secretariaPermisos: {
+      ...SECRETARIA_PERMISOS_DEFAULT,
+      agenda: true, pacientes_lista: true, caja: true,
+      cuentas_cobro: true, pacientes_crear: true,
+    },
+  },
+  {
+    id: 6,
+    user: "empresa.abc",
+    // SHA-256("empresa2026")
+    passHash: "b7cb6abb0a3eb230c725327ff0d42a720f6efeee7cb2120a5a9db4c057d645c0",
+    name: "Empresa ABC S.A.S.", nombre: "Empresa ABC S.A.S.",
+    role: "admin_empresa",
+    orgId: ORG_DEFAULT_ID,
+    license: "libre", licenseExpiry: "2099-12-31",
+    activo: true,
+    secretariaPermisos: { ...SECRETARIA_PERMISOS_DEFAULT },
+  },
+  {
+    id: 7,
+    user: "empresa.xyz",
+    // SHA-256("empresa2026")
+    passHash: "b7cb6abb0a3eb230c725327ff0d42a720f6efeee7cb2120a5a9db4c057d645c0",
+    name: "Empresa XYZ Ltda.", nombre: "Empresa XYZ Ltda.",
+    role: "admin_empresa",
+    orgId: ORG_DEFAULT_ID,
+    license: "libre", licenseExpiry: "2099-12-31",
+    activo: true,
+    secretariaPermisos: { ...SECRETARIA_PERMISOS_DEFAULT },
+  },
+  {
+    id: 8,
+    user: "empresa.qrs",
+    // SHA-256("empresa2026")
+    passHash: "b7cb6abb0a3eb230c725327ff0d42a720f6efeee7cb2120a5a9db4c057d645c0",
+    name: "Empresa QRS S.A.", nombre: "Empresa QRS S.A.",
+    role: "admin_empresa",
+    orgId: ORG_DEFAULT_ID,
+    license: "libre", licenseExpiry: "2099-12-31",
+    activo: true,
+    secretariaPermisos: { ...SECRETARIA_PERMISOS_DEFAULT },
   },
 ];
 const initialCompanyState = {
