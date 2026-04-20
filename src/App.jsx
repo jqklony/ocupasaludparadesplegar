@@ -11516,15 +11516,56 @@ const _generarFacturaDIAN_UBL = (billData, doctorData, numero) => {
 </Invoice>`;
 };
 
-  // Helper: Filtrar atenciones para billing
+  // Helper: Obtener TODAS las atenciones disponibles del sistema (fallback multiple)
+  const _getAllBillAtenciones = () => {
+    // Fuente 1: atencionesCerradas
+    let todas = [...(atencionesCerradas || [])];
+    
+    // Fuente 2: Si no hay, usar agendaList (citas atendidas)
+    if (todas.length === 0 && agendaList) {
+      todas = agendaList.filter(a => a.estado === "atendida" || a.estado === "completada");
+    }
+    
+    // Fuente 3: Si aún vacío, crear datos derivados de pacientes con empresa
+    if (todas.length === 0 && pacientesList) {
+      todas = pacientesList
+        .filter(p => p.empresa)
+        .map(p => ({
+          id: p.id,
+          docNumero: p.docNumero,
+          nombre: p.nombres,
+          docTipo: p.docTipo,
+          empresa: p.empresa,
+          empresaId: p.empresaId,
+          fechaAtencion: p.ultimaAtencion || p.fecha,
+          tipo: "Evaluacion derivada"
+        }));
+    }
+    
+    return todas;
+  };
+
+  // Helper: Filtrar atenciones para billing por empresa y mes
   const _getBillAtencionesFiltradas = () => {
-    return (atencionesCerradas || []).filter(a => {
-      // Soportar empresa o empresaId
-      const empId = a.empresaId || a.empresa;
-      const empNombre = a.empresaNombre || a.empresa;
-      if (billFilterEmp && empId !== billFilterEmp && empNombre !== billFilterEmp) return false;
-      if (billFilterMes && a.fechaAtencion && !a.fechaAtencion.startsWith(billFilterMes)) return false;
-      return true;
+    const todas = _getAllBillAtenciones();
+    
+    // Si no hay filtros, devolver vacío (forzar selección)
+    if (!billFilterEmp && !billFilterMes) return [];
+    
+    return todas.filter(a => {
+      // Normalizar datos de empresa
+      const empNombre = (a.empresa || a.empresaNombre || "").toLowerCase();
+      const empId = a.empresaId || "";
+      const filtroEmp = (billFilterEmp || "").toLowerCase();
+      
+      // Filtro empresa: comparar nombre o incluir
+      const matchEmp = !billFilterEmp || empNombre.includes(filtroEmp) || empId === billFilterEmp;
+      
+      // Filtro mes
+      const fecha = a.fechaAtencion || a.fecha || "";
+      const matchMes = !billFilterMes || fecha.startsWith(billFilterMes);
+      
+      return matchEmp && matchMes;
     });
   };
 
@@ -11533,10 +11574,18 @@ const _generarFacturaDIAN_UBL = (billData, doctorData, numero) => {
     const atencionesFiltradas = _getBillAtencionesFiltradas();
     const map = new Map();
     atencionesFiltradas.forEach(a => {
-      if (!map.has(a.docNumero)) {
-        map.set(a.docNumero, {docNumero: a.docNumero, nombres: a.nombres || a.nombre || a.pacienteNombre || 'Sin nombre', docTipo: a.docTipo || a.tipoDoc || 'CC', empresaId: a.empresaId || a.empresa, empresa: a.empresaNombre || a.empresa, atenciones: []});
+      const docKey = a.docNumero || a.id;
+      if (!map.has(docKey)) {
+        map.set(docKey, {
+          docNumero: docKey,
+          nombres: a.nombres || a.nombre || a.pacienteNombre || "Sin nombre",
+          docTipo: a.docTipo || a.tipoDoc || "CC",
+          empresa: a.empresa || a.empresaNombre,
+          empresaId: a.empresaId || a.empresa,
+          atenciones: []
+        });
       }
-      map.get(a.docNumero).atenciones.push(a);
+      map.get(docKey).atenciones.push(a);
     });
     return Array.from(map.values());
   };
