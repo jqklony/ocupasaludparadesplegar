@@ -11550,7 +11550,7 @@ const _generarFacturaDIAN_UBL = (billData, doctorData, numero) => {
     const todas = _getAllBillAtenciones();
     
     // Si no hay filtros, devolver vacío (forzar selección)
-    if (!billFilterEmp && !billFilterMes) return [];
+    if (!billFilterEmp && !billFilterMes) return todas;  // Sin filtros: devolver todas
     
     return todas.filter(a => {
       // Normalizar datos de empresa
