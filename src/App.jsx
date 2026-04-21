@@ -15452,6 +15452,56 @@ function AppInner() {
       });
       setUsersList(fixed);
       setUsersReady(true);
+      // ── RESTAURACIÓN EN ARRANQUE: aunque siso_users esté en localStorage,
+      // si pacientes/empresas están vacíos hay que traerlos de Supabase ──────
+      if (sessionUser) {
+        const _localPatsNow = sp(_patKey(sessionUser), []);
+        const _localCompsNow = sp(_compKey(sessionUser), []);
+        if (_localPatsNow.length === 0 || _localCompsNow.length === 0) {
+          // Traer de Supabase en background sin bloquear la UI
+          (async () => {
+            try {
+              const cloud = await Promise.race([
+                _sbGetAll(),
+                new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000))
+              ]);
+              if (!cloud) return;
+              if (_localPatsNow.length === 0) {
+                const _pats = cloud?.["siso_patients_" + sessionUser]?.value
+                  || cloud?.["siso_db_patients_" + sessionUser]?.value;
+                if (Array.isArray(_pats) && _pats.length > 0) {
+                  setPatientsList(_pats);
+                  _ls.setItem(_patKey(sessionUser), JSON.stringify(_pats));
+                  dataReadyRef.current = true;
+                  console.log("[SISO] ✅ Pacientes restaurados desde Supabase en arranque:", _pats.length);
+                  // Normalizar clave cloud
+                  if (!cloud?.["siso_patients_" + sessionUser]?.value || cloud["siso_patients_" + sessionUser].value.length === 0) {
+                    _sbSet("siso_patients_" + sessionUser, _pats);
+                  }
+                }
+              } else {
+                dataReadyRef.current = true;
+              }
+              if (_localCompsNow.length === 0) {
+                const _comps = cloud?.["siso_companies_" + sessionUser]?.value
+                  || cloud?.["siso_companies_shared"]?.value;
+                if (Array.isArray(_comps) && _comps.length > 0) {
+                  setCompanies(_comps);
+                  _ls.setItem(_compKey(sessionUser), JSON.stringify(_comps));
+                  console.log("[SISO] ✅ Empresas restauradas desde Supabase en arranque:", _comps.length);
+                  if (!cloud?.["siso_companies_" + sessionUser]?.value || cloud["siso_companies_" + sessionUser].value.length === 0) {
+                    _sbSet("siso_companies_" + sessionUser, _comps);
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn("[SISO] Restauración en arranque falló:", err.message);
+            }
+          })();
+        } else {
+          dataReadyRef.current = true;
+        }
+      }
     } else {
       // ══ Cache vacío — ESPERAR a Supabase antes de permitir login ══
       (async () => {
