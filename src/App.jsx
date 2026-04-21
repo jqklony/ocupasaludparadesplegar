@@ -275,17 +275,76 @@ const _SB_SERVICE_KEY = _cfgSafeKey(_cfgRaw.sbServiceKey) || null; // null = sol
 // En producción inyectar via: <script>window.__SISO_CONFIG={sbUrl:'TU_URL',sbKey:'TU_KEY'};</script>
 // Las claves se configuran en el primer despliegue y se rotan cada 90 días - NUNCA en código fuente.
 // Gestión de sesión - expiración automática por inactividad (30 min)
-// Headers con soporte para proxy o Supabase directo
-const _SB_HEADERS = {
-  apikey: _SB_KEY,
-  Authorization: `Bearer ${_SB_KEY}`,
-  "Content-Type": "application/json",
-  Prefer: "resolution=merge-duplicates,return=minimal",
+// ══════════════════════════════════════════════════════════════════
+// SUPABASE AUTH — integración REST (sin SDK) para RLS con auth.uid()
+// Email sintético: {username}@siso.ocupasalud.app
+// JWT almacenado en window._sbJwt — se renueva en cada login
+// ══════════════════════════════════════════════════════════════════
+const _sbAuthSignIn = async (username, plainPassword) => {
+  try {
+    const r = await fetch(`${_SB_URL}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: _SB_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: `${username}@siso.ocupasalud.app`,
+        password: plainPassword,
+      }),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (d.access_token) {
+      window._sbJwt = d.access_token;
+      window._sbJwtExp = Date.now() + (d.expires_in || 3600) * 1000;
+      console.log("[SISO Auth] JWT obtenido para", username);
+    }
+    return d.access_token || null;
+  } catch { return null; }
 };
+const _sbAuthSignUp = async (username, plainPassword) => {
+  // Crear usuario en Supabase Auth (usa anon key — permitido con email+pass)
+  try {
+    const r = await fetch(`${_SB_URL}/auth/v1/signup`, {
+      method: "POST",
+      headers: { apikey: _SB_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: `${username}@siso.ocupasalud.app`,
+        password: plainPassword,
+        data: { username }, // guardado en raw_user_meta_data
+      }),
+    });
+    const d = await r.json();
+    // Si el usuario ya existe devuelve 400 con "User already registered"
+    if (!r.ok && !d?.msg?.includes("already")) return false;
+    return true;
+  } catch { return false; }
+};
+const _sbAuthSignOut = async () => {
+  const tok = typeof window !== "undefined" ? window._sbJwt : null;
+  if (tok) {
+    try {
+      await fetch(`${_SB_URL}/auth/v1/logout`, {
+        method: "POST",
+        headers: { apikey: _SB_KEY, Authorization: `Bearer ${tok}` },
+      });
+    } catch {}
+  }
+  if (typeof window !== "undefined") { window._sbJwt = null; window._sbJwtExp = null; }
+};
+// Headers dinámicos: usa JWT autenticado si disponible, anon key como fallback seguro
+const _getSbHeaders = () => {
+  const tok = (typeof window !== "undefined" && window._sbJwt) || _SB_KEY;
+  return {
+    apikey: _SB_KEY,
+    Authorization: `Bearer ${tok}`,
+    "Content-Type": "application/json",
+    Prefer: "resolution=merge-duplicates,return=minimal",
+  };
+};
+// Alias estático para compatibilidad (porciones que no necesitan JWT dinámico)
+const _SB_HEADERS = { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" };
 // Wrapper de fetch con soporte dual: proxy (futuro) o Supabase directo (actual)
 const _securePost = async (key, value) => {
   if (_PROXY_URL) {
-    // Modo proxy - key secreta nunca sale al cliente
     try {
       const r = await fetch(_PROXY_URL, {
         method: "POST",
@@ -294,25 +353,17 @@ const _securePost = async (key, value) => {
         credentials: "include",
       });
       return r.ok;
-    } catch {
-      return false;
-    }
+    } catch { return false; }
   }
-  // Modo directo Supabase (actual - piloto)
+  // Modo directo Supabase — usa JWT si está disponible (RLS auth.uid())
   try {
     const r = await fetch(`${_SB_URL}/rest/v1/siso_store`, {
       method: "POST",
-      headers: _SB_HEADERS,
-      body: JSON.stringify({
-        key,
-        value,
-        updated_at: new Date().toISOString(),
-      }),
+      headers: _getSbHeaders(),
+      body: JSON.stringify({ key, value, updated_at: new Date().toISOString() }),
     });
     return r.ok;
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 };
 const _SB_KEYS = [
   "siso_db_patients",
@@ -629,7 +680,7 @@ const _sbGetAll = async () => {
   try {
     const r = await fetch(
       `${_SB_URL}/rest/v1/siso_store?select=key,value,updated_at`,
-      { headers: _SB_HEADERS }
+      { headers: _getSbHeaders() }
     );
     if (!r.ok) return null;
     const rows = await r.json();
@@ -646,7 +697,7 @@ const _sbDelete = async (key) => {
   try {
     const r = await fetch(
       `${_SB_URL}/rest/v1/siso_store?key=eq.${encodeURIComponent(key)}`,
-      { method: "DELETE", headers: _SB_HEADERS }
+      { method: "DELETE", headers: _getSbHeaders() }
     );
     return r.ok;
   } catch {
@@ -15941,6 +15992,7 @@ function AppInner() {
     if (!currentUser) return;
     const resetTimer = () => _resetSessionTimer(() => {
       showAlert("⏰ Sesión expirada por inactividad (30 minutos).\nSus datos están guardados. Debe iniciar sesión nuevamente.");
+      _sbAuthSignOut(); // Invalidar JWT de Supabase Auth al expirar
       setCurrentUser(null);
       _ls.removeItem("siso_session");
       setView("login");
@@ -16853,6 +16905,19 @@ const handleLogin = (u, p) => {
           setTwoFAError("");
           return;
         }
+        // ══ SUPABASE AUTH: obtener JWT para RLS con auth.uid() ══
+        // Se ejecuta en paralelo — si falla, el login sigue con anon key (degradado seguro)
+        _sbAuthSignIn(found.user, p).then(tok => {
+          if (!tok) {
+            // Usuario no existe aún en Supabase Auth — crearlo automáticamente
+            _sbAuthSignUp(found.user, p).then(() => {
+              // Intentar login nuevamente tras crear la cuenta
+              _sbAuthSignIn(found.user, p).then(tok2 => {
+                if (tok2) console.log("[SISO Auth] Usuario creado y autenticado en Supabase Auth:", found.user);
+              });
+            });
+          }
+        });
         // ══ B-05: Resetear contador de intentos fallidos en login exitoso ══
         setLoginAttempts(0);
         _ls.removeItem("siso_login_attempts");
@@ -20030,6 +20095,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
           </button>
           <button
             onClick={() => {
+              _sbAuthSignOut(); // Cerrar sesión en Supabase Auth (invalida JWT)
               setCurrentUser(null);
               setView("login");
               _ls.removeItem("siso_session");
