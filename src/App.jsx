@@ -15012,6 +15012,9 @@ function AppInner() {
   const fileInputRef = useRef(null);
   const fileInputSigRef = useRef(null);
   const csvInputRef = useRef(null);
+  // ── GUARD: evitar que auto-sync sobreescriba nube con lista vacía no inicializada ──
+  // Se pone en true solo cuando pacientes/empresas han sido cargados desde nube o localStorage
+  const dataReadyRef = useRef(false);
   // ── SEGURIDAD: Auto-logout por inactividad (30 min) ─────────────────────
   const _inactivityRef = useRef(null);
   const _warnRef = useRef(null);
@@ -15428,7 +15431,10 @@ function AppInner() {
     // Pacientes: cargar SOLO los del usuario de sesión activa (aislamiento absoluto)
     // Si no hay sesión guardada, dejar la lista vacía - se cargará en handleLogin
     if (sessionUser) {
-      setPatientsList(sp(_patKey(sessionUser), []));
+      const _localPats = sp(_patKey(sessionUser), []);
+      setPatientsList(_localPats);
+      // Si había pacientes en localStorage, marcar datos como listos para sync
+      if (_localPats.length > 0) dataReadyRef.current = true;
     }
     // NO cargar 'siso_db_patients' genérico - mezclaria pacientes de todos los médicos
     // ══ FIX DEFINITIVO: Cargar usuarios con persistencia real ══
@@ -15489,13 +15495,18 @@ function AppInner() {
               if (Array.isArray(_initPats) && _initPats.length > 0) {
                 setPatientsList(_initPats);
                 _ls.setItem(_patKey(sessionUser), JSON.stringify(_initPats));
+                dataReadyRef.current = true; // datos reales listos → auto-sync puede proceder
               }
-              const _initComps = cloud?.["siso_companies_" + sessionUser]?.value;
+              // FIX RECUPERACIÓN: buscar empresas en clave propia o en shared (resistente a borrados)
+              const _initComps = cloud?.["siso_companies_" + sessionUser]?.value
+                || cloud?.["siso_companies_shared"]?.value;
               if (Array.isArray(_initComps) && _initComps.length > 0) {
                 setCompanies(_initComps);
                 _ls.setItem(_compKey(sessionUser), JSON.stringify(_initComps));
               }
             }
+            // Si no hay sesión activa, marcar ready de todas formas (datos de usuarios cargados)
+            if (!sessionUser) dataReadyRef.current = true;
             console.log("[SISO] ✅ Usuarios y datos restaurados desde Supabase:", cloudUsers.length);
           } else {
             setUsersList(initialUsers);
@@ -15737,6 +15748,12 @@ function AppInner() {
     if (!currentUser) return;
     const AUTO_INTERVAL_MS = 2 * 60 * 1000; // 2 minutos
     const doAutoBackup = async () => {
+      // GUARD: no sincronizar si los datos aún no han sido inicializados
+      // (evita sobreescribir nube con listas vacías al arrancar en navegador nuevo)
+      if (!dataReadyRef.current) {
+        console.warn("[SISO] Auto-sync omitido: datos aún no inicializados.");
+        return;
+      }
       try {
         if (_syncStatusCallback) _syncStatusCallback("syncing");
         // Sincronizar todas las colecciones a Supabase
@@ -15744,9 +15761,12 @@ function AppInner() {
         const _asSuf = currentUser?.empresaId
           ? "empresa_" + currentUser.empresaId
           : currentUser?.user || "shared";
+        // GUARD: solo guardar pacientes/empresas si tenemos datos reales
+        const _patToSave = patientsList.length > 0 ? patientsList : null;
+        const _compToSave = companies.length > 0 ? companies : null;
         const tasks = [
-          _sbSet(_patKeyCloud(currentUser?.user || "shared"), patientsList),
-          _sbSet(_compKeyCloud(currentUser?.user || "shared"), companies),
+          ...(_patToSave ? [_sbSet(_patKeyCloud(currentUser?.user || "shared"), _patToSave)] : []),
+          ...(_compToSave ? [_sbSet(_compKeyCloud(currentUser?.user || "shared"), _compToSave)] : []),
           _sbSet("siso_users", usersList),
           _sbSet(`siso_saved_bills_${_asSuf}`, savedBillsList),
           _sbSet("siso_saved_reports", savedReports),
@@ -16466,6 +16486,15 @@ JSON REQUERIDO (sin markdown, sin texto adicional):
   };
   // ── GUARDADO MANUAL EN NUBE CON REPORTE ─────────────────────────────────
   const handleManualCloudSave = async () => {
+    // GUARD: si no hay datos cargados, advertir al usuario antes de sobreescribir la nube
+    if (!dataReadyRef.current || (patientsList.length === 0 && companies.length === 0)) {
+      const confirmEmpty = window.confirm(
+        "⚠️ ADVERTENCIA: No hay pacientes ni empresas cargados en este momento.\n\n" +
+        "Si continúa, SOBREESCRIBIRÁ la nube con datos vacíos y perderá todos sus datos.\n\n" +
+        "¿Está seguro de que desea guardar datos vacíos en la nube?"
+      );
+      if (!confirmEmpty) return;
+    }
     setSyncStatus("syncing");
     const ts = new Date().toISOString();
     const currentKeys = sps("siso_ai_keys", aiConfig.keys || {});
@@ -16473,12 +16502,15 @@ JSON REQUERIDO (sin markdown, sin texto adicional):
       .filter(([, v]) => v && v.length > 8)
       .map(([k]) => k);
     const _bkSuf = currentUser?.empresaId ? "empresa_" + currentUser.empresaId : currentUser?.user || "shared";
+    // GUARD: solo guardar pacientes/empresas si hay datos reales
+    const _patToSaveManual = patientsList.length > 0 ? patientsList : null;
+    const _compToSaveManual = companies.length > 0 ? companies : null;
     const tasks = {
-      [`Pacientes / HC (${currentUser?.user})`]: _sbSet(
+      ...(_patToSaveManual ? {[`Pacientes / HC (${currentUser?.user})`]: _sbSet(
         _patKeyCloud(currentUser?.user || "shared"),
-        patientsList
-      ),
-      Empresas: _sbSet(_compKeyCloud(currentUser?.user || "shared"), companies),
+        _patToSaveManual
+      )} : {}),
+      ...(_compToSaveManual ? {Empresas: _sbSet(_compKeyCloud(currentUser?.user || "shared"), _compToSaveManual)} : {}),
       "Usuarios y perfiles": _sbSet("siso_users", usersList),
       "Facturas / Cuentas de cobro": _sbSet(`siso_saved_bills_${_bkSuf}`, savedBillsList),
       "Informes guardados": _sbSet("siso_saved_reports", savedReports),
@@ -16531,6 +16563,100 @@ JSON REQUERIDO (sin markdown, sin texto adicional):
     });
     setShowSyncReport(true);
   };
+
+  // ── RECUPERACIÓN DE EMERGENCIA: escanear todas las claves de Supabase ─────────────────
+  const [showDiagnostico, setShowDiagnostico] = useState(false);
+  const [diagnosticoData, setDiagnosticoData] = useState(null);
+  const [diagnosticoCargando, setDiagnosticoCargando] = useState(false);
+
+  const handleDiagnosticoNube = async () => {
+    setDiagnosticoCargando(true);
+    setShowDiagnostico(true);
+    try {
+      const cloud = await _sbGetAll();
+      if (!cloud) {
+        setDiagnosticoData({ error: "No se pudo conectar a Supabase. Verifique su conexión." });
+        return;
+      }
+      const uid = currentUser?.user || "drcucalon";
+      const allKeys = Object.keys(cloud);
+      // Buscar todas las claves que contengan datos de pacientes o empresas
+      const patKeys = allKeys.filter(k => k.includes("patient") || k.includes("pacient"));
+      const compKeys = allKeys.filter(k => k.includes("compan") || k.includes("empresa") || k.includes("siso_companies"));
+      const userKeys = allKeys.filter(k => k === "siso_users");
+      // Detalles de claves clave del usuario actual
+      const keyVariants = [
+        `siso_patients_${uid}`,
+        `siso_db_patients_${uid}`,
+        `siso_companies_${uid}`,
+        `siso_companies`,
+        `siso_users`,
+      ];
+      const details = {};
+      for (const k of keyVariants) {
+        const val = cloud[k]?.value;
+        details[k] = {
+          found: !!val,
+          count: Array.isArray(val) ? val.length : (val ? 1 : 0),
+          updatedAt: cloud[k]?.updatedAt || null,
+          sample: Array.isArray(val) && val.length > 0 ? val[0]?.nombre || val[0]?.name || val[0]?.razonSocial || "(item)" : null,
+        };
+      }
+      // Buscar claves adicionales que podrían tener datos
+      const extraPatKeys = patKeys.filter(k => !keyVariants.includes(k));
+      const extraCompKeys = compKeys.filter(k => !keyVariants.includes(k));
+      setDiagnosticoData({
+        totalKeys: allKeys.length,
+        uid,
+        details,
+        extraPatKeys: extraPatKeys.map(k => ({
+          key: k,
+          count: Array.isArray(cloud[k]?.value) ? cloud[k].value.length : 0,
+          updatedAt: cloud[k]?.updatedAt,
+        })),
+        extraCompKeys: extraCompKeys.map(k => ({
+          key: k,
+          count: Array.isArray(cloud[k]?.value) ? cloud[k].value.length : 0,
+          updatedAt: cloud[k]?.updatedAt,
+        })),
+        cloudRef: cloud, // referencia para restauración
+      });
+    } catch (err) {
+      setDiagnosticoData({ error: err.message });
+    } finally {
+      setDiagnosticoCargando(false);
+    }
+  };
+
+  const handleRestaurarDesdeKey = (key) => {
+    if (!diagnosticoData?.cloudRef) return;
+    const val = diagnosticoData.cloudRef[key]?.value;
+    if (!Array.isArray(val) || val.length === 0) {
+      showAlert("⚠️ Esta clave no tiene datos para restaurar.");
+      return;
+    }
+    const isPat = key.includes("patient") || key.includes("db_patients");
+    const isComp = key.includes("compan") || (key === "siso_companies");
+    if (isPat) {
+      if (!window.confirm(`¿Restaurar ${val.length} pacientes desde "${key}"?\n\nEsto reemplazará la lista actual.`)) return;
+      setPatientsList(val);
+      _ls.setItem(_patKey(currentUser?.user || "shared"), JSON.stringify(val));
+      // Guardar inmediatamente en la clave estándar
+      _sbSet(_patKeyCloud(currentUser?.user || "shared"), val);
+      dataReadyRef.current = true;
+      showAlert(`✅ ${val.length} pacientes restaurados correctamente.`);
+    } else if (isComp) {
+      if (!window.confirm(`¿Restaurar ${val.length} empresas desde "${key}"?\n\nEsto reemplazará la lista actual.`)) return;
+      setCompanies(val);
+      _ls.setItem(_compKey(currentUser?.user || "shared"), JSON.stringify(val));
+      _sbSet(_compKeyCloud(currentUser?.user || "shared"), val);
+      showAlert(`✅ ${val.length} empresas restauradas correctamente.`);
+    } else {
+      showAlert("No se puede determinar el tipo de datos de esta clave.");
+    }
+    setShowDiagnostico(false);
+  };
+
   const handleSaveAIConfig = (cfg) => {
     setAiConfig(cfg);
     const uid = currentUser?.user || "default";
@@ -16835,22 +16961,34 @@ const handleLogin = (u, p) => {
           const currentLocalPats = sp(userPatKey, []);
           if (
             Array.isArray(cloudPats) &&
+            cloudPats.length > 0 &&  // nunca sobreescribir con lista vacía
             cloudPats.length >= currentLocalPats.length
           ) {
             setPatientsList(cloudPats);
             _ls.setItem(userPatKey, JSON.stringify(cloudPats));
             // Sincronizar también a la clave cloud para unificar en próximas cargas
-            if (!cloud?.[userPatKeyCloud]?.value) _sbSet(userPatKeyCloud, cloudPats);
+            if (!cloud?.[userPatKeyCloud]?.value || cloud[userPatKeyCloud].value.length === 0) {
+              _sbSet(userPatKeyCloud, cloudPats);
+            }
           }
+          // Marcar datos como cargados para que auto-sync pueda proceder de forma segura
+          dataReadyRef.current = true;
           // Empresas del usuario específico (o empresa compartida)
+          // FIX RECUPERACIÓN: también buscar en siso_companies_shared (clave segura no borrada por auto-sync)
           const cloudComps = cloud?.[userCompKeyCloud]?.value
-            || cloud?.["siso_companies_" + _storageUserId]?.value;
+            || cloud?.["siso_companies_" + _storageUserId]?.value
+            || cloud?.["siso_companies_shared"]?.value;
           if (
             Array.isArray(cloudComps) &&
+            cloudComps.length > 0 &&  // nunca sobreescribir con lista vacía
             cloudComps.length >= localComps.length
           ) {
             setCompanies(cloudComps);
             _ls.setItem(userCompKey, JSON.stringify(cloudComps));
+            // Si la clave propia está vacía en Supabase, migrar desde shared
+            if (!cloud?.[userCompKeyCloud]?.value || cloud[userCompKeyCloud].value.length === 0) {
+              _sbSet(userCompKeyCloud, cloudComps);
+            }
           } else if (localComps.length === 0) {
             // Si no hay empresas propias, verificar clave legacy compartida
             const legacyComps = cloud?.["siso_companies"]?.value;
@@ -19689,6 +19827,14 @@ Esta historia clínica debe conservarse mínimo 20 años.
                   <Cloud className="w-3 h-3" />
                 )}
                 {" Guardar en Nube"}
+              </button>
+              <button
+                onClick={handleDiagnosticoNube}
+                disabled={diagnosticoCargando}
+                title="Diagnóstico y recuperación de datos desde Supabase"
+                className="text-xs flex items-center bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg border border-amber-200 font-bold hover:bg-amber-100 gap-1"
+              >
+                {diagnosticoCargando ? <Loader2 className="w-3 h-3 animate-spin" /> : "🔍"} Nube
               </button>
               <input
                 type="file"
@@ -51016,6 +51162,87 @@ body{padding-top:52px;}
         />
       )}
       {/* ── MODAL REPORTE DE GUARDADO EN NUBE ── */}
+      {/* ── MODAL DIAGNÓSTICO Y RECUPERACIÓN DE DATOS NUBE ── */}
+      {showDiagnostico && (
+        <div className="fixed inset-0 bg-black/70 z-[9999] flex items-center justify-center p-4" onClick={() => setShowDiagnostico(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-black text-gray-900 text-base">🔍 Diagnóstico de Nube</h2>
+                <p className="text-[11px] text-gray-400">Escaneo de datos en Supabase</p>
+              </div>
+              <button onClick={() => setShowDiagnostico(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            </div>
+            {diagnosticoCargando && (
+              <div className="flex items-center gap-2 text-amber-700 bg-amber-50 rounded-xl p-4">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span className="text-sm font-semibold">Escaneando Supabase...</span>
+              </div>
+            )}
+            {diagnosticoData?.error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 font-semibold">
+                ❌ {diagnosticoData.error}
+              </div>
+            )}
+            {diagnosticoData && !diagnosticoData.error && !diagnosticoCargando && (
+              <>
+                <div className="bg-gray-50 rounded-xl p-3 mb-4 text-xs text-gray-600">
+                  <span className="font-bold">Total de claves en Supabase:</span> {diagnosticoData.totalKeys} | <span className="font-bold">Usuario:</span> {diagnosticoData.uid}
+                </div>
+                <p className="text-xs font-black text-gray-700 uppercase tracking-wider mb-2">Claves principales</p>
+                <div className="space-y-1.5 mb-4">
+                  {Object.entries(diagnosticoData.details).map(([key, info]) => (
+                    <div key={key} className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold border ${info.found && info.count > 0 ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-red-50 border-red-200 text-red-700"}`}>
+                      <div>
+                        <span className="font-mono">{key}</span>
+                        {info.sample && <span className="ml-2 text-[10px] opacity-70">→ "{info.sample}"</span>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>{info.found ? `✅ ${info.count} registros` : "❌ Vacío / No existe"}</span>
+                        {info.found && info.count > 0 && (key.includes("patient") || key.includes("compan")) && (
+                          <button onClick={() => handleRestaurarDesdeKey(key)} className="bg-emerald-600 text-white px-2 py-0.5 rounded-md text-[10px] font-bold hover:bg-emerald-700">
+                            Restaurar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {(diagnosticoData.extraPatKeys.length > 0 || diagnosticoData.extraCompKeys.length > 0) && (
+                  <>
+                    <p className="text-xs font-black text-amber-700 uppercase tracking-wider mb-2">Claves adicionales encontradas</p>
+                    <div className="space-y-1.5 mb-4">
+                      {[...diagnosticoData.extraPatKeys, ...diagnosticoData.extraCompKeys].map(info => (
+                        <div key={info.key} className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold border ${info.count > 0 ? "bg-blue-50 border-blue-200 text-blue-800" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
+                          <span className="font-mono">{info.key}</span>
+                          <div className="flex items-center gap-2">
+                            <span>{info.count > 0 ? `✅ ${info.count} registros` : "vacío"}</span>
+                            {info.count > 0 && (
+                              <button onClick={() => handleRestaurarDesdeKey(info.key)} className="bg-blue-600 text-white px-2 py-0.5 rounded-md text-[10px] font-bold hover:bg-blue-700">
+                                Restaurar
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {Object.values(diagnosticoData.details).every(d => !d.found || d.count === 0) && diagnosticoData.extraPatKeys.filter(k => k.count > 0).length === 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 mb-4">
+                    <p className="font-black mb-1">⚠️ No se encontraron datos en Supabase</p>
+                    <p className="text-xs">Los datos pueden haberse perdido si se guardó una lista vacía anteriormente. Si tiene un archivo de respaldo (BACKUP_*.json), puede importarlo usando el botón "Importar Backup" en Configuración.</p>
+                  </div>
+                )}
+                <button onClick={() => setShowDiagnostico(false)} className="w-full bg-gray-800 text-white py-2.5 rounded-xl font-black text-sm hover:bg-gray-900">
+                  Cerrar
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {showSyncReport && syncReport && (
         <div
           className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4"
