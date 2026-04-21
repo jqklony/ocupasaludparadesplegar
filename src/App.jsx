@@ -14761,6 +14761,8 @@ function AppInner() {
     emitidaPor: "organizacion", // FASE 2: 'organizacion' | 'medico_independiente'
   });
   const [savedBillsList, setSavedBillsList] = useState([]);
+  const [showSavedBills, setShowSavedBills] = useState(false); // Panel cuentas guardadas
+  const [editingBillId, setEditingBillId] = useState(null);    // ID de cuenta en edición
   // ── B-F1-03 Portafolio de servicios ──────────────────────────────────
   const [portafolioItems, setPortafolioItems] = useState(() => {
     try {
@@ -29766,7 +29768,16 @@ Esta historia clínica debe conservarse mínimo 20 años.
           <div className="bg-white shadow rounded-2xl p-6 mb-6 no-print">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-black text-orange-800 flex items-center gap-2">
-                <Receipt className="w-5 h-5" /> Cuentas de Cobro
+                <Receipt className="w-5 h-5" />
+                {editingBillId ? (
+                  <span className="flex items-center gap-2">
+                    Cuentas de Cobro
+                    <span className="bg-orange-100 text-orange-700 text-xs font-black px-2 py-0.5 rounded-full border border-orange-300">
+                      ✏️ Editando No.{String(savedBillsList.find(b=>b.id===editingBillId)?.number||"?").padStart(3,"0")}
+                    </span>
+                    <button onClick={() => { setEditingBillId(null); }} className="text-xs text-gray-400 hover:text-gray-600 font-bold underline">Cancelar edición</button>
+                  </span>
+                ) : "Cuentas de Cobro"}
               </h2>
               <div className="flex gap-2">
                 <button
@@ -29781,45 +29792,59 @@ Esta historia clínica debe conservarse mínimo 20 años.
                       showAlert("Seleccione cliente.");
                       return;
                     }
-                    const nb = {
-                      ...billData,
-                      id: "bill_" + Date.now(),
-                      savedAt: new Date().toISOString(),
-                      pagada: false,
-                    };
-                    const upd = [...savedBillsList, nb];
-                    setSavedBillsList(upd);
-                    {
-                      const _bSuf = currentUser?.empresaId
-                        ? "empresa_" + currentUser.empresaId
-                        : currentUser?.user || "shared";
+                    const _bSuf = currentUser?.empresaId
+                      ? "empresa_" + currentUser.empresaId
+                      : currentUser?.user || "shared";
+                    if (editingBillId) {
+                      // ── MODO EDICIÓN: actualizar la cuenta existente ──
+                      const upd = savedBillsList.map(b =>
+                        b.id === editingBillId
+                          ? { ...b, ...billData, editadoEn: new Date().toISOString() }
+                          : b
+                      );
+                      setSavedBillsList(upd);
                       _sync(`siso_saved_bills_${_bSuf}`, JSON.stringify(upd));
-                    }
-                    if (volverAEnvioIntegral) {
-                      showAlert("✅ Cuenta de cobro guardada.\n\nVolviendo al panel de envío integral...");
-                      setTimeout(() => {
-                        setEnvioIntegralEmpresa({ empresaId: volverAEnvioIntegral.empresaId, empresaNombre: volverAEnvioIntegral.empresaNombre, totalPacientes: 0, periodo: "", precioPaciente: "35000", empresaNit: "" });
-                        setShowEnvioIntegral(true);
-                        setVolverAEnvioIntegral(null);
-                        goTo("reporte");
-                      }, 1000);
+                      setEditingBillId(null);
+                      showAlert("✅ Cuenta de cobro actualizada correctamente.");
                     } else {
-                      showAlert("✅ Cuenta de cobro guardada.\nPuede verla en Módulo Financiero → 💳 Cuentas");
+                      // ── MODO NUEVO: crear nueva cuenta ──
+                      const nb = {
+                        ...billData,
+                        id: "bill_" + Date.now(),
+                        savedAt: new Date().toISOString(),
+                        pagada: false,
+                      };
+                      const upd = [...savedBillsList, nb];
+                      setSavedBillsList(upd);
+                      _sync(`siso_saved_bills_${_bSuf}`, JSON.stringify(upd));
+                      if (volverAEnvioIntegral) {
+                        showAlert("✅ Cuenta de cobro guardada.\n\nVolviendo al panel de envío integral...");
+                        setTimeout(() => {
+                          setEnvioIntegralEmpresa({ empresaId: volverAEnvioIntegral.empresaId, empresaNombre: volverAEnvioIntegral.empresaNombre, totalPacientes: 0, periodo: "", precioPaciente: "35000", empresaNit: "" });
+                          setShowEnvioIntegral(true);
+                          setVolverAEnvioIntegral(null);
+                          goTo("reporte");
+                        }, 1000);
+                      } else {
+                        showAlert("✅ Cuenta de cobro guardada.\nPuedes verla en 📋 Guardadas.");
+                      }
                     }
                   }}
-                  className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 hover:bg-emerald-700"
+                  className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition ${editingBillId ? "bg-orange-600 hover:bg-orange-700 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"}`}
                 >
-                  <Save className="w-4 h-4" /> Guardar
+                  <Save className="w-4 h-4" />
+                  {editingBillId ? "💾 Guardar cambios" : "Guardar"}
                 </button>
                 <button
-                  onClick={() => {
-                    goTo("caja");
-                    setTimeout(() => setCajaTab("facturacion"), 100);
-                  }}
-                  className="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 hover:bg-blue-800"
+                  onClick={() => setShowSavedBills(v => !v)}
+                  className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 transition ${showSavedBills ? "bg-blue-800 text-white" : "bg-blue-700 text-white hover:bg-blue-800"}`}
                 >
-                  💳 Ver cuentas (
-                  {savedBillsList.filter((b) => !b.pagada).length} pend.)
+                  📋 Guardadas ({savedBillsList.length})
+                  {savedBillsList.filter(b => !b.pagada).length > 0 && (
+                    <span className="bg-yellow-400 text-yellow-900 text-[10px] font-black px-1.5 py-0.5 rounded-full ml-1">
+                      {savedBillsList.filter(b => !b.pagada).length} pend.
+                    </span>
+                  )}
                 </button>
                 <button
                   onClick={() => handlePrint("Cuenta-de-Cobro")}
@@ -30102,6 +30127,153 @@ Esta historia clínica debe conservarse mínimo 20 años.
               />
             </div>
           </div>
+
+          {/* ══ PANEL: CUENTAS DE COBRO GUARDADAS ══════════════════════════════════ */}
+          {showSavedBills && (
+            <div className="no-print bg-white rounded-2xl shadow-lg border border-blue-200 mb-6 overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-700 to-blue-600 px-5 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-white font-black text-sm flex items-center gap-2">
+                    📋 Cuentas de Cobro Guardadas
+                    <span className="bg-white/20 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+                      {savedBillsList.length} total · {savedBillsList.filter(b=>!b.pagada).length} pendientes
+                    </span>
+                  </p>
+                  <p className="text-blue-200 text-[10px] mt-0.5">Haz clic en ✏️ Editar para cargar la cuenta en el editor</p>
+                </div>
+                <button onClick={() => setShowSavedBills(false)} className="text-blue-200 hover:text-white font-black text-lg">✕</button>
+              </div>
+
+              {savedBillsList.length === 0 ? (
+                <div className="p-8 text-center text-gray-400 text-sm italic">
+                  No hay cuentas guardadas aún. Crea y guarda tu primera cuenta de cobro.
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100 max-h-[520px] overflow-y-auto">
+                  {[...savedBillsList].reverse().map((bill) => {
+                    const isEditing = editingBillId === bill.id;
+                    const monto = Number(bill.amount || 0);
+                    const fecha = bill.date || bill.savedAt?.split("T")[0] || "";
+                    const _bSuf = currentUser?.empresaId ? "empresa_" + currentUser.empresaId : currentUser?.user || "shared";
+                    return (
+                      <div key={bill.id} className={`p-4 flex items-center gap-4 hover:bg-blue-50 transition ${isEditing ? "bg-blue-50 border-l-4 border-blue-500" : ""}`}>
+                        {/* Estado */}
+                        <div className="flex-shrink-0 text-center w-14">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black ${bill.pagada ? "bg-emerald-100 text-emerald-700" : "bg-yellow-100 text-yellow-700"}`}>
+                            {bill.pagada ? "✅ Cobrada" : "⏳ Pendiente"}
+                          </span>
+                        </div>
+                        {/* Número */}
+                        <div className="flex-shrink-0 w-14 text-center">
+                          <p className="text-xs font-black text-gray-500">No.</p>
+                          <p className="text-sm font-black text-blue-700">{String(bill.number || "0").padStart(3,"0")}</p>
+                        </div>
+                        {/* Info principal */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-black text-sm text-gray-800 truncate">{bill.clientName || "Sin cliente"}</p>
+                          <p className="text-[11px] text-gray-500">NIT: {bill.clientNit || "—"} · {fecha}</p>
+                          {bill.concept && <p className="text-[10px] text-gray-400 truncate">{bill.concept}</p>}
+                        </div>
+                        {/* Monto */}
+                        <div className="flex-shrink-0 text-right w-28">
+                          <p className="text-base font-black text-emerald-700">${monto.toLocaleString("es-CO")}</p>
+                          {bill.pagada && bill.fechaPago && <p className="text-[10px] text-gray-400">Pagada: {bill.fechaPago}</p>}
+                        </div>
+                        {/* Acciones */}
+                        <div className="flex-shrink-0 flex gap-1.5">
+                          {/* EDITAR — carga la cuenta en el editor */}
+                          <button
+                            title="Editar esta cuenta en el documento"
+                            onClick={() => {
+                              setBillData({
+                                number: bill.number || "01",
+                                type: bill.type || "empresa",
+                                companyId: bill.companyId || "",
+                                clientName: bill.clientName || "",
+                                clientNit: bill.clientNit || "",
+                                medicoId: bill.medicoId || "",
+                                tipoServicio: bill.tipoServicio || "ingreso",
+                                date: bill.date || new Date().toISOString().split("T")[0],
+                                amount: bill.amount || "",
+                                amountWords: bill.amountWords || "",
+                                concept: bill.concept || "",
+                                bankName: bill.bankName || "",
+                                accountType: bill.accountType || "",
+                                accountNumber: bill.accountNumber || "",
+                                totalPacientes: bill.totalPacientes || 0,
+                                precioPaciente: bill.precioPaciente || 0,
+                                billDoctorId: bill.billDoctorId || "",
+                                emitidaPor: bill.emitidaPor || "organizacion",
+                              });
+                              setEditingBillId(bill.id);
+                              setShowSavedBills(false);
+                              // Scroll suave al editor
+                              setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 100);
+                              showAlert("✏️ Cuenta No." + String(bill.number||"0").padStart(3,"0") + " cargada en el editor.\n\nModifica los campos y presiona 💾 Guardar cambios para actualizar.");
+                            }}
+                            className="px-3 py-1.5 bg-blue-600 text-white text-[10px] font-black rounded-lg hover:bg-blue-700 transition flex items-center gap-1"
+                          >✏️ Editar</button>
+                          {/* VER — imprimir */}
+                          <button
+                            title="Vista de impresión"
+                            onClick={() => {
+                              setBillData({
+                                number: bill.number || "01",
+                                type: bill.type || "empresa",
+                                companyId: bill.companyId || "",
+                                clientName: bill.clientName || "",
+                                clientNit: bill.clientNit || "",
+                                medicoId: bill.medicoId || "",
+                                tipoServicio: bill.tipoServicio || "ingreso",
+                                date: bill.date || new Date().toISOString().split("T")[0],
+                                amount: bill.amount || "",
+                                amountWords: bill.amountWords || "",
+                                concept: bill.concept || "",
+                                bankName: bill.bankName || "",
+                                accountType: bill.accountType || "",
+                                accountNumber: bill.accountNumber || "",
+                                totalPacientes: bill.totalPacientes || 0,
+                                precioPaciente: bill.precioPaciente || 0,
+                                billDoctorId: bill.billDoctorId || "",
+                                emitidaPor: bill.emitidaPor || "organizacion",
+                              });
+                              setShowSavedBills(false);
+                              setTimeout(() => handlePrint("Cuenta-de-Cobro"), 300);
+                            }}
+                            className="px-3 py-1.5 bg-gray-600 text-white text-[10px] font-black rounded-lg hover:bg-gray-700 transition flex items-center gap-1"
+                          >🖨️</button>
+                          {/* MARCAR PAGADA */}
+                          {!bill.pagada && (
+                            <button
+                              title="Marcar como pagada"
+                              onClick={() => {
+                                const updated = savedBillsList.map(b => b.id===bill.id ? {...b, pagada:true, fechaPago: new Date().toISOString().split("T")[0]} : b);
+                                setSavedBillsList(updated);
+                                _sync(`siso_saved_bills_${_bSuf}`, JSON.stringify(updated));
+                              }}
+                              className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-black rounded-lg hover:bg-emerald-700 transition"
+                            >✅</button>
+                          )}
+                          {/* ELIMINAR */}
+                          <button
+                            title="Eliminar cuenta"
+                            onClick={() => {
+                              if (!window.confirm(`¿Eliminar cuenta No.${String(bill.number||"0").padStart(3,"0")} de ${bill.clientName}?`)) return;
+                              const updated = savedBillsList.filter(b => b.id !== bill.id);
+                              setSavedBillsList(updated);
+                              _sync(`siso_saved_bills_${_bSuf}`, JSON.stringify(updated));
+                              if (editingBillId === bill.id) setEditingBillId(null);
+                            }}
+                            className="px-3 py-1.5 bg-red-50 text-red-600 text-[10px] font-black rounded-lg hover:bg-red-100 transition"
+                          >🗑️</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           <style>{`
           .doc-editable [contenteditable]:hover { outline: 2px dashed #3b82f6; outline-offset:2px; border-radius:3px; cursor:text; }
