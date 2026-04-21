@@ -18768,35 +18768,36 @@ Esta historia clínica debe conservarse mínimo 20 años.
     const isBill = title === "Cuenta-de-Cobro";
     const printStyle = document.createElement('style');
     printStyle.textContent = isBill ? `
-      /* ══ CSS CUENTA DE COBRO ══ */
+      /* ══ CSS CUENTA DE COBRO — PRINT FIEL A PANTALLA ══ */
       @media print {
-        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
-        @page { size: letter portrait; margin: 0; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; box-sizing: border-box !important; }
 
-        /* Ocultar todo lo que no es el documento */
+        /* Márgenes de página: 0.4cm evita que el browser escale por márgenes físicos de impresora */
+        @page { size: letter portrait; margin: 0.4cm; }
+
+        /* Ocultar controles */
         nav, .no-print, .bill-fmt-toolbar, [class*="no-print"] { display: none !important; }
 
-        /* Quitar padding/margin del contenedor de página */
-        body { margin: 0 !important; padding: 0 !important; background: white !important; }
-        .min-h-screen { min-height: unset !important; background: white !important; padding: 0 !important; }
-        .max-w-4xl { max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+        /* Contenedores: eliminar todo espacio extra */
+        html, body { margin: 0 !important; padding: 0 !important; background: white !important; font-size: 16px !important; }
+        .min-h-screen { min-height: unset !important; background: white !important; padding: 0 !important; margin: 0 !important; }
+        .max-w-4xl { max-width: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
+        .doc-editable { margin: 0 !important; padding: 0 !important; }
 
-        /* El documento: exactamente igual que en pantalla */
+        /* El documento: ocupa todo el ancho disponible dentro de los márgenes de página */
         .carta-visual {
-          width: 21.59cm !important;
+          width: 100% !important;
           min-height: unset !important;
-          padding: 2.5cm !important;
-          margin: 0 auto !important;
+          padding: 1.8cm !important;
+          margin: 0 !important;
           box-shadow: none !important;
           border-radius: 0 !important;
           background: white !important;
         }
 
-        /* Preservar grids exactos del documento */
+        /* Preservar grids exactos */
         .carta-visual .grid { display: grid !important; }
-        .carta-visual .grid-cols-2 {
-          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        }
+        .carta-visual .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 
         /* Preservar flex */
         .carta-visual .flex { display: flex !important; }
@@ -18804,6 +18805,9 @@ Esta historia clínica debe conservarse mínimo 20 años.
         .carta-visual .items-center { align-items: center !important; }
         .carta-visual .items-start { align-items: flex-start !important; }
         .carta-visual .items-end { align-items: flex-end !important; }
+        .carta-visual .w-1\\/2 { width: 50% !important; }
+        .carta-visual .w-2\\/5 { width: 40% !important; }
+        .carta-visual .w-3\\/5 { width: 60% !important; }
 
         /* Colores exactos */
         .bg-emerald-600 { background-color: #059669 !important; }
@@ -18817,6 +18821,23 @@ Esta historia clínica debe conservarse mínimo 20 años.
         .rounded-t-xl { border-radius: 0.75rem 0.75rem 0 0 !important; }
         .rounded-b-xl { border-radius: 0 0 0.75rem 0.75rem !important; }
         .rounded-l { border-radius: 0.25rem 0 0 0.25rem !important; }
+
+        /* Texto "Bajo juramento": tamaño en pt (unidad absoluta independiente de DPI) */
+        .bill-juramento-text {
+          font-size: 13.5pt !important;
+          font-weight: 700 !important;
+          color: #111 !important;
+          line-height: 1.4 !important;
+          text-align: right !important;
+        }
+
+        /* Tamaños de texto del documento en pt para consistencia de impresión */
+        .text-3xl { font-size: 22pt !important; }
+        .text-2xl { font-size: 18pt !important; }
+        .text-xl  { font-size: 15pt !important; }
+        .text-lg  { font-size: 12pt !important; }
+        .text-sm  { font-size: 9pt !important; }
+        .text-xs  { font-size: 8pt !important; }
 
         /* Eliminar outline de campos editables */
         [contenteditable] { outline: none !important; background: transparent !important; border: none !important; box-shadow: none !important; }
@@ -30605,6 +30626,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     contentEditable
                     suppressContentEditableWarning
                     data-placeholder="Nota legal"
+                    className="bill-juramento-text"
                     style={{ fontSize: "18px", color: "#111", fontWeight: 700, lineHeight: 1.4 }}
                   >
                     Bajo juramento : Me acojo al Art. 383 E.T. Tarifa mínima 0%. No practicar retención.
