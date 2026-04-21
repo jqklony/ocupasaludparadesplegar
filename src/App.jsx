@@ -15913,6 +15913,17 @@ function AppInner() {
         const _customMeds = sp("siso_custom_meds", null);
         if (_customMeds?.length)
           tasks.push(_sbSet("siso_custom_meds", _customMeds));
+        // ── Encuestas sociodemográficas (lista + respuestas individuales) ─────────
+        if (encuestas?.length) {
+          tasks.push(_sbSet(`siso_encuestas_${_u}`, encuestas));
+          // También respaldar respuestas de cada encuesta que esté en estado activa
+          encuestas.forEach(enc => {
+            if (enc?.token) {
+              const _resp = sp(`siso_encuesta_resp_${enc.token}`, null);
+              if (_resp?.length) tasks.push(_sbSet(`siso_encuesta_resp_${enc.token}`, _resp));
+            }
+          });
+        }
         // ── API keys ─────────────────────────────────────────────────────────────
         const currentKeys = sps("siso_ai_keys", aiConfig.keys || {});
         if (currentUser?.user)
@@ -15943,6 +15954,7 @@ function AppInner() {
     arlGuardados,
     teleconsultas,
     habeasRequests,
+    encuestas,
   ]);
   // ── PERSISTENCIA DE SESIÓN: guarda estado completo en localStorage ────────
   useEffect(() => {
