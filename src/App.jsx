@@ -15482,6 +15482,20 @@ function AppInner() {
               setAiConfig(prev => ({ ...prev, activeProvider: prov.activeProvider || prev.activeProvider }));
               _ls.setItem("siso_ai_config_provider", JSON.stringify(prov));
             }
+            // ── Restaurar pacientes y empresas del usuario activo (arranque fresco) ──
+            if (sessionUser) {
+              const _initPats = cloud?.["siso_patients_" + sessionUser]?.value
+                || cloud?.["siso_db_patients_" + sessionUser]?.value;
+              if (Array.isArray(_initPats) && _initPats.length > 0) {
+                setPatientsList(_initPats);
+                _ls.setItem(_patKey(sessionUser), JSON.stringify(_initPats));
+              }
+              const _initComps = cloud?.["siso_companies_" + sessionUser]?.value;
+              if (Array.isArray(_initComps) && _initComps.length > 0) {
+                setCompanies(_initComps);
+                _ls.setItem(_compKey(sessionUser), JSON.stringify(_initComps));
+              }
+            }
             console.log("[SISO] ✅ Usuarios y datos restaurados desde Supabase:", cloudUsers.length);
           } else {
             setUsersList(initialUsers);
@@ -16813,7 +16827,11 @@ const handleLogin = (u, p) => {
         _sbGetAll().then((cloud) => {
           if (!cloud) return;
           // Pacientes del usuario específico (o empresa compartida)
-          const cloudPats = cloud?.[userPatKeyCloud]?.value;
+          // Buscar en ambas claves posibles: cloud key y db key (compatibilidad)
+          const cloudPats = cloud?.[userPatKeyCloud]?.value
+            || cloud?.[userPatKey]?.value
+            || cloud?.["siso_db_patients_" + _storageUserId]?.value
+            || cloud?.["siso_patients_" + _storageUserId]?.value;
           const currentLocalPats = sp(userPatKey, []);
           if (
             Array.isArray(cloudPats) &&
@@ -16821,9 +16839,12 @@ const handleLogin = (u, p) => {
           ) {
             setPatientsList(cloudPats);
             _ls.setItem(userPatKey, JSON.stringify(cloudPats));
+            // Sincronizar también a la clave cloud para unificar en próximas cargas
+            if (!cloud?.[userPatKeyCloud]?.value) _sbSet(userPatKeyCloud, cloudPats);
           }
           // Empresas del usuario específico (o empresa compartida)
-          const cloudComps = cloud?.[userCompKeyCloud]?.value;
+          const cloudComps = cloud?.[userCompKeyCloud]?.value
+            || cloud?.["siso_companies_" + _storageUserId]?.value;
           if (
             Array.isArray(cloudComps) &&
             cloudComps.length >= localComps.length
