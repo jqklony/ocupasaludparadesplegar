@@ -15812,30 +15812,35 @@ function AppInner() {
           ? "empresa_" + currentUser.empresaId
           : currentUser?.user || "shared";
         // GUARD: solo guardar pacientes/empresas si tenemos datos reales
-        const _patToSave = patientsList.length > 0 ? patientsList : null;
-        const _compToSave = companies.length > 0 ? companies : null;
+        const _patToSave   = patientsList.length > 0 ? patientsList : null;
+        const _compToSave  = companies.length   > 0 ? companies    : null;
+        const _u           = currentUser?.user  || "shared";
         const tasks = [
-          ...(_patToSave ? [_sbSet(_patKeyCloud(currentUser?.user || "shared"), _patToSave)] : []),
-          ...(_compToSave ? [_sbSet(_compKeyCloud(currentUser?.user || "shared"), _compToSave)] : []),
-          _sbSet("siso_users", usersList),
-          _sbSet(`siso_saved_bills_${_asSuf}`, savedBillsList),
-          _sbSet("siso_saved_reports", savedReports),
-          _sbSet("siso_audit_log", auditLog),
-          _sbSet("siso_mensajes", mensajes),
-          _sbSet(`siso_agendados_${_asSuf}`, agendados),
-          _sbSet(`siso_atenciones_${_asSuf}`, atencionesCerradas),
-          _sbSet("siso_ai_config_provider", {
-            activeProvider: aiConfig.activeProvider,
-          }),
+          // ── DOBLE ESCRITURA: clave primaria + clave de respaldo (nunca se pierden) ──
+          ...(_patToSave  ? [
+            _sbSet(_patKeyCloud(_u), _patToSave),   // siso_patients_drcucalon   (primaria)
+            _sbSet(_patKey(_u),      _patToSave),   // siso_db_patients_drcucalon (respaldo)
+          ] : []),
+          ...(_compToSave ? [
+            _sbSet(_compKeyCloud(_u), _compToSave), // siso_companies_drcucalon  (primaria)
+            _sbSet("siso_companies_shared", _compToSave), // respaldo compartido
+          ] : []),
+          // ── Datos operativos ──────────────────────────────────────────────────────
+          _sbSet("siso_users",                            usersList),
+          _sbSet(`siso_saved_bills_${_asSuf}`,            savedBillsList),
+          _sbSet("siso_saved_reports",                    savedReports),
+          _sbSet("siso_audit_log",                        auditLog),
+          _sbSet("siso_mensajes",                         mensajes),
+          _sbSet(`siso_agendados_${_asSuf}`,              agendados),
+          _sbSet(`siso_atenciones_${_asSuf}`,             atencionesCerradas),
+          _sbSet("siso_ai_config_provider", { activeProvider: aiConfig.activeProvider }),
         ];
+        // ── Firma y datos del médico ──────────────────────────────────────────────
         if (doctorSignature)
           tasks.push(_sbSet("siso_doctor_signature", doctorSignature));
-        // FIX: Guardar doctorData del usuario actual como clave dedicada
-        if (currentUser?.doctorData && currentUser?.user) {
+        if (currentUser?.doctorData && currentUser?.user)
           tasks.push(_sbSet(`siso_doctor_data_${currentUser.user}`, currentUser.doctorData));
-        }
-        // Bloque 3: módulos que antes solo vivían en localStorage
-        const _u = currentUser?.user || "shared";
+        // ── Módulos adicionales (guardar siempre aunque estén vacíos para marcar timestamp) ──
         if (cajaMovimientos?.length)
           tasks.push(_sbSet(`siso_caja_movs_${_u}`, cajaMovimientos));
         if (arlGuardados?.length)
@@ -15844,7 +15849,20 @@ function AppInner() {
           tasks.push(_sbSet(`siso_teleconsultas_${_u}`, teleconsultas));
         if (habeasRequests?.length)
           tasks.push(_sbSet(`siso_habeas_${_u}`, habeasRequests));
-        // API keys del usuario actual
+        // ── Módulos que faltaban en el sync anterior ─────────────────────────────
+        const _cartasCustodia = sp("siso_cartas_custodia", null);
+        if (_cartasCustodia?.length)
+          tasks.push(_sbSet("siso_cartas_custodia", _cartasCustodia));
+        const _cotizaciones = sp("siso_cotizaciones", null);
+        if (_cotizaciones?.length)
+          tasks.push(_sbSet("siso_cotizaciones", _cotizaciones));
+        const _informesMedico = sp(`siso_informes_${_u}`, null);
+        if (_informesMedico?.length)
+          tasks.push(_sbSet(`siso_informes_${_u}`, _informesMedico));
+        const _customMeds = sp("siso_custom_meds", null);
+        if (_customMeds?.length)
+          tasks.push(_sbSet("siso_custom_meds", _customMeds));
+        // ── API keys ─────────────────────────────────────────────────────────────
         const currentKeys = sps("siso_ai_keys", aiConfig.keys || {});
         if (currentUser?.user)
           tasks.push(_sbSet(`siso_ai_keys_${currentUser.user}`, currentKeys));
@@ -17117,6 +17135,15 @@ const handleLogin = (u, p) => {
           goTo("changePassword");
         } else {
           goTo("dashboard");
+          // AUTO-BACKUP: descargar copia de seguridad automática al iniciar sesión
+          setTimeout(() => {
+            try {
+              handleExportData();
+              console.log("[SISO] Auto-backup de sesión descargado correctamente.");
+            } catch(e) {
+              console.warn("[SISO] Auto-backup de sesión falló:", e);
+            }
+          }, 3500);
         }
       } else {
         // ══ B-05: Rate limiting mejorado - 15 min, persistente, con audit log ══
