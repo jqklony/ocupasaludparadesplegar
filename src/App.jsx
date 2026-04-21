@@ -30029,8 +30029,84 @@ Esta historia clínica debe conservarse mínimo 20 años.
           .doc-editable [contenteditable]:hover { outline: 2px dashed #3b82f6; outline-offset:2px; border-radius:3px; cursor:text; }
           .doc-editable [contenteditable]:focus { outline: 2px solid #2563eb; outline-offset:2px; border-radius:3px; background:#eff6ff; }
           .doc-editable [contenteditable]:empty:before { content: attr(data-placeholder); color: #9ca3af; font-style: italic; }
-          @media print { .doc-editable [contenteditable] { outline:none !important; background:transparent !important; } }
+          .bill-resizable-field { resize: vertical; overflow: auto; min-height: 3em; display: block; width: 100%; box-sizing: border-box; }
+          @media print { .doc-editable [contenteditable] { outline:none !important; background:transparent !important; } .bill-fmt-toolbar { display:none !important; } }
         `}</style>
+
+          {/* ── Barra de formato de texto – no se imprime ── */}
+          <div className="bill-fmt-toolbar no-print mb-3 flex flex-wrap items-center gap-3 p-3 bg-slate-100 rounded-xl border border-slate-200">
+            <span className="text-xs font-black text-slate-700 flex items-center gap-1">✏️ Formato del campo activo:</span>
+            {/* Botones A- / A+ : onMouseDown+preventDefault mantiene el foco en el contentEditable */}
+            <div className="flex items-center gap-1">
+              <button
+                title="Reducir tamaño de letra"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  const el = document.querySelector('.doc-editable [contenteditable]:focus');
+                  if (el) {
+                    const curr = parseFloat(window.getComputedStyle(el).fontSize) || 13;
+                    el.style.fontSize = Math.max(7, curr - 1) + 'px';
+                  }
+                }}
+                className="w-8 h-8 bg-white border border-slate-300 rounded-lg font-bold text-sm hover:bg-red-50 hover:border-red-300 transition flex items-center justify-center select-none"
+              >A-</button>
+              <button
+                title="Aumentar tamaño de letra"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  const el = document.querySelector('.doc-editable [contenteditable]:focus');
+                  if (el) {
+                    const curr = parseFloat(window.getComputedStyle(el).fontSize) || 13;
+                    el.style.fontSize = Math.min(72, curr + 1) + 'px';
+                  }
+                }}
+                className="w-8 h-8 bg-white border border-slate-300 rounded-lg font-bold text-sm hover:bg-green-50 hover:border-green-300 transition flex items-center justify-center select-none"
+              >A+</button>
+            </div>
+            {/* Tamaños predefinidos como botones (no blur el contentEditable) */}
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="text-[10px] font-bold text-slate-500 mr-1">Tamaño:</span>
+              {[8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32, 36].map(sz => (
+                <button
+                  key={sz}
+                  title={sz + 'px'}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    const el = document.querySelector('.doc-editable [contenteditable]:focus');
+                    if (el) el.style.fontSize = sz + 'px';
+                  }}
+                  className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono hover:bg-blue-50 hover:border-blue-400 transition select-none"
+                >{sz}</button>
+              ))}
+            </div>
+            <div className="border-l border-slate-300 pl-3 flex items-center gap-2">
+              {/* Negrita */}
+              <button
+                title="Negrita"
+                onMouseDown={(e) => { e.preventDefault(); document.execCommand('bold'); }}
+                className="w-8 h-8 bg-white border border-slate-300 rounded-lg font-black text-sm hover:bg-yellow-50 hover:border-yellow-400 transition flex items-center justify-center select-none"
+              >B</button>
+              {/* Cursiva */}
+              <button
+                title="Cursiva"
+                onMouseDown={(e) => { e.preventDefault(); document.execCommand('italic'); }}
+                className="w-8 h-8 bg-white border border-slate-300 rounded-lg italic text-sm hover:bg-yellow-50 hover:border-yellow-400 transition flex items-center justify-center select-none"
+              >I</button>
+              {/* Subrayado */}
+              <button
+                title="Subrayado"
+                onMouseDown={(e) => { e.preventDefault(); document.execCommand('underline'); }}
+                className="w-8 h-8 bg-white border border-slate-300 rounded-lg underline text-sm hover:bg-yellow-50 hover:border-yellow-400 transition flex items-center justify-center select-none"
+              >U</button>
+            </div>
+            <div className="border-l border-slate-300 pl-3 text-[10px] text-slate-500 leading-tight">
+              <p className="font-bold">💡 Cómo usar:</p>
+              <p>1. Haz clic en el campo a editar</p>
+              <p>2. Selecciona texto o deja sin selección para todo el campo</p>
+              <p>3. Elige el tamaño. El campo descripción es <strong>expandible ↕</strong></p>
+            </div>
+          </div>
+
           <div className="doc-editable">
             <div
               className="bg-white mx-auto shadow-2xl print:shadow-none carta-visual"
@@ -30110,16 +30186,18 @@ Esta historia clínica debe conservarse mínimo 20 años.
                   </span>
                   <span>Valor</span>
                 </div>
-                <div className="border border-emerald-600 rounded-b-xl p-5 flex justify-between items-center">
-                  <div className="w-3/4 pr-4">
-                    <p
+                <div className="border border-emerald-600 rounded-b-xl p-5 flex justify-between items-start gap-4">
+                  <div className="w-3/4 pr-2">
+                    <div
                       contentEditable
                       suppressContentEditableWarning
-                      className="text-sm font-medium text-gray-800 uppercase leading-relaxed"
+                      className="bill-resizable-field text-sm font-medium text-gray-800 uppercase leading-relaxed rounded border border-transparent hover:border-blue-200 focus:border-blue-400 p-1 transition"
                       data-placeholder="Descripción del servicio prestado..."
+                      style={{ minHeight: '4em' }}
                     >
                       {billData.concept}
-                    </p>
+                    </div>
+                    <p className="no-print text-[9px] text-slate-400 mt-0.5 text-right select-none">↕ arrastra el borde inferior para ampliar el campo</p>
                   </div>
                   <div className="w-1/4 text-right">
                     <p
