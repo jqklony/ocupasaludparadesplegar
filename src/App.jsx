@@ -14570,12 +14570,16 @@ function AppInner() {
     if (!emailConfig.emailjsConfigurado || !window.emailjs) return false;
     try {
       window.emailjs.init(emailConfig.emailjsPublicKey);
+      // NOTA: enviamos el texto plano como 'message' para que el template
+      // lo muestre correctamente sin importar si usa {{message}} o {{{message}}}.
+      // El htmlBody se envía en 'html_message' por si el template soporta HTML.
       await window.emailjs.send(emailConfig.emailjsServiceId, emailConfig.emailjsTemplateId, {
         to_email: to,
         from_name: emailConfig.nombre || activeDoctorData?.nombre || "OcupaSalud",
         from_email: emailConfig.email,
         subject: subject,
-        message: htmlBody || body,
+        message: body,           // ← siempre texto plano (nunca muestra HTML crudo)
+        html_message: htmlBody || body, // ← HTML para templates que lo soporten
         reply_to: emailConfig.email,
       });
       return true;
@@ -18761,67 +18765,97 @@ Esta historia clínica debe conservarse mínimo 20 años.
     }
   };
   const handlePrint = (title) => {
+    const isBill = title === "Cuenta-de-Cobro";
     const printStyle = document.createElement('style');
-    printStyle.textContent = `
+    printStyle.textContent = isBill ? `
+      /* ══ CSS EXCLUSIVO PARA CUENTA DE COBRO ══ */
+      @media print {
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+        @page { size: letter portrait; margin: 0.5cm; }
+        /* Ocultar TODO excepto el documento */
+        body > * { display: none !important; }
+        #root > * { display: none !important; }
+        /* Mostrar solo el contenedor principal de la cuenta */
+        #root .min-h-screen { display: block !important; }
+        nav, .no-print, .bill-fmt-toolbar, button, select, input, label,
+        [class*="no-print"], .bg-white.shadow.rounded-2xl { display: none !important; }
+        /* El documento imprimible: mantener exactamente como en pantalla */
+        .doc-editable { display: block !important; }
+        .carta-visual {
+          display: block !important;
+          width: 21cm !important;
+          min-height: auto !important;
+          margin: 0 auto !important;
+          padding: 2cm !important;
+          box-shadow: none !important;
+          border-radius: 0 !important;
+          background: white !important;
+          page-break-inside: avoid !important;
+        }
+        /* Preservar grid de 2 columnas (cliente/fecha, banco/acreedor) */
+        .carta-visual .grid-cols-2 {
+          display: grid !important;
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          gap: 1.5rem !important;
+        }
+        /* Preservar flex layouts */
+        .carta-visual .flex { display: flex !important; }
+        .carta-visual .justify-between { justify-content: space-between !important; }
+        .carta-visual .items-center { align-items: center !important; }
+        /* Preservar colores de cabecera */
+        .border-emerald-600 { border-color: #059669 !important; }
+        .bg-emerald-600 { background-color: #059669 !important; }
+        .text-white { color: #ffffff !important; }
+        .bg-blue-50 { background-color: #eff6ff !important; }
+        .bg-gray-50 { background-color: #f9fafb !important; }
+        /* Preservar fuentes y tamaños */
+        .text-3xl { font-size: 1.875rem !important; }
+        .text-2xl { font-size: 1.5rem !important; }
+        .text-lg { font-size: 1.125rem !important; }
+        .font-black { font-weight: 900 !important; }
+        /* Ocultar borde/outline de contenteditable */
+        [contenteditable] { outline: none !important; background: transparent !important; border: none !important; }
+        .bill-resizable-field { resize: none !important; }
+        /* Firma */
+        .carta-visual img { max-height: 80px !important; }
+        /* Nota legal al pie */
+        .text-\\[8px\\] { font-size: 8px !important; }
+      }
+    ` : `
       @media print {
         * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
         @page { size: letter portrait; margin: 0.8cm 1cm; }
         body { font-size: 9pt !important; line-height: 1.3 !important; }
-        /* Ocultar elementos de navegación */
         nav, .no-print, button:not(.print-keep), [class*="no-print"] { display: none !important; }
-        /* Tablas: colores exactos como en pantalla */
         table { border-collapse: collapse !important; width: 100% !important; page-break-inside: auto !important; font-size: 8pt !important; }
         thead { display: table-header-group !important; }
         tr { page-break-inside: avoid !important; }
         th { background-color: #1e293b !important; color: white !important; padding: 4px 6px !important; font-size: 8pt !important; border: 1px solid #374151 !important; }
         td { border: 1px solid #d1d5db !important; padding: 3px 6px !important; font-size: 8pt !important; }
         tr:nth-child(even) { background-color: #f8fafc !important; }
-        /* Gráficos y barras de estadísticas */
         [class*="bg-emerald"], [class*="bg-green"] { background-color: #059669 !important; }
         [class*="bg-blue"] { background-color: #2563eb !important; }
         [class*="bg-red"] { background-color: #dc2626 !important; }
         [class*="bg-amber"], [class*="bg-yellow"] { background-color: #d97706 !important; }
         [class*="bg-purple"] { background-color: #7c3aed !important; }
         [class*="bg-teal"] { background-color: #0d9488 !important; }
-        /* Texto de colores */
         [class*="text-emerald"], [class*="text-green"] { color: #059669 !important; }
         [class*="text-blue"] { color: #2563eb !important; }
         [class*="text-red"] { color: #dc2626 !important; }
-        /* Bordes y shadows */
-        [class*="border"] { border-color: #d1d5db !important; }
         [class*="shadow"] { box-shadow: none !important; }
-        [class*="rounded"] { border-radius: 0 !important; }
-        /* Evitar cortes solo en bloques pequeños */
         .print-section { page-break-inside: avoid !important; }
-        [class*="rounded-xl"], [class*="rounded-2xl"] { page-break-inside: auto !important; border-radius: 0 !important; }
-        /* PRINT-FIX: overflow visible globalmente para evitar cortes */
         * { overflow: visible !important; }
         [class*="overflow-x-auto"], [class*="overflow-auto"], [class*="overflow-y-auto"], [class*="overflow-hidden"] { overflow: visible !important; height: auto !important; }
         [class*="max-h-"] { max-height: none !important; }
-        [class*="max-w-"] { max-width: none !important; }
-        div { page-break-inside: auto !important; break-inside: auto !important; }
-        [data-report-content] * { overflow: visible !important; border-radius: 0 !important; }
-        [data-report-content] div { page-break-inside: auto !important; break-inside: auto !important; }
-        /* Ancho completo — todos los contenedores se expanden */
         .max-w-5xl, .max-w-4xl, .max-w-3xl, .max-w-2xl, .max-w-xl, .max-w-lg, .max-w-md,
         .container, [class*="max-w-"] { max-width: 100% !important; width: 100% !important; }
-        /* Padding lateral reducido para aprovechar el papel */
-        .px-4, .px-5, .px-6, .px-8 { padding-left: 0.3rem !important; padding-right: 0.3rem !important; }
-        .p-4, .p-5, .p-6, .p-8 { padding: 0.3rem !important; }
-        /* Grids: adaptarse al ancho del papel (solo en HC, no en reportes) */
         .carta-visual .grid { display: block !important; }
         .carta-visual .grid > * { margin-bottom: 0.5rem !important; }
         [data-report-content] .grid { display: grid !important; }
         [data-report-content] .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
         [data-report-content] .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
         [data-report-content] .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
-        /* Flexbox: no envolver para tablas */
-        .flex-wrap { flex-wrap: nowrap !important; }
-        /* Charts/barras de progreso: mantener proporciones */
-        [class*="h-2"], [class*="h-3"], [class*="h-4"] { height: auto !important; min-height: 8px !important; }
-        /* Gap reducido */
         .gap-4, .gap-6, .gap-8 { gap: 0.3rem !important; }
-        /* Asegurar que el contenido principal ocupa todo */
         #root { width: 100% !important; }
         main, [role="main"] { width: 100% !important; padding: 0 !important; margin: 0 !important; }
       }
@@ -50978,7 +51012,58 @@ body{padding-top:52px;}
                   // Enviar email
                   const codAccFinal = portalDocsData.codigoAcceso;
                   const subject = `Documentación Médica Ocupacional — ${emp.empresaNombre}`;
-                  const body = `Estimado/a encargado de SST,\n\n${emp.empresaNombre}\n\nSe adjunta la documentación completa:\n\n  📋 Informe Epidemiológico — ${emp.totalPacientes} trabajadores\n  📄 ${certCount} Certificados de Aptitud Laboral\n  💰 Cuenta de Cobro No. ${cuentaData?.number || "—"} — $${Number(cuentaData?.amount || 0).toLocaleString("es-CO")}\n  📁 Carta de Custodia de HC\n\n\nACCEDA A SUS DOCUMENTOS\n\nPortal de Certificados:\n${portalUrl}\n\n  1. Seleccione "🏢 Empresa"\n  2. Ingrese NIT: ${nitEmp}\n  3. Descargue todos los documentos\n\n  Código de acceso: ${codAccFinal}\n\n\nCordialmente,\n${docD.nombre || ""}\n${docD.titulo || ""}\n${docD.licencia ? "Lic: " + docD.licencia : ""}\n${docD.ciudad || ""}\n${docD.email || emailConfig?.email || ""}`;
+                  const _sep = "─".repeat(52);
+                  const body = [
+                    `Estimado/a encargado/a de Seguridad y Salud en el Trabajo`,
+                    `${emp.empresaNombre}`,
+                    ``,
+                    _sep,
+                    `ENTREGA DE DOCUMENTACIÓN MÉDICA OCUPACIONAL`,
+                    _sep,
+                    ``,
+                    `Le informamos que hemos completado la evaluación médica`,
+                    `ocupacional correspondiente a su empresa y ponemos a su`,
+                    `disposición la documentación completa:`,
+                    ``,
+                    `  • Informe Epidemiológico ............. ${emp.totalPacientes} trabajador(es)`,
+                    `  • Certificados de Aptitud Laboral .... ${certCount} certificado(s)`,
+                    `  • Cuenta de Cobro ................... No. ${String(cuentaData?.number||"0").padStart(3,"0")} — $${Number(cuentaData?.amount||0).toLocaleString("es-CO")}`,
+                    `  • Carta de Custodia de Historias ..... Incluida`,
+                    ``,
+                    _sep,
+                    `ACCESO AL PORTAL DE DOCUMENTOS`,
+                    _sep,
+                    ``,
+                    `  Link:   ${portalUrl}`,
+                    `  NIT:    ${nitEmp}`,
+                    `  Código: ${codAccFinal}`,
+                    ``,
+                    `Pasos para descargar:`,
+                    `  1. Abra el link del portal`,
+                    `  2. Haga clic en el botón verde "Empresa"`,
+                    `  3. Ingrese el NIT: ${nitEmp}`,
+                    `  4. Ingrese el código de acceso: ${codAccFinal}`,
+                    `  5. Descargue todos los documentos en PDF`,
+                    ``,
+                    `Cada trabajador también puede consultar su certificado`,
+                    `individualmente ingresando su número de cédula.`,
+                    ``,
+                    _sep,
+                    ``,
+                    `Cordialmente,`,
+                    ``,
+                    `${docD.nombre || ""}`,
+                    `${docD.titulo || "Médico Especialista en Salud Ocupacional"}`,
+                    docD.licencia ? `Licencia S.O.: ${docD.licencia}` : "",
+                    `Resolución de Médico Especialista en SST`,
+                    docD.ciudad ? `${docD.ciudad}` : "",
+                    `Cel: ${docD.celular || ""}`,
+                    `${docD.email || emailConfig?.email || ""}`,
+                    ``,
+                    _sep,
+                    `Res. 1843/2025 · Ley 1581/2012`,
+                    `La información es confidencial y de uso exclusivo del destinatario.`,
+                  ].filter(l => l !== undefined).join("\n");
                   const extraHTML = `<p style="font-size:12px;color:#065f46;font-weight:900;margin:0 0 10px;">📦 Documentación completa — ${emp.empresaNombre}</p><table style="width:100%;border-collapse:collapse;"><tbody><tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px;font-size:12px;">📋 Informe Epidemiológico</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">${emp.totalPacientes} trabajadores</td></tr><tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px;font-size:12px;">📄 Certificados</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">${certCount} certificados</td></tr><tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px;font-size:12px;">💰 Cuenta de Cobro</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">No. ${cuentaData?.number || "—"} · $${Number(cuentaData?.amount || 0).toLocaleString("es-CO")}</td></tr><tr><td style="padding:8px;font-size:12px;">📁 Carta de Custodia</td><td style="padding:8px;font-size:11px;color:#065f46;font-weight:700;">✅</td></tr></tbody></table><div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;margin-top:12px;text-align:center;"><p style="font-size:10px;color:#065f46;font-weight:700;margin:0;">🔑 Código de acceso empresarial</p><p style="font-size:18px;font-family:monospace;font-weight:900;color:#065f46;margin:4px 0 0;letter-spacing:2px;">${codAccFinal}</p></div>`;
                   const htmlBody = _generarEmailHTML("encargado de SST", nitEmp, portalUrl, extraHTML, true);
                   const emailEmp = comp?.emailContacto || comp?.email || "";
