@@ -50936,15 +50936,22 @@ body{padding-top:52px;}
                     <p className="text-[10px] text-gray-500">{hasCustodia ? "Guardada" : "No creada"}</p></div>
                   </div>
                   {!hasCustodia && <button onClick={() => {
-                    // Guardar carta de custodia pre-llenada con todos los datos del médico (para portal)
+                    // Parsear periodo "YYYY-MM" → mes (0-indexed) y año
+                    const _periodoStr = emp.periodo || new Date().toISOString().slice(0, 7);
+                    const [_pAnio, _pMes] = _periodoStr.split("-").map(Number);
                     const custodia = {
                       id: "inf_cust_" + Date.now(),
                       empresaId: emp.empresaId,
                       empresaNombre: emp.empresaNombre,
                       empresaNit: comp ? `${comp.nit}${comp.dv ? "-" + comp.dv : ""}` : emp.empresaNit,
                       tipo: "custodia",
-                      periodo: emp.periodo,
+                      periodo: _periodoStr,
+                      // Mes y año del periodo de valoración (mes 0-indexed para MONTHS_ES)
+                      mes: isNaN(_pMes) ? new Date().getMonth() : _pMes - 1,
+                      anio: isNaN(_pAnio) ? new Date().getFullYear() : _pAnio,
                       totalPacientes: emp.totalPacientes,
+                      certCount: certCount,
+                      ciudadDest: comp?.ciudad || "Ciudad",
                       medicoNombre: (activeDoctorData?.nombre || "JULIAN CUCALON").toUpperCase(),
                       medicoLicencia: activeDoctorData?.licencia || "14497-12-2019",
                       medicoCC: activeDoctorData?.cedula || activeDoctorData?.rut || "1061750704",
@@ -50957,6 +50964,11 @@ body{padding-top:52px;}
                       savedAt: new Date().toISOString(),
                     };
                     saveInforme(custodia);
+                    // Guardar también en clave dedicada siso_cartas_custodia en Supabase
+                    const _prevCartas = (() => { try { return JSON.parse(localStorage.getItem("siso_cartas_custodia") || "[]"); } catch { return []; } })();
+                    const _newCartas = [..._prevCartas.filter(c => !(c.empresaId === custodia.empresaId && c.periodo === custodia.periodo)), custodia];
+                    localStorage.setItem("siso_cartas_custodia", JSON.stringify(_newCartas));
+                    _sbSet("siso_cartas_custodia_" + (currentUser?.user || "shared"), _newCartas);
                     showAlert("✅ Carta de Custodia generada y guardada para " + emp.empresaNombre);
                   }} className="px-3 py-1 bg-amber-600 text-white text-[10px] font-black rounded-lg hover:bg-amber-700">Crear ahora →</button>}
                 </div>

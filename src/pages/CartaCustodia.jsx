@@ -175,6 +175,11 @@ export default function CartaCustodia({
   const [ciudadDest, setCiudadDest] = useState("Ciudad");
   const [saved, setSaved] = useState(false);
 
+  // Tab: "nueva" | "guardadas"
+  const [activeTab, setActiveTab] = useState("nueva");
+  // Carta que se está visualizando en el panel derecho (null = la del formulario)
+  const [previewCarta, setPreviewCarta] = useState(null);
+
   // Datos del médico
   const docNombre   = (activeDoctorData?.nombre   || "JULIAN CUCALON").toUpperCase();
   const docTitulo   = (activeDoctorData?.titulo    || "MEDICO ESPECIALISTA EN SST").toUpperCase();
@@ -194,6 +199,12 @@ export default function CartaCustodia({
   const mesTexto       = MONTHS_ES[mesVal];
   const fechaTexto     = formatDateEs(fechaCarta);
 
+  // Lista de cartas guardadas (tipo "custodia")
+  const cartasGuardadas = useMemo(
+    () => (savedInformes || []).filter(i => i.tipo === "custodia").sort((a, b) => (b.savedAt || "").localeCompare(a.savedAt || "")),
+    [savedInformes]
+  );
+
   const handleGuardar = useCallback(() => {
     if (!selectedCompanyId) { showAlert("Selecciona una empresa primero"); return; }
     const custodia = {
@@ -201,9 +212,11 @@ export default function CartaCustodia({
       empresaId: selectedCompanyId,
       empresaNombre,
       tipo: "custodia",
+      periodo: `${anioVal}-${String(mesVal + 1).padStart(2, "0")}`,
       fecha: fechaCarta,
       mes: mesVal,
       anio: anioVal,
+      ciudadDest: ciudadDisplay,
       medicoNombre: docNombre,
       medicoLicencia: docLicencia,
       // Datos completos para renderizar en el portal
@@ -219,7 +232,34 @@ export default function CartaCustodia({
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
     showAlert("✅ Carta de Custodia guardada para " + empresaNombre);
-  }, [selectedCompanyId, empresaNombre, fechaCarta, mesVal, anioVal, docNombre, docLicencia, docCC, docTitulo, docEmail, docCel, docCiudad, firmaSrc, saveInforme, showAlert]);
+    // Cambiar al tab de guardadas para que la vea de inmediato
+    setTimeout(() => setActiveTab("guardadas"), 800);
+  }, [selectedCompanyId, empresaNombre, fechaCarta, mesVal, anioVal, ciudadDisplay, docNombre, docLicencia, docCC, docTitulo, docEmail, docCel, docCiudad, firmaSrc, saveInforme, showAlert]);
+
+  // Cargar una carta guardada en el formulario para editar
+  const handleEditarCarta = useCallback((carta) => {
+    setSelectedCompanyId(carta.empresaId || "");
+    if (carta.fecha) setFechaCarta(carta.fecha);
+    if (typeof carta.mes === "number") setMesVal(carta.mes);
+    else if (carta.periodo) {
+      const _m = parseInt((carta.periodo || "").split("-")[1], 10);
+      if (!isNaN(_m)) setMesVal(_m - 1);
+    }
+    if (carta.anio) setAnioVal(carta.anio);
+    else if (carta.periodo) {
+      const _a = parseInt((carta.periodo || "").split("-")[0], 10);
+      if (!isNaN(_a)) setAnioVal(_a);
+    }
+    if (carta.ciudadDest) setCiudadDest(carta.ciudadDest);
+    setPreviewCarta(null);
+    setActiveTab("nueva");
+    showAlert("📝 Carta cargada para edición — modifica los datos y guarda nuevamente.");
+  }, [showAlert]);
+
+  // Previsualizar una carta guardada en el panel derecho
+  const handleVerCarta = useCallback((carta) => {
+    setPreviewCarta(carta);
+  }, []);
 
   const handleEmail = () => {
     const to  = selectedCompany?.email || selectedCompany?.correo || "";
@@ -233,6 +273,25 @@ export default function CartaCustodia({
     window.location.href = `mailto:${to}?subject=${sub}&body=${bod}`;
   };
 
+  // ── Datos para el documento previsualizado ──
+  const previewDocNombre   = previewCarta ? (previewCarta.medicoNombre   || docNombre)   : docNombre;
+  const previewDocTitulo   = previewCarta ? (previewCarta.medicoTitulo   || docTitulo)   : docTitulo;
+  const previewDocLicencia = previewCarta ? (previewCarta.medicoLicencia || docLicencia) : docLicencia;
+  const previewDocCC       = previewCarta ? (previewCarta.medicoCC       || docCC)       : docCC;
+  const previewDocCel      = previewCarta ? (previewCarta.medicoTel      || docCel)      : docCel;
+  const previewDocEmail    = previewCarta ? (previewCarta.medicoEmail    || docEmail)     : docEmail;
+  const previewDocCiudad   = previewCarta ? (previewCarta.medicoCiudad   || docCiudad)   : docCiudad;
+  const previewFirma       = previewCarta ? (previewCarta.firma          || firmaSrc)    : firmaSrc;
+  const previewEmpresa     = previewCarta ? (previewCarta.empresaNombre  || empresaNombre) : empresaNombre;
+  const previewCiudadDest  = previewCarta ? (previewCarta.ciudadDest     || ciudadDisplay) : ciudadDisplay;
+  const previewMes         = previewCarta
+    ? (typeof previewCarta.mes === "number" ? MONTHS_ES[previewCarta.mes] : mesTexto)
+    : mesTexto;
+  const previewAnio        = previewCarta ? (previewCarta.anio || anioVal) : anioVal;
+  const previewFechaTexto  = previewCarta && previewCarta.fecha
+    ? formatDateEs(previewCarta.fecha)
+    : fechaTexto;
+
   return (
     <div className="min-h-screen bg-gray-100 flex">
       <style>{`
@@ -245,91 +304,199 @@ export default function CartaCustodia({
       `}</style>
 
       {/* ── PANEL IZQUIERDO ── */}
-      <div className="no-print w-72 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 shadow-lg">
+      <div className="no-print w-80 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 shadow-lg">
         {/* Header */}
         <div className="bg-gradient-to-r from-emerald-800 to-teal-700 p-4">
           <h2 className="text-sm font-black text-white">📁 Carta de Custodia</h2>
           <p className="text-[10px] text-emerald-300">Historias Clínicas Ocupacionales</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Empresa */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5">🏢 Empresa destinataria *</label>
-            <select
-              value={selectedCompanyId}
-              onChange={e => {
-                setSelectedCompanyId(e.target.value);
-                const co = (companies || []).find(c => c.id === e.target.value);
-                if (co?.ciudad) setCiudadDest(co.ciudad);
-              }}
-              className="w-full text-xs border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
-            >
-              <option value="">— Seleccionar empresa —</option>
-              {(companies || []).map(c => (
-                <option key={c.id} value={c.id}>{c.nombre || c.empresaNombre}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Fecha */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5">📅 Fecha de la carta</label>
-            <input type="date" value={fechaCarta} onChange={e => setFechaCarta(e.target.value)}
-              className="w-full text-xs border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-          </div>
-
-          {/* Mes/Año */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5">Mes de valoraciones</label>
-            <div className="flex gap-2">
-              <select value={mesVal} onChange={e => setMesVal(Number(e.target.value))}
-                className="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white capitalize">
-                {MONTHS_ES.map((m, i) => <option key={i} value={i}>{m}</option>)}
-              </select>
-              <input type="number" value={anioVal} onChange={e => setAnioVal(Number(e.target.value))}
-                min="2020" max="2035"
-                className="w-20 text-xs border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-            </div>
-          </div>
-
-          {/* Ciudad */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5">Ciudad destinatario</label>
-            <input type="text" value={ciudadDest} onChange={e => setCiudadDest(e.target.value)}
-              className="w-full text-xs border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-              placeholder="Ciudad" />
-          </div>
-
-          {/* Doctor info */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-0.5">
-            <p className="text-[10px] font-bold text-emerald-800 mb-1.5">👨‍⚕️ Médico (auto)</p>
-            <p className="text-[10px] text-gray-700"><span className="font-bold">Nombre:</span> {docNombre}</p>
-            <p className="text-[10px] text-gray-700"><span className="font-bold">CC:</span> {docCC}</p>
-            <p className="text-[10px] text-gray-700"><span className="font-bold">Licencia:</span> {docLicencia}</p>
-            <p className="text-[10px] text-gray-700"><span className="font-bold">Cel:</span> {docCel}</p>
-            {firmaSrc
-              ? <p className="text-[10px] text-emerald-700 font-bold mt-1">✅ Firma digital cargada</p>
-              : <p className="text-[10px] text-amber-600 mt-1">⚠ Sin firma digital</p>}
-          </div>
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => { setActiveTab("nueva"); setPreviewCarta(null); }}
+            className={`flex-1 py-2 text-xs font-bold transition ${activeTab === "nueva" ? "bg-emerald-50 text-emerald-700 border-b-2 border-emerald-600" : "text-gray-500 hover:bg-gray-50"}`}
+          >
+            ✍️ Nueva carta
+          </button>
+          <button
+            onClick={() => setActiveTab("guardadas")}
+            className={`flex-1 py-2 text-xs font-bold transition relative ${activeTab === "guardadas" ? "bg-emerald-50 text-emerald-700 border-b-2 border-emerald-600" : "text-gray-500 hover:bg-gray-50"}`}
+          >
+            📋 Guardadas
+            {cartasGuardadas.length > 0 && (
+              <span className="absolute top-1 right-3 bg-emerald-600 text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-black">
+                {cartasGuardadas.length}
+              </span>
+            )}
+          </button>
         </div>
 
-        {/* Botones */}
+        {/* ── TAB: NUEVA CARTA ── */}
+        {activeTab === "nueva" && (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Empresa */}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1.5">🏢 Empresa destinataria *</label>
+              <select
+                value={selectedCompanyId}
+                onChange={e => {
+                  setSelectedCompanyId(e.target.value);
+                  const co = (companies || []).find(c => c.id === e.target.value);
+                  if (co?.ciudad) setCiudadDest(co.ciudad);
+                }}
+                className="w-full text-xs border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+              >
+                <option value="">— Seleccionar empresa —</option>
+                {(companies || []).map(c => (
+                  <option key={c.id} value={c.id}>{c.nombre || c.empresaNombre}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Fecha */}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1.5">📅 Fecha de la carta</label>
+              <input type="date" value={fechaCarta} onChange={e => setFechaCarta(e.target.value)}
+                className="w-full text-xs border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+            </div>
+
+            {/* Mes/Año */}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1.5">Mes de valoraciones</label>
+              <div className="flex gap-2">
+                <select value={mesVal} onChange={e => setMesVal(Number(e.target.value))}
+                  className="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white capitalize">
+                  {MONTHS_ES.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                </select>
+                <input type="number" value={anioVal} onChange={e => setAnioVal(Number(e.target.value))}
+                  min="2020" max="2035"
+                  className="w-20 text-xs border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+              </div>
+            </div>
+
+            {/* Ciudad */}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1.5">Ciudad destinatario</label>
+              <input type="text" value={ciudadDest} onChange={e => setCiudadDest(e.target.value)}
+                className="w-full text-xs border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                placeholder="Ciudad" />
+            </div>
+
+            {/* Doctor info */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-0.5">
+              <p className="text-[10px] font-bold text-emerald-800 mb-1.5">👨‍⚕️ Médico (auto)</p>
+              <p className="text-[10px] text-gray-700"><span className="font-bold">Nombre:</span> {docNombre}</p>
+              <p className="text-[10px] text-gray-700"><span className="font-bold">CC:</span> {docCC}</p>
+              <p className="text-[10px] text-gray-700"><span className="font-bold">Licencia:</span> {docLicencia}</p>
+              <p className="text-[10px] text-gray-700"><span className="font-bold">Cel:</span> {docCel}</p>
+              {firmaSrc
+                ? <p className="text-[10px] text-emerald-700 font-bold mt-1">✅ Firma digital cargada</p>
+                : <p className="text-[10px] text-amber-600 mt-1">⚠ Sin firma digital</p>}
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB: CARTAS GUARDADAS ── */}
+        {activeTab === "guardadas" && (
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {cartasGuardadas.length === 0 ? (
+              <div className="text-center py-10">
+                <p className="text-2xl mb-2">📭</p>
+                <p className="text-xs text-gray-400 font-semibold">No hay cartas guardadas aún</p>
+                <p className="text-[10px] text-gray-400 mt-1">Crea una nueva carta y guárdala</p>
+              </div>
+            ) : (
+              cartasGuardadas.map(carta => {
+                const mesNombre = typeof carta.mes === "number" ? MONTHS_ES[carta.mes] : (carta.periodo ? MONTHS_ES[parseInt((carta.periodo || "").split("-")[1], 10) - 1] || "—" : "—");
+                const anioC = carta.anio || (carta.periodo ? parseInt((carta.periodo || "").split("-")[0], 10) : "");
+                const isActive = previewCarta?.id === carta.id;
+                return (
+                  <div key={carta.id}
+                    className={`rounded-xl border p-3 transition cursor-pointer ${isActive ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-300" : "border-gray-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/50"}`}
+                    onClick={() => handleVerCarta(carta)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-black text-gray-800 truncate">
+                          {carta.empresaNombre || "Empresa"}
+                        </p>
+                        <p className="text-[10px] text-emerald-700 font-semibold capitalize">
+                          {mesNombre} {anioC}
+                          {carta.totalPacientes ? ` · ${carta.totalPacientes} trabajador(es)` : ""}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">
+                          Guardada: {carta.savedAt ? new Date(carta.savedAt).toLocaleDateString("es-CO", { day:"2-digit", month:"short", year:"numeric" }) : "—"}
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-1 flex-shrink-0">
+                        <button
+                          onClick={e => { e.stopPropagation(); handleVerCarta(carta); }}
+                          title="Ver carta"
+                          className="w-7 h-7 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 flex items-center justify-center text-sm transition"
+                        >👁</button>
+                        <button
+                          onClick={e => { e.stopPropagation(); handleEditarCarta(carta); }}
+                          title="Editar / recargar en formulario"
+                          className="w-7 h-7 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-700 flex items-center justify-center text-sm transition"
+                        >✏️</button>
+                        <button
+                          onClick={e => { e.stopPropagation(); handleVerCarta(carta); setTimeout(() => window.print(), 350); }}
+                          title="Imprimir esta carta"
+                          className="w-7 h-7 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 flex items-center justify-center text-sm transition"
+                        >🖨️</button>
+                      </div>
+                    </div>
+                    {isActive && (
+                      <p className="text-[9px] text-emerald-600 mt-1.5 font-semibold">
+                        ← Mostrando en previsualización
+                      </p>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* Botones inferiores */}
         <div className="p-4 border-t border-gray-200 space-y-2">
-          <button onClick={() => window.print()}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition">
-            🖨️ Imprimir / Descargar PDF
-          </button>
-          <button onClick={handleGuardar}
-            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition border-2 ${
-              saved ? "bg-emerald-50 border-emerald-500 text-emerald-700" : "bg-white border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-            }`}>
-            {saved ? "✅ ¡Guardada!" : "💾 Guardar carta"}
-          </button>
-          <button onClick={handleEmail} disabled={!selectedCompanyId}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-white border-2 border-sky-300 text-sky-700 rounded-lg text-xs font-bold hover:bg-sky-50 disabled:opacity-40 transition">
-            📧 Enviar por Email
-          </button>
+          {previewCarta ? (
+            <>
+              <div className="text-[10px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-center">
+                📋 Visualizando: {previewCarta.empresaNombre}
+              </div>
+              <button onClick={() => window.print()}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition">
+                🖨️ Imprimir esta carta
+              </button>
+              <button onClick={() => { handleEditarCarta(previewCarta); }}
+                className="w-full flex items-center justify-center gap-2 py-2 bg-white border-2 border-amber-400 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-50 transition">
+                ✏️ Editar carta
+              </button>
+              <button onClick={() => setPreviewCarta(null)}
+                className="w-full flex items-center justify-center gap-2 py-2 text-gray-500 hover:text-gray-700 text-xs transition">
+                ← Nueva carta
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => window.print()}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition">
+                🖨️ Imprimir / Descargar PDF
+              </button>
+              <button onClick={handleGuardar}
+                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition border-2 ${
+                  saved ? "bg-emerald-50 border-emerald-500 text-emerald-700" : "bg-white border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                }`}>
+                {saved ? "✅ ¡Guardada!" : "💾 Guardar carta"}
+              </button>
+              <button onClick={handleEmail} disabled={!selectedCompanyId}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-white border-2 border-sky-300 text-sky-700 rounded-lg text-xs font-bold hover:bg-sky-50 disabled:opacity-40 transition">
+                📧 Enviar por Email
+              </button>
+            </>
+          )}
           <button onClick={() => goTo("dashboard")}
             className="w-full flex items-center justify-center gap-2 py-2 text-gray-500 hover:text-gray-700 text-xs transition">
             ← Volver
@@ -340,19 +507,19 @@ export default function CartaCustodia({
       {/* ── PANEL DERECHO: DOCUMENTO ── */}
       <div className="flex-1 overflow-auto bg-gray-200 p-8 flex justify-center items-start">
         <CartaDocumento
-          docNombre={docNombre}
-          docTitulo={docTitulo}
-          docLicencia={docLicencia}
-          docCC={docCC}
-          docCel={docCel}
-          docEmail={docEmail}
-          docCiudad={docCiudad}
-          firmaSrc={firmaSrc}
-          fechaTexto={fechaTexto}
-          empresaNombre={empresaNombre}
-          ciudadDest={ciudadDisplay}
-          mesTexto={mesTexto}
-          anioVal={anioVal}
+          docNombre={previewDocNombre}
+          docTitulo={previewDocTitulo}
+          docLicencia={previewDocLicencia}
+          docCC={previewDocCC}
+          docCel={previewDocCel}
+          docEmail={previewDocEmail}
+          docCiudad={previewDocCiudad}
+          firmaSrc={previewFirma}
+          fechaTexto={previewFechaTexto}
+          empresaNombre={previewEmpresa}
+          ciudadDest={previewCiudadDest}
+          mesTexto={previewMes}
+          anioVal={previewAnio}
         />
       </div>
     </div>
