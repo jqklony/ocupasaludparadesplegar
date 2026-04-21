@@ -12747,14 +12747,15 @@ function PortalCustodiaViewer({ custodia, empresaNombre, periodo, sbUrl, sbKey }
   );
 }
 
-// ── Cuenta de Cobro — comprobante de pago + verificación IA ─────────────────
+// ── Cuenta de Cobro — documento completo + comprobante de pago ───────────────
 function PortalCuentaCobroCard({ cuenta, empresaNombre, periodo, sbUrl, sbKey, nitBusq }) {
   const [comprobante, setComprobante] = React.useState(cuenta?.comprobante || null);
-  const [pagado, setPagado] = React.useState(cuenta?.pagado || false);
-  const [uploading, setUploading] = React.useState(false);
-  const [iaResult, setIaResult] = React.useState(cuenta?.comprobante?.iaResult || null);
-  const [checking, setChecking] = React.useState(false);
-  const [error, setError] = React.useState("");
+  const [pagado, setPagado]           = React.useState(cuenta?.pagado || false);
+  const [uploading, setUploading]     = React.useState(false);
+  const [iaResult, setIaResult]       = React.useState(cuenta?.comprobante?.iaResult || null);
+  const [checking, setChecking]       = React.useState(false);
+  const [error, setError]             = React.useState("");
+  const [showDoc, setShowDoc]         = React.useState(false);
   const monto = Number(cuenta?.amount || 0).toLocaleString("es-CO");
 
   const updateSupa = async (newComp, confirmed) => {
@@ -12811,49 +12812,198 @@ function PortalCuentaCobroCard({ cuenta, empresaNombre, periodo, sbUrl, sbKey, n
 
   if (!cuenta) return null;
 
-  return (
-    <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-black text-orange-800">💰 Cuenta de Cobro No. {cuenta.number}</p>
-          <p className="text-[10px] text-orange-600">${monto} COP · {cuenta.date}</p>
-          {cuenta.concept && <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">{cuenta.concept}</p>}
+  // ── Documento visual completo (réplica fiel de la cuenta de cobro) ──────
+  const BillDoc = () => {
+    const docN  = cuenta.doctorNombre   || "JULIAN CUCALON";
+    const docT  = cuenta.doctorTitulo   || "MEDICO ESPECIALISTA EN SST";
+    const docL  = cuenta.doctorLicencia || "14497-12-2019";
+    const docCC = cuenta.doctorCC       || "1061750704";
+    const docCel= cuenta.doctorCel      || "3182213979";
+    const docEM = cuenta.doctorEmail    || "dr.juliancucalon@gmail.com";
+    const docCd = cuenta.doctorCiudad   || "Popayán";
+    const banco = cuenta.bankName       || "BANCOLOMBIA";
+    const tipo  = cuenta.accountType    || "Ahorros";
+    const acct  = cuenta.accountNumber  || "";
+    const rut   = cuenta.rut            || docCC;
+    const firma = cuenta.firma          || null;
+    const clientNit = cuenta.clientNit  || "";
+    const clientName= cuenta.clientName || empresaNombre || "";
+    const concept   = cuenta.concept    || "";
+    const amtWords  = cuenta.amountWords|| "";
+    const billDate  = cuenta.date       || "";
+    const billNum   = String(cuenta.number || "1").padStart(3, "0");
+    const s = {
+      wrap:      { fontFamily:'"Arial","Helvetica",sans-serif', fontSize:"11pt", color:"#111", background:"white", width:"100%", padding:"32px 40px", boxSizing:"border-box" },
+      hRow:      { display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"4px solid #059669", paddingBottom:"16px", marginBottom:"24px" },
+      logoBadge: { width:"48px", height:"48px", background:"linear-gradient(135deg,#065f46,#0f766e)", borderRadius:"8px", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 },
+      sep:       { height:"2px", background:"linear-gradient(90deg,#059669,#0d9488)", border:"none", margin:"8px 0 16px" },
+      cell:      { padding:"14px 16px", background:"#f9fafb", borderRadius:"12px", border:"1px solid #f3f4f6" },
+      tHead:     { display:"flex", justifyContent:"space-between", background:"#059669", color:"white", padding:"8px 14px", borderRadius:"8px 8px 0 0", fontWeight:700, fontSize:"10pt" },
+      tBody:     { display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px", border:"1px solid #d1fae5", borderTop:"none", borderRadius:"0 0 8px 8px" },
+    };
+    return (
+      <div style={s.wrap}>
+        {/* Header */}
+        <div style={s.hRow}>
+          <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+            <div style={s.logoBadge}><span style={{ color:"white", fontWeight:900, fontSize:"13px" }}>JC</span></div>
+            <div>
+              <p style={{ margin:0, fontWeight:900, fontSize:"12pt", color:"#111" }}>{docN}</p>
+              <p style={{ margin:0, fontSize:"7pt", color:"#6B7280", letterSpacing:"0.05em" }}>{docT}</p>
+              <p style={{ margin:0, fontSize:"7pt", color:"#059669", fontWeight:700 }}>RM: {docL}</p>
+              <p style={{ margin:0, fontSize:"7pt", color:"#9CA3AF" }}>{docCd.toLowerCase()}</p>
+            </div>
+          </div>
+          <div style={{ textAlign:"right" }}>
+            <p style={{ margin:0, fontWeight:900, fontSize:"22pt", color:"#111", letterSpacing:"-1px", textTransform:"uppercase" }}>Cuenta de Cobro</p>
+            <div style={{ display:"inline-block", background:"#059669", color:"white", fontWeight:700, padding:"2px 12px", borderRadius:"4px 0 0 4px", fontSize:"10pt", marginTop:"4px" }}>
+              No. {billNum}
+            </div>
+          </div>
         </div>
-        <span className={`text-[10px] font-black px-2.5 py-1 rounded-full flex-shrink-0 ml-2 ${pagado ? "bg-emerald-100 text-emerald-800 border border-emerald-300" : "bg-red-100 text-red-700 border border-red-200"}`}>
-          {pagado ? "✅ PAGADA" : "⏳ PENDIENTE"}
-        </span>
+
+        {/* Cliente + Fecha */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"20px", marginBottom:"20px" }}>
+          <div style={s.cell}>
+            <p style={{ margin:"0 0 4px", fontSize:"8pt", fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Cliente</p>
+            <p style={{ margin:0, fontWeight:900, fontSize:"13pt", color:"#111", textTransform:"uppercase" }}>{clientName}</p>
+            <p style={{ margin:"4px 0 0", fontSize:"9pt", color:"#6B7280" }}>NIT/CC: {clientNit}</p>
+          </div>
+          <div style={{ textAlign:"right", display:"flex", flexDirection:"column", justifyContent:"center" }}>
+            <p style={{ margin:0, fontSize:"8pt", fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Fecha de Emisión</p>
+            <p style={{ margin:"4px 0 0", fontWeight:700, fontSize:"13pt", color:"#111" }}>{billDate}</p>
+          </div>
+        </div>
+
+        {/* Concepto */}
+        <div style={{ marginBottom:"8px" }}>
+          <div style={s.tHead}><span>Concepto del Servicio</span><span>Valor</span></div>
+          <div style={s.tBody}>
+            <p style={{ margin:0, fontSize:"10pt", fontWeight:700, color:"#111", flex:1 }}>{concept}</p>
+            <p style={{ margin:0, fontWeight:900, fontSize:"18pt", color:"#111", whiteSpace:"nowrap", marginLeft:"16px" }}>$ {monto}</p>
+          </div>
+        </div>
+        {amtWords && <p style={{ textAlign:"right", fontSize:"8pt", color:"#9CA3AF", fontStyle:"italic", marginBottom:"20px" }}>Son {amtWords}</p>}
+
+        {/* Banco + Acreedor */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"20px", marginBottom:"28px" }}>
+          <div style={s.cell}>
+            <p style={{ margin:"0 0 6px", fontSize:"8pt", fontWeight:700, color:"#9CA3AF", textTransform:"uppercase" }}>Información de Pago</p>
+            <p style={{ margin:0, fontWeight:900, color:"#111" }}>{banco}</p>
+            <p style={{ margin:"2px 0", fontSize:"9pt", color:"#374151" }}>Tipo: {tipo}</p>
+            <p style={{ margin:"2px 0", fontSize:"9pt", color:"#374151" }}>No.&nbsp;&nbsp;{acct}</p>
+            <p style={{ margin:"2px 0", fontSize:"9pt", color:"#059669", fontWeight:700 }}>RUT: {rut}</p>
+          </div>
+          <div style={{ paddingLeft:"16px" }}>
+            <p style={{ margin:"0 0 6px", fontSize:"8pt", fontWeight:700, color:"#9CA3AF", textTransform:"uppercase" }}>Acreedor</p>
+            <p style={{ margin:0, fontWeight:900, color:"#111" }}>{docN.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase())}</p>
+            <p style={{ margin:"2px 0", fontSize:"9pt", color:"#374151" }}>NIT/CC: {docCC}</p>
+            <p style={{ margin:"2px 0", fontSize:"9pt", color:"#374151" }}>Lic: {docL}</p>
+            <p style={{ margin:"2px 0", fontSize:"9pt", color:"#374151" }}>Cel: {docCel}</p>
+            <p style={{ margin:"2px 0", fontSize:"9pt", color:"#374151" }}>{docEM}</p>
+          </div>
+        </div>
+
+        {/* Firma + Juramento */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", borderTop:"1px solid #E5E7EB", paddingTop:"20px" }}>
+          <div style={{ textAlign:"center" }}>
+            {firma ? (
+              <img src={firma} alt="Firma" style={{ maxHeight:"60px", maxWidth:"160px", objectFit:"contain", display:"block", margin:"0 auto 6px" }} />
+            ) : (
+              <div style={{ height:"54px", width:"160px", border:"1.5px dashed #D1D5DB", borderRadius:"6px", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 6px" }}>
+                <span style={{ fontSize:"8pt", color:"#D1D5DB" }}>Firma digital</span>
+              </div>
+            )}
+            <div style={{ borderTop:"2px solid #374151", paddingTop:"6px", textAlign:"center" }}>
+              <p style={{ margin:0, fontWeight:900, fontSize:"10pt", color:"#111" }}>{docN.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase())}</p>
+              <p style={{ margin:0, fontSize:"8pt", color:"#6B7280" }}>{docT}</p>
+              <p style={{ margin:0, fontSize:"8pt", color:"#6B7280" }}>C.C. {docCC}</p>
+              <p style={{ margin:0, fontSize:"8pt", color:"#059669", fontWeight:700 }}>RM: {docL}</p>
+              <p style={{ margin:0, fontSize:"8pt", color:"#6B7280" }}>Tel: {docCel}</p>
+              <p style={{ margin:0, fontSize:"8pt", color:"#6B7280" }}>{docCd.toLowerCase()}</p>
+            </div>
+          </div>
+          <div style={{ textAlign:"right", maxWidth:"42%" }}>
+            <p style={{ margin:0, fontWeight:700, fontSize:"13.5pt", color:"#111", lineHeight:1.4 }}>
+              Bajo juramento : Me acojo al Art. 383 E.T. Tarifa mínima 0%. No practicar retención.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* ── Resumen + botón ver documento ── */}
+      <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-black text-orange-800">💰 Cuenta de Cobro No. {String(cuenta.number||"1").padStart(3,"0")}</p>
+            <p className="text-[10px] text-orange-600">${monto} COP · {cuenta.date}</p>
+            {cuenta.concept && <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">{cuenta.concept}</p>}
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${pagado ? "bg-emerald-100 text-emerald-800 border border-emerald-300" : "bg-red-100 text-red-700 border border-red-200"}`}>
+              {pagado ? "✅ PAGADA" : "⏳ PENDIENTE"}
+            </span>
+            <button
+              onClick={() => setShowDoc(v => !v)}
+              className="text-[10px] font-black px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition"
+            >
+              {showDoc ? "🔼 Ocultar documento" : "📄 Ver Cuenta de Cobro"}
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Estado comprobante */}
-      {checking && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <p className="text-[10px] text-blue-700 font-black">⏳ Verificando comprobante con IA...</p>
+      {/* ── Documento completo ── */}
+      {showDoc && (
+        <div className="rounded-xl border border-gray-200 overflow-hidden shadow-lg bg-white">
+          <div className="bg-gray-100 border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+            <p className="text-xs font-black text-gray-700">📋 Cuenta de Cobro — Documento oficial</p>
+            <button onClick={() => { const w=window.open("","_blank"); w.document.write(`<html><head><style>body{margin:0;font-family:Arial,sans-serif;}</style></head><body>${document.querySelector('.portal-bill-doc')?.innerHTML||""}</body></html>`); w.document.close(); w.print(); }} className="text-[10px] font-bold text-gray-500 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-200 transition">🖨️ Imprimir</button>
+          </div>
+          <div className="portal-bill-doc overflow-x-auto">
+            <BillDoc />
+          </div>
         </div>
       )}
 
-      {!checking && comprobante && iaResult && (
-        <div className={`rounded-lg p-3 border ${iaResult.confirmado ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
-          <p className={`text-[10px] font-black mb-1 ${iaResult.confirmado ? "text-emerald-800" : "text-amber-800"}`}>
-            {iaResult.confirmado ? "✅ Pago verificado por IA" : "⚠️ Verificado con observaciones"}
-          </p>
-          <p className="text-[10px] text-gray-600">Archivo: {comprobante.nombre}</p>
-          {iaResult.montoPagado && iaResult.montoPagado !== "N/A" && (
-            <p className="text-[10px] text-gray-600">Monto detectado: <strong>{iaResult.montoPagado}</strong></p>
-          )}
-          {iaResult.observacion && <p className="text-[10px] text-gray-500 mt-1 italic">{iaResult.observacion}</p>}
-        </div>
-      )}
+      {/* ── Comprobante de pago ── */}
+      <div className="bg-white border border-orange-200 rounded-xl p-3 space-y-2">
+        <p className="text-xs font-black text-gray-700">📎 Comprobante de pago</p>
 
-      {!checking && !comprobante && (
-        <div>
-          {error && <p className="text-[10px] text-red-600 mb-2 font-bold">⚠️ {error}</p>}
-          <label className="flex items-center justify-center gap-2 cursor-pointer px-3 py-2.5 rounded-xl border-2 border-dashed border-orange-300 text-xs font-black text-orange-700 hover:bg-orange-100 transition">
-            <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={handleFile} disabled={uploading} />
-            📎 Adjuntar comprobante de pago
-          </label>
-          <p className="text-[9px] text-gray-400 mt-1 text-center">JPG, PNG, WEBP o PDF · Máx 5 MB · Un comprobante por cuenta · La IA verificará el monto</p>
-        </div>
-      )}
+        {checking && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-[10px] text-blue-700 font-black">⏳ Verificando comprobante con IA...</p>
+          </div>
+        )}
+
+        {!checking && comprobante && iaResult && (
+          <div className={`rounded-lg p-3 border ${iaResult.confirmado ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
+            <p className={`text-[10px] font-black mb-1 ${iaResult.confirmado ? "text-emerald-800" : "text-amber-800"}`}>
+              {iaResult.confirmado ? "✅ Pago verificado por IA" : "⚠️ Verificado con observaciones"}
+            </p>
+            <p className="text-[10px] text-gray-600">Archivo: {comprobante.nombre}</p>
+            {iaResult.montoPagado && iaResult.montoPagado !== "N/A" && (
+              <p className="text-[10px] text-gray-600">Monto detectado: <strong>{iaResult.montoPagado}</strong></p>
+            )}
+            {iaResult.observacion && <p className="text-[10px] text-gray-500 mt-1 italic">{iaResult.observacion}</p>}
+          </div>
+        )}
+
+        {!checking && !comprobante && (
+          <div>
+            {error && <p className="text-[10px] text-red-600 mb-2 font-bold">⚠️ {error}</p>}
+            <label className="flex items-center justify-center gap-2 cursor-pointer px-3 py-2.5 rounded-xl border-2 border-dashed border-orange-300 text-xs font-black text-orange-700 hover:bg-orange-100 transition">
+              <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={handleFile} disabled={uploading} />
+              📎 Adjuntar comprobante de pago
+            </label>
+            <p className="text-[9px] text-gray-400 mt-1 text-center">JPG, PNG, WEBP o PDF · Máx 5 MB · La IA verificará el monto automáticamente</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -29116,7 +29266,10 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     </div>
                   )}
                   <button
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      const btn = e.currentTarget;
+                      btn.disabled = true;
+                      btn.textContent = "⏳ Guardando en Supabase...";
                       let saved = { ...editingCompany };
                       // FASE 2: medicoIds incluye responsable
                       if (
@@ -29152,12 +29305,18 @@ Esta historia clínica debe conservarse mínimo 20 años.
                         c.id === saved.id ? saved : c
                       );
                       setCompanies(upd);
-                      _syncCompanies(upd);
+                      // localStorage inmediato
+                      const _suidSave = currentUser?.user || "shared";
+                      _ls.setItem(_compKey(_suidSave), JSON.stringify(upd));
+                      // Supabase explícito con confirmación
+                      const sbOk = await _sbSet(_compKeyCloud(_suidSave), upd);
                       setEditingCompany(null);
                       if (saved.portalActivo) {
                         setPortalActivadoInfo(saved);
                       } else {
-                        showAlert("✅ Empresa actualizada.");
+                        showAlert(sbOk
+                          ? "✅ Empresa actualizada y sincronizada en Supabase."
+                          : "⚠️ Empresa guardada localmente. La sincronización con Supabase fallará — se reintentará en el próximo auto-sync.");
                       }
                     }}
                     className="w-full mt-4 bg-purple-700 hover:bg-purple-800 text-white py-2.5 rounded-xl text-sm font-black"
@@ -51019,7 +51178,33 @@ body{padding-top:52px;}
                       fecha: new Date().toISOString().split("T")[0],
                       informe: informeData ? { totalPacientes: informeData.totalPacientes || emp.totalPacientes, resumen: informeData.resumen || "", fecha: informeData.fecha, statsKey: informeData.statsKey || null } : null,
                       certificados: { count: certCount, documentos: certsEmpresa.map(p => (p.docNumero || "").replace(/\s/g, "")) },
-                      cuenta: cuentaData ? { number: cuentaData.number, amount: cuentaData.amount, date: cuentaData.date, concept: cuentaData.concept, pagado: false, comprobante: null } : null,
+                      cuenta: cuentaData ? {
+                        // Datos base
+                        number: cuentaData.number,
+                        amount: cuentaData.amount,
+                        date: cuentaData.date,
+                        concept: cuentaData.concept,
+                        amountWords: cuentaData.amountWords || "",
+                        pagado: false,
+                        comprobante: null,
+                        // Cliente
+                        clientName: cuentaData.clientName || emp.empresaNombre,
+                        clientNit: cuentaData.clientNit || (comp ? `${comp.nit}${comp.dv ? "-" + comp.dv : ""}` : emp.empresaNit || ""),
+                        // Banco / pago
+                        bankName: cuentaData.bankName || (activeDoctorData?.banco || "BANCOLOMBIA"),
+                        accountType: cuentaData.accountType || (activeDoctorData?.tipoCuenta || "Ahorros"),
+                        accountNumber: cuentaData.accountNumber || (activeDoctorData?.cuentaBancaria || ""),
+                        rut: activeDoctorData?.cedula || "1061750704",
+                        // Médico acreedor
+                        doctorNombre: (activeDoctorData?.nombre || "JULIAN CUCALON").toUpperCase(),
+                        doctorCC: activeDoctorData?.cedula || "1061750704",
+                        doctorLicencia: activeDoctorData?.licencia || "14497-12-2019",
+                        doctorTitulo: (activeDoctorData?.titulo || "MEDICO ESPECIALISTA EN SST").toUpperCase(),
+                        doctorCel: activeDoctorData?.celular || "3182213979",
+                        doctorEmail: activeDoctorData?.email || "dr.juliancucalon@gmail.com",
+                        doctorCiudad: activeDoctorData?.ciudad || "Popayán",
+                        firma: activeSignature || activeDoctorData?.firma || activeDoctorData?.signature || null,
+                      } : null,
                       custodia: custodiaData ? {
                         fecha: custodiaData.fecha,
                         medicoNombre: custodiaData.medicoNombre,
