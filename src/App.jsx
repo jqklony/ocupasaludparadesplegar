@@ -30600,14 +30600,14 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     showData={true}
                   />
                 </div>
-                <div className="w-2/5 text-right text-[8px] text-gray-400">
+                <div className="w-2/5 text-right">
                   <p
                     contentEditable
                     suppressContentEditableWarning
                     data-placeholder="Nota legal"
+                    style={{ fontSize: "18px", color: "#111", fontWeight: 700, lineHeight: 1.4 }}
                   >
-                    Me acojo al Art. 383 E.T. Tarifa mínima 0%. No practicar
-                    retención.
+                    Bajo juramento : Me acojo al Art. 383 E.T. Tarifa mínima 0%. No practicar retención.
                   </p>
                 </div>
               </div>
