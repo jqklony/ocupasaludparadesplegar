@@ -18768,58 +18768,59 @@ Esta historia clínica debe conservarse mínimo 20 años.
     const isBill = title === "Cuenta-de-Cobro";
     const printStyle = document.createElement('style');
     printStyle.textContent = isBill ? `
-      /* ══ CSS EXCLUSIVO PARA CUENTA DE COBRO ══ */
+      /* ══ CSS CUENTA DE COBRO ══ */
       @media print {
         * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
-        @page { size: letter portrait; margin: 0.5cm; }
-        /* Ocultar TODO excepto el documento */
-        body > * { display: none !important; }
-        #root > * { display: none !important; }
-        /* Mostrar solo el contenedor principal de la cuenta */
-        #root .min-h-screen { display: block !important; }
-        nav, .no-print, .bill-fmt-toolbar, button, select, input, label,
-        [class*="no-print"], .bg-white.shadow.rounded-2xl { display: none !important; }
-        /* El documento imprimible: mantener exactamente como en pantalla */
-        .doc-editable { display: block !important; }
+        @page { size: letter portrait; margin: 0; }
+
+        /* Ocultar todo lo que no es el documento */
+        nav, .no-print, .bill-fmt-toolbar, [class*="no-print"] { display: none !important; }
+
+        /* Quitar padding/margin del contenedor de página */
+        body { margin: 0 !important; padding: 0 !important; background: white !important; }
+        .min-h-screen { min-height: unset !important; background: white !important; padding: 0 !important; }
+        .max-w-4xl { max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+
+        /* El documento: exactamente igual que en pantalla */
         .carta-visual {
-          display: block !important;
-          width: 21cm !important;
-          min-height: auto !important;
+          width: 21.59cm !important;
+          min-height: unset !important;
+          padding: 2.5cm !important;
           margin: 0 auto !important;
-          padding: 2cm !important;
           box-shadow: none !important;
           border-radius: 0 !important;
           background: white !important;
-          page-break-inside: avoid !important;
         }
-        /* Preservar grid de 2 columnas (cliente/fecha, banco/acreedor) */
+
+        /* Preservar grids exactos del documento */
+        .carta-visual .grid { display: grid !important; }
         .carta-visual .grid-cols-2 {
-          display: grid !important;
           grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-          gap: 1.5rem !important;
         }
-        /* Preservar flex layouts */
+
+        /* Preservar flex */
         .carta-visual .flex { display: flex !important; }
         .carta-visual .justify-between { justify-content: space-between !important; }
         .carta-visual .items-center { align-items: center !important; }
-        /* Preservar colores de cabecera */
-        .border-emerald-600 { border-color: #059669 !important; }
+        .carta-visual .items-start { align-items: flex-start !important; }
+        .carta-visual .items-end { align-items: flex-end !important; }
+
+        /* Colores exactos */
         .bg-emerald-600 { background-color: #059669 !important; }
+        .border-emerald-600 { border-color: #059669 !important; }
+        .border-b-4 { border-bottom-width: 4px !important; border-style: solid !important; }
         .text-white { color: #ffffff !important; }
         .bg-blue-50 { background-color: #eff6ff !important; }
         .bg-gray-50 { background-color: #f9fafb !important; }
-        /* Preservar fuentes y tamaños */
-        .text-3xl { font-size: 1.875rem !important; }
-        .text-2xl { font-size: 1.5rem !important; }
-        .text-lg { font-size: 1.125rem !important; }
-        .font-black { font-weight: 900 !important; }
-        /* Ocultar borde/outline de contenteditable */
-        [contenteditable] { outline: none !important; background: transparent !important; border: none !important; }
-        .bill-resizable-field { resize: none !important; }
-        /* Firma */
-        .carta-visual img { max-height: 80px !important; }
-        /* Nota legal al pie */
-        .text-\\[8px\\] { font-size: 8px !important; }
+        .bg-gray-800 { background-color: #1f2937 !important; }
+        .rounded-xl { border-radius: 0.75rem !important; }
+        .rounded-t-xl { border-radius: 0.75rem 0.75rem 0 0 !important; }
+        .rounded-b-xl { border-radius: 0 0 0.75rem 0.75rem !important; }
+        .rounded-l { border-radius: 0.25rem 0 0 0.25rem !important; }
+
+        /* Eliminar outline de campos editables */
+        [contenteditable] { outline: none !important; background: transparent !important; border: none !important; box-shadow: none !important; }
+        .bill-resizable-field { resize: none !important; min-height: unset !important; }
       }
     ` : `
       @media print {
