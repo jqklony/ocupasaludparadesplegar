@@ -14811,6 +14811,7 @@ function AppInner() {
   const [reportEndDate, setReportEndDate] = useState("");
   const [reportAIResult, setReportAIResult] = useState(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [lastSavedInforme, setLastSavedInforme] = useState(null); // informe guardado listo para publicar en portal
   const [showExportTable, setShowExportTable] = useState(false);
   const [precioPorPaciente, setPrecioPorPaciente] = useState("");
   // Exportar tabla de pacientes como CSV (sin datos sensibles -- confidencialidad Res.1843/2025 Art.19)
@@ -25762,13 +25763,66 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     savedAt: new Date().toISOString(),
                   };
                   saveInforme(informe);
-                  showAlert("✅ Informe guardado para " + compName + "\nPeriodo: " + periodo);
+                  setLastSavedInforme(informe);
+                  showAlert("✅ Informe guardado para " + compName + "\nPeriodo: " + periodo + "\n\nUsa el botón 📤 Publicar en portal para que la empresa lo vea.");
                 }}
                 className="bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2"
               >
                 <Save className="w-4 h-4" /> Guardar Informe
               </button>
             )}
+            {/* Publicar informe en portal empresa */}
+            {selectedCompanyReport && savedInformes.some(i => i.empresaId === selectedCompanyReport && !i.tipo) && (() => {
+              const _inf = lastSavedInforme?.empresaId === selectedCompanyReport
+                ? lastSavedInforme
+                : savedInformes.find(i => i.empresaId === selectedCompanyReport && !i.tipo);
+              const _comp = companies.find(c => c.id === selectedCompanyReport);
+              const _nit = (_comp?.nit || "").replace(/[^0-9]/g, "");
+              // Normalizar período: extraer YYYY-MM del string del informe
+              const _periodoKey = (() => {
+                const ps = _inf?.periodo || "";
+                const m = ps.match(/(\d{4}-\d{2})/);
+                return m ? m[1] : new Date().toISOString().slice(0,7);
+              })();
+              return (
+                <button
+                  onClick={async (e) => {
+                    const btn = e.currentTarget;
+                    btn.disabled = true;
+                    btn.textContent = "⏳ Publicando...";
+                    try {
+                      if (!_nit) { showAlert("⚠️ La empresa no tiene NIT registrado."); btn.disabled=false; btn.textContent="📤 Publicar en portal"; return; }
+                      const r = await fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_portal_empresa_docs_${_nit}&select=value`, { headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` } });
+                      const d = await r.json();
+                      const informePayload = { totalPacientes: _inf.totalPacientes, resumen: _inf.resumen || "", fecha: _inf.fecha, statsKey: _inf.statsKey || null };
+                      if (d[0]?.value) {
+                        const docs = d[0].value;
+                        let found = false;
+                        docs.periodos = (docs.periodos || []).map(p => {
+                          const pKey = (p.periodo || "").match(/(\d{4}-\d{2})/)?.[1] || p.periodo;
+                          if (pKey === _periodoKey) { found = true; return { ...p, informe: informePayload }; }
+                          return p;
+                        });
+                        if (!found) docs.periodos.unshift({ periodo: _periodoKey, fecha: _inf.fecha, informe: informePayload, certificados: null, cuenta: null, custodia: null });
+                        docs.updatedAt = new Date().toISOString();
+                        await _sbSet(`siso_portal_empresa_docs_${_nit}`, docs);
+                      } else {
+                        await _sbSet(`siso_portal_empresa_docs_${_nit}`, { nit: _nit, nombre: compName, updatedAt: new Date().toISOString(), periodos: [{ periodo: _periodoKey, fecha: _inf.fecha, informe: informePayload, certificados: null, cuenta: null, custodia: null }] });
+                      }
+                      btn.textContent = "✅ Publicado en portal";
+                      showAlert("✅ Informe publicado en el portal de " + compName + ".\nLa empresa ya puede verlo al ingresar al portal con su NIT.");
+                    } catch(err) {
+                      btn.disabled = false;
+                      btn.textContent = "📤 Publicar en portal";
+                      showAlert("⚠️ Error al publicar: " + err.message);
+                    }
+                  }}
+                  className="bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2"
+                >
+                  📤 Publicar en portal
+                </button>
+              );
+            })()}
             {/* Enviar todo a empresa */}
             {selectedCompanyReport && (
               <button
@@ -30461,10 +30515,33 @@ Esta historia clínica debe conservarse mínimo 20 años.
                           {!bill.pagada && (
                             <button
                               title="Marcar como pagada"
-                              onClick={() => {
-                                const updated = savedBillsList.map(b => b.id===bill.id ? {...b, pagada:true, fechaPago: new Date().toISOString().split("T")[0]} : b);
+                              onClick={async (e) => {
+                                const btn = e.currentTarget;
+                                btn.disabled = true;
+                                const fechaPago = new Date().toISOString().split("T")[0];
+                                const updated = savedBillsList.map(b => b.id===bill.id ? {...b, pagada:true, fechaPago} : b);
                                 setSavedBillsList(updated);
                                 _sync(`siso_saved_bills_${_bSuf}`, JSON.stringify(updated));
+                                // Actualizar también en portal empresa (siso_portal_empresa_docs_${nit})
+                                try {
+                                  const _compEmp = companies.find(c => c.id === bill.companyId || (c.nombre||"").toLowerCase().trim() === (bill.clientName||"").toLowerCase().trim());
+                                  if (_compEmp) {
+                                    const _nitP = (_compEmp.nit || "").replace(/[^0-9]/g, "");
+                                    if (_nitP) {
+                                      const _pr = await fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_portal_empresa_docs_${_nitP}&select=value`, { headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` } });
+                                      const _pd = await _pr.json();
+                                      if (_pd[0]?.value) {
+                                        const _docs = _pd[0].value;
+                                        _docs.periodos = (_docs.periodos || []).map(p => p.cuenta
+                                          ? { ...p, cuenta: { ...p.cuenta, pagado: true, fechaPago } }
+                                          : p
+                                        );
+                                        await _sbSet(`siso_portal_empresa_docs_${_nitP}`, _docs);
+                                      }
+                                    }
+                                  }
+                                } catch {}
+                                btn.disabled = false;
                               }}
                               className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-black rounded-lg hover:bg-emerald-700 transition"
                             >✅</button>
