@@ -9,7 +9,7 @@ import { useAppState, useAppStateObject } from '../hooks/useAppState.js';
 import { formatDate } from '../utils/formatters.js';
 
 // Configuración localStorage para simular backend
-const LOCAL_STORAGE_KEYS = {
+
   companies: 'siso_companies',
   patients: 'siso_db_patients',
   bills: 'siso_saved_bills',
