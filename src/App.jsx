@@ -15852,10 +15852,23 @@ function AppInner() {
         const _billSuf = currentUser?.empresaId ? "empresa_" + currentUser.empresaId : currentUser?.user || "shared";
         applyCloud(`siso_saved_bills_${_billSuf}`, setSavedBillsList, [], `siso_saved_bills_${_billSuf}`);
       }
-      // Encuestas: sincronizar desde Supabase
+      // Encuestas: sincronizar desde Supabase (clave compartida entre usuarios)
       {
+        applyCloud("siso_encuestas", setEncuestas, [], "siso_encuestas");
+        // Migración: también leer clave antigua por usuario y fusionar si hay datos
         const _encSuf = currentUser?.user || "shared";
-        applyCloud(`siso_encuestas_${_encSuf}`, setEncuestas, [], "siso_encuestas");
+        const _oldKey = `siso_encuestas_${_encSuf}`;
+        if (cloud[_oldKey]?.value && Array.isArray(cloud[_oldKey].value) && cloud[_oldKey].value.length > 0) {
+          const oldEncs = cloud[_oldKey].value;
+          const sharedEncs = Array.isArray(cloud["siso_encuestas"]?.value) ? cloud["siso_encuestas"].value : [];
+          const merged = [...sharedEncs];
+          oldEncs.forEach(e => { if (!merged.find(x => x.id === e.id)) merged.push(e); });
+          if (merged.length > sharedEncs.length) {
+            setEncuestas(merged);
+            localStorage.setItem("siso_encuestas", JSON.stringify(merged));
+            _sbSet("siso_encuestas", merged); // migrar a clave compartida
+          }
+        }
       }
       // Informes guardados
       {
@@ -28694,7 +28707,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     const updated = [...encuestas, newEnc];
                     setEncuestas(updated);
                     localStorage.setItem("siso_encuestas", JSON.stringify(updated));
-                    _sbSet("siso_encuestas_" + (currentUser?.user || "shared"), updated);
+                    _sbSet("siso_encuestas", updated);
                     const url = window.location.origin + window.location.pathname + "#encuesta?token=" + token;
                     showAlert("✅ Encuesta creada!\n\n📋 Link para compartir:\n" + url + "\n\nEnvíe este link al encargado de la empresa para que los trabajadores llenen sus datos.");
                     // Copiar al portapapeles
@@ -28776,7 +28789,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                 const updEnc3 = encuestas.map(e => e.id === enc.id ? {...e, estado: "importada"} : e);
                                 setEncuestas(updEnc3);
                                 localStorage.setItem("siso_encuestas", JSON.stringify(updEnc3));
-                                _sbSet("siso_encuestas_" + (currentUser?.user || "shared"), updEnc3);
+                                _sbSet("siso_encuestas", updEnc3);
                                 showAlert(`✅ ${nuevos.length} trabajador(es) importados como pacientes.\n\n→ Redirigiendo a Historia Clínica...`);
                                 setTimeout(() => goTo("historia"), 1500);
                               });

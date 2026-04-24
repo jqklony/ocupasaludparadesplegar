@@ -265,4 +265,41 @@ const _patKeyCloud = (userId) => `siso_patients_${userId}`;
 const _compKey = (userId) => `siso_companies_${userId}`;
 const _compKeyCloud = (userId) => `siso_companies_${userId}`;
 
+// ── Aliases compatibles con src/lib/supabaseSync.js de siso-appultimo ────────
+/**
+ * Guarda un array completo en Supabase siso_store (localStorage + cloud).
+ * @param {string} supabaseKey — clave en siso_store
+ * @param {Array}  data        — array completo a guardar
+ */
+export const syncArrayToSupabase = async (supabaseKey, data) => {
+  try { localStorage.setItem(supabaseKey, JSON.stringify(data)); } catch {}
+  const ok = await _sbSet(supabaseKey, data);
+  return { ok: !!ok, source: ok ? 'supabase' : 'local-only' };
+};
+
+/**
+ * Lee un array desde Supabase siso_store. Fallback a localStorage.
+ * @param {string} supabaseKey — clave en siso_store
+ * @param {string} localKey    — clave localStorage de respaldo
+ */
+export const readArrayFromSupabase = async (supabaseKey, localKey) => {
+  try {
+    const r = await fetch(
+      `${_SB_URL}/rest/v1/siso_store?key=eq.${encodeURIComponent(supabaseKey)}&select=value`,
+      { headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` } }
+    );
+    if (r.ok) {
+      const rows = await r.json();
+      if (rows?.[0]?.value && Array.isArray(rows[0].value)) {
+        try { localStorage.setItem(localKey || supabaseKey, JSON.stringify(rows[0].value)); } catch {}
+        return rows[0].value;
+      }
+    }
+  } catch {}
+  try {
+    const stored = JSON.parse(localStorage.getItem(localKey || supabaseKey) || '[]');
+    return Array.isArray(stored) ? stored : [];
+  } catch { return []; }
+};
+
 export { _SB_URL, _SB_KEY, _SB_SERVICE_KEY, _SB_HEADERS, _PROXY_URL, _securePost, _sbSet, _sbGetAll, _sbDelete, _sbQueue, _SB_KEYS, _SB_KEY_PREFIXES, _sbRl, _rlCheck, _sbStorageUpload, _sbStorageGetSignedUrl, _sbStorageDelete, _SB_BUCKET, _validateMimeType, _syncStatusCallback, _sync, _patKey, _patKeyCloud, _compKey, _compKeyCloud };
