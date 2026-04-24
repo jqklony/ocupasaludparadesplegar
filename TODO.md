@@ -1,11 +1,40 @@
-# TODO - Ajuste Monolito Portal Empresa por NIT
+# 🚀 TODO - Modo Agenda Encuesta (Protocolo Aprobado)
 
-- [ ] 1. Localizar en `src/App.jsx` los bloques reales de render de Empresas/Reportes/Bill/Certificados.
-- [ ] 2. Insertar estado y helpers para búsqueda por NIT y agregación de documentos por empresa.
-- [ ] 3. Implementar vista "Portal Empresa por NIT" dentro de `renderCompanies` (o bloque equivalente).
-- [ ] 4. Integrar certificados por período con selección y descarga/impresión individual + bloque.
-- [ ] 5. Integrar listados de Informes, Cuentas de Cobro y Cartas de Custodia por NIT.
-- [ ] 6. Añadir validaciones (NIT inválido, sin documentos, acciones deshabilitadas).
-- [ ] 7. Revisar consistencia de referencias empresa/NIT en guardados existentes.
-- [ ] 8. Ejecutar build del monolito (`npm run build`) y corregir errores.
-- [ ] 9. Dejar resumen final técnico de cambios realizados.
+## 📋 Progreso Actual
+- [x] Servidor dev corriendo: http://localhost:5175/
+- [ ] Verificar estado actual agenda/encuestas
+
+## 🔧 Pasos de Implementación (Secuencial)
+
+### **Paso 1: utils/supabase.js** - Función marcarAgendaVisto()
+```
+[ ] Añadir export async function marcarAgendaVisto(agendaId)
+[ ] Test: console.log(await marcarAgendaVisto(testId))
+```
+
+### **Paso 2: src/pages/Historia.jsx** - Implementar componente completo
+```
+[ ] Convertir stub → recibe agendaPatientId
+[ ] Header "HC desde Agenda Encuesta"
+[ ] Botón "Marcar Visto y Cerrar" → callback
+[ ] Test: Abrir manualmente ?historia=agendaId
+```
+
+### **Paso 3: src/App.jsx** - Lógica principal
+```
+[ ] Añadir [showHistoriaEncuesta, setShowHistoriaEncuesta]
+[ ] Filtro "Solo Encuesta" en renderAgenda()
+[ ] Botón "Abrir HC" → setShowHistoriaEncuesta(true)
+[ ] Modal HC con callback onCerrarEncuestaAgenda
+[ ] Integrar marcarAgendaVisto() en callback
+```
+
+### **Paso 4: Verificación & Commit**
+```
+[ ] Test end-to-end: Encuesta → Agenda → HC → Visto
+[ ] git add . && git commit -m "feat: modo agenda encuesta"
+[ ] git push origin main
+[ ] Actualizar este TODO.md [x]
+```
+
+**Próximo paso automático: Editar utils/supabase.js**

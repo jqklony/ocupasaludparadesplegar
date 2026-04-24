@@ -1,4 +1,4 @@
-﻿// src/utils/supabase.js - Supabase Cloud Sync
+﻿﻿// src/utils/supabase.js - Supabase Cloud Sync
 import { _ls, _ss } from './storage.js';
 
 const _PROXY_URL =
@@ -265,7 +265,31 @@ const _patKeyCloud = (userId) => `siso_patients_${userId}`;
 const _compKey = (userId) => `siso_companies_${userId}`;
 const _compKeyCloud = (userId) => `siso_companies_${userId}`;
 
+// ══ NUEVA FUNCIÓN: Marcar agenda como "visto" desde HC ══
+/**
+ * Actualiza estado de cita en siso_agendados a "visto"
+ * @param {string} agendaId - ID de la cita en siso_agendados
+ * @returns {Promise<boolean>} true si éxito
+ */
+export const marcarAgendaVisto = async (agendaId) => {
+  if (!agendaId) return false;
+  try {
+    const r = await fetch(
+      `${_SB_URL}/rest/v1/siso_agendados?select=id`,
+      {
+        method: "PATCH",
+        headers: _SB_HEADERS,
+        body: JSON.stringify({ estado: "visto" }),
+      }
+    );
+    return r.ok;
+  } catch {
+    return false;
+  }
+};
+
 // ── Aliases compatibles con src/lib/supabaseSync.js de siso-appultimo ────────
+
 /**
  * Guarda un array completo en Supabase siso_store (localStorage + cloud).
  * @param {string} supabaseKey — clave en siso_store
