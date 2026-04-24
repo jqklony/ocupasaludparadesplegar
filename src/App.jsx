@@ -15233,6 +15233,17 @@ function AppInner() {
   const [editingCompany, setEditingCompany] = useState(null);
   const [loadingEncuestas, setLoadingEncuestas] = useState(false);
   const [encuestasSyncStatus, setEncuestasSyncStatus] = useState(null); // null|'saving'|'ok'|'error'
+  // ── MODAL AGENDAR DESDE ENCUESTA ──
+  const [agendarEncModal, setAgendarEncModal] = useState(null); // null | {enc, resps}
+  const [agendarEncForm, setAgendarEncForm] = useState({
+    fecha: new Date().toISOString().split('T')[0],
+    horaInicio: '07:00',
+    duracion: '20',
+    medicoId: '',
+    tipoConsulta: 'INGRESO',
+    tipoPago: 'convenio',
+    valorConsulta: '',
+  });
   // ── CAJA POR MÉDICO (component-level) ──
   const [cajaMedicoPeriodo, setCajaMedicoPeriodo] = useState("mes");
   const [porcentajeMedico, setPorcentajeMedico] = useState(60); // % honorarios médico vs clínica
@@ -28906,26 +28917,16 @@ Esta historia clínica debe conservarse mínimo 20 años.
                               const r = await fetch(`${_SB_URL}/rest/v1/siso_store?key=eq.siso_encuesta_resp_${enc.token}&select=value`, { headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` } });
                               const d = await r.json();
                               const resps = d[0]?.value || [];
-                              if (resps.length === 0) { showAlert("Sin respuestas para agendar. Primero importe los pacientes."); return; }
-                              showPrompt("📅 Fecha para agendar las citas (YYYY-MM-DD):", (fecha) => {
-                                if (!fecha) return;
-                                showPrompt("⏰ Hora de inicio (ej: 07:00):", (horaInicio) => {
-                                  if (!horaInicio) return;
-                                  const [h2, m2] = horaInicio.split(":").map(Number);
-                                  const nuevasCitas = resps.map((r2, i) => {
-                                    const minutos = h2 * 60 + m2 + (i * 20);
-                                    const hh = String(Math.floor(minutos / 60)).padStart(2, "0");
-                                    const mm = String(minutos % 60).padStart(2, "0");
-                                    return { id: "cita_enc_" + Date.now() + "_" + i, fecha, hora: `${hh}:${mm}`, pacienteNombre: r2.nombres, pacienteDoc: r2.docNumero, empresa: enc.empresaNombre, empresaId: enc.empresaId, tipoConsulta: enc.tipoExamen, medicoId: currentUser?.user || "", medicoNombre: activeDoctorData?.nombre || currentUser?.name || "", estado: "pendiente", _fromEncuesta: enc.token };
-                                  });
-                                  const updAgenda = [...(agendados || []), ...nuevasCitas];
-                                  setAgendados(updAgenda);
-                                  _sync("siso_agendados", JSON.stringify(updAgenda));
-                                  showAlert(`✅ ${nuevasCitas.length} citas agendadas para el ${fecha}\nDesde las ${horaInicio} (cada 20 min)\n\n→ Redirigiendo a la Agenda...`);
-                                  setTimeout(() => goTo("agenda"), 1500);
-                                });
-                              });
-                            } catch { showAlert("Error al agendar."); }
+                              if (resps.length === 0) { showAlert("Sin respuestas para agendar.\n\nAsegúrese de que los trabajadores hayan completado la encuesta."); return; }
+                              // Abrir modal con todos los campos necesarios
+                              setAgendarEncForm(prev => ({
+                                ...prev,
+                                tipoConsulta: enc.tipoExamen || 'INGRESO',
+                                medicoId: currentUser?.user || '',
+                                fecha: new Date().toISOString().split('T')[0],
+                              }));
+                              setAgendarEncModal({ enc, resps });
+                            } catch { showAlert("Error al cargar respuestas para agendar."); }
                           }} className="px-3 py-1.5 bg-orange-50 text-orange-700 text-[10px] font-black rounded-lg hover:bg-orange-100">📅 Agendar Todos</button>
                         </div>
                         {/* TABLA DE RESPUESTAS (expandible) */}
@@ -51976,6 +51977,189 @@ body{padding-top:52px;}
           </div>
         </div>
       )}
+      {/* ════════════════════════════════════════════════════
+          MODAL: AGENDAR TRABAJADORES DESDE ENCUESTA
+          ════════════════════════════════════════════════════ */}
+      {agendarEncModal && (
+        <div className="fixed inset-0 bg-black/60 z-[210] flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setAgendarEncModal(null); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-orange-600 to-amber-600 px-5 py-4 text-white">
+              <p className="font-black text-base">📅 Agendar Trabajadores</p>
+              <p className="text-orange-100 text-xs mt-0.5">
+                {agendarEncModal.enc.empresaNombre} · {agendarEncModal.resps.length} trabajador(es) · {agendarEncModal.enc.tipoExamen}
+              </p>
+            </div>
+            {/* Formulario */}
+            <div className="p-5 space-y-3 max-h-[70vh] overflow-y-auto">
+              {/* Fecha */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-black text-gray-600 block mb-1">📅 Fecha de las citas *</label>
+                  <input type="date" value={agendarEncForm.fecha}
+                    onChange={e => setAgendarEncForm(p => ({...p, fecha: e.target.value}))}
+                    className="w-full border-2 border-gray-200 rounded-xl p-2 text-sm focus:border-orange-400 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-600 block mb-1">⏰ Hora de inicio *</label>
+                  <input type="time" value={agendarEncForm.horaInicio}
+                    onChange={e => setAgendarEncForm(p => ({...p, horaInicio: e.target.value}))}
+                    className="w-full border-2 border-gray-200 rounded-xl p-2 text-sm focus:border-orange-400 focus:outline-none" />
+                </div>
+              </div>
+              {/* Duración y Tipo consulta */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-black text-gray-600 block mb-1">⏱ Duración por paciente</label>
+                  <select value={agendarEncForm.duracion}
+                    onChange={e => setAgendarEncForm(p => ({...p, duracion: e.target.value}))}
+                    className="w-full border-2 border-gray-200 rounded-xl p-2 text-sm focus:border-orange-400 focus:outline-none">
+                    {['10','15','20','25','30','40','45','60'].map(d =>
+                      <option key={d} value={d}>{d} minutos</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-600 block mb-1">🩺 Tipo de examen</label>
+                  <select value={agendarEncForm.tipoConsulta}
+                    onChange={e => setAgendarEncForm(p => ({...p, tipoConsulta: e.target.value}))}
+                    className="w-full border-2 border-gray-200 rounded-xl p-2 text-sm focus:border-orange-400 focus:outline-none">
+                    {['INGRESO','PERIODICO','EGRESO','POST-INCAPACIDAD','CONTROL'].map(t =>
+                      <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+              {/* Médico */}
+              <div>
+                <label className="text-[10px] font-black text-gray-600 block mb-1">👨‍⚕️ Médico responsable *</label>
+                <select value={agendarEncForm.medicoId}
+                  onChange={e => setAgendarEncForm(p => ({...p, medicoId: e.target.value}))}
+                  className="w-full border-2 border-gray-200 rounded-xl p-2 text-sm focus:border-orange-400 focus:outline-none">
+                  <option value="">— Seleccione médico —</option>
+                  {usersList.filter(u => u.role === 'medico' || u.role === 'super_admin' || u.role === 'administrador').map(u =>
+                    <option key={u.user} value={u.user}>{u.name || u.user}</option>)}
+                </select>
+              </div>
+              {/* Tipo de pago */}
+              <div>
+                <label className="text-[10px] font-black text-gray-600 block mb-1">💳 Tipo de pago</label>
+                <div className="flex gap-3">
+                  {[{v:'convenio',l:'🤝 Convenio empresa'},{v:'particular',l:'💰 Particular'}].map(opt =>
+                    <label key={opt.v} className={`flex-1 flex items-center gap-2 p-2.5 border-2 rounded-xl cursor-pointer text-xs font-bold transition ${agendarEncForm.tipoPago === opt.v ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                      <input type="radio" name="tipoPago" value={opt.v} checked={agendarEncForm.tipoPago === opt.v}
+                        onChange={() => setAgendarEncForm(p => ({...p, tipoPago: opt.v}))} className="sr-only" />
+                      {opt.l}
+                    </label>
+                  )}
+                </div>
+              </div>
+              {/* Valor (si particular) */}
+              {agendarEncForm.tipoPago === 'particular' && (
+                <div>
+                  <label className="text-[10px] font-black text-gray-600 block mb-1">💵 Valor de la consulta (COP)</label>
+                  <input type="number" placeholder="ej: 80000" value={agendarEncForm.valorConsulta}
+                    onChange={e => setAgendarEncForm(p => ({...p, valorConsulta: e.target.value}))}
+                    className="w-full border-2 border-gray-200 rounded-xl p-2 text-sm focus:border-orange-400 focus:outline-none" />
+                </div>
+              )}
+              {/* Preview de horarios */}
+              <div className="bg-orange-50 rounded-xl p-3 border border-orange-100">
+                <p className="text-[10px] font-black text-orange-700 mb-1">📋 Vista previa de horarios</p>
+                <div className="space-y-0.5 max-h-28 overflow-y-auto">
+                  {agendarEncModal.resps.slice(0,6).map((r2, i) => {
+                    const mins = (parseInt(agendarEncForm.horaInicio?.split(':')[0]||7) * 60)
+                      + (parseInt(agendarEncForm.horaInicio?.split(':')[1]||0))
+                      + (i * (parseInt(agendarEncForm.duracion)||20));
+                    const hh = String(Math.floor(mins/60)%24).padStart(2,'0');
+                    const mm = String(mins%60).padStart(2,'0');
+                    return <p key={i} className="text-[9px] text-orange-800">{hh}:{mm} — {r2.nombres || '(sin nombre)'}</p>;
+                  })}
+                  {agendarEncModal.resps.length > 6 && <p className="text-[9px] text-orange-500 italic">...y {agendarEncModal.resps.length - 6} más</p>}
+                </div>
+              </div>
+            </div>
+            {/* Footer botones */}
+            <div className="px-5 py-4 bg-gray-50 flex gap-3 border-t border-gray-100">
+              <button onClick={() => setAgendarEncModal(null)}
+                className="flex-1 py-2.5 border-2 border-gray-200 text-gray-600 rounded-xl font-bold text-sm hover:bg-gray-100">
+                Cancelar
+              </button>
+              <button
+                disabled={!agendarEncForm.fecha || !agendarEncForm.horaInicio || !agendarEncForm.medicoId}
+                onClick={() => {
+                  const { enc, resps } = agendarEncModal;
+                  const [hh0, mm0] = agendarEncForm.horaInicio.split(':').map(Number);
+                  const durMins = parseInt(agendarEncForm.duracion) || 20;
+                  const medicoObj = usersList.find(u => u.user === agendarEncForm.medicoId);
+                  const medicoNombre = medicoObj?.name || medicoObj?.nombre || agendarEncForm.medicoId;
+                  const fechaHoy = new Date().toISOString().split('T')[0];
+                  const _agSuf = currentUser?.empresaId
+                    ? 'empresa_' + currentUser.empresaId
+                    : currentUser?.user || 'shared';
+
+                  const nuevasCitas = resps.map((r2, i) => {
+                    const minTot = hh0 * 60 + mm0 + (i * durMins);
+                    const horaCita = String(Math.floor(minTot/60)%24).padStart(2,'0') + ':' + String(minTot%60).padStart(2,'0');
+                    const minFin = minTot + durMins;
+                    const horaFinCita = String(Math.floor(minFin/60)%24).padStart(2,'0') + ':' + String(minFin%60).padStart(2,'0');
+                    return {
+                      id: 'ag_enc_' + Date.now() + '_' + i,
+                      nombre: r2.nombres || '',
+                      docTipo: r2.docTipo || 'CC',
+                      docNumero: r2.docNumero || '',
+                      celular: r2.celular || '',
+                      eps: r2.eps || '',
+                      arl: r2.arl || enc.arl || '',
+                      empresa: enc.empresaNombre,
+                      empresaId: enc.empresaId,
+                      cargo: r2.cargo || '',
+                      genero: r2.genero || '',
+                      fecha: agendarEncForm.fecha,
+                      hora: horaCita,
+                      horaCita,
+                      horaFinCita,
+                      duracion: durMins,
+                      medicoId: agendarEncForm.medicoId,
+                      medicoNombre,
+                      tipoConsulta: agendarEncForm.tipoConsulta,
+                      tipoPago: agendarEncForm.tipoPago,
+                      valorConsulta: agendarEncForm.tipoPago === 'particular' ? agendarEncForm.valorConsulta : '',
+                      estado: agendarEncForm.fecha === fechaHoy ? 'espera' : 'programado',
+                      registradoPor: currentUser?.user || '',
+                      registradoEn: new Date().toISOString(),
+                      _fromEncuesta: enc.token,
+                    };
+                  });
+
+                  const updAgenda = [...(agendados || []), ...nuevasCitas];
+                  setAgendados(updAgenda);
+                  // Guardar en clave compartida Y clave por médico (visible para secretaria)
+                  _sync(`siso_agendados_${_agSuf}`, JSON.stringify(updAgenda));
+                  _sbSet(`siso_agendados_${_agSuf}`, updAgenda);
+                  // También en clave del médico si es diferente
+                  if (agendarEncForm.medicoId && agendarEncForm.medicoId !== _agSuf) {
+                    _sync(`siso_agendados_${agendarEncForm.medicoId}`, JSON.stringify(updAgenda));
+                    _sbSet(`siso_agendados_${agendarEncForm.medicoId}`, updAgenda);
+                  }
+                  setAgendarEncModal(null);
+                  showAlert(
+                    `✅ ${nuevasCitas.length} cita(s) agendadas\n\n` +
+                    `📅 Fecha: ${agendarEncForm.fecha}\n` +
+                    `⏰ Inicio: ${agendarEncForm.horaInicio} · ${durMins} min c/u\n` +
+                    `👨‍⚕️ Médico: ${medicoNombre}\n` +
+                    `💳 Pago: ${agendarEncForm.tipoPago === 'particular' ? 'Particular — $' + (agendarEncForm.valorConsulta||'0') : 'Convenio empresa'}\n\n` +
+                    `→ Diríjase a la Agenda para verlas`
+                  );
+                  setTimeout(() => goTo('agenda'), 2000);
+                }}
+                className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-black text-sm transition">
+                📅 Confirmar — Agendar {agendarEncModal.resps.length} paciente(s)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal datos paciente — Vista secretaria */}
       {showSecretariaPatientModal && (
         <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowSecretariaPatientModal(null); }}>
