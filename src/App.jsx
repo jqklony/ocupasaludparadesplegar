@@ -15231,6 +15231,8 @@ function AppInner() {
   // ── EMPRESAS (component-level to avoid React #310) ──
   const [companiesTab, setCompaniesTab] = useState("lista");
   const [editingCompany, setEditingCompany] = useState(null);
+  const [loadingEncuestas, setLoadingEncuestas] = useState(false);
+  const [encuestasSyncStatus, setEncuestasSyncStatus] = useState(null); // null|'saving'|'ok'|'error'
   // ── CAJA POR MÉDICO (component-level) ──
   const [cajaMedicoPeriodo, setCajaMedicoPeriodo] = useState("mes");
   const [porcentajeMedico, setPorcentajeMedico] = useState(60); // % honorarios médico vs clínica
@@ -15478,6 +15480,61 @@ function AppInner() {
       document.head.appendChild(pp);
     }
   }, []);
+  // ── ENCUESTAS: carga directa desde Supabase (no esperar _sbGetAll batch) ─────
+  // Busca siso_encuestas (clave compartida) + todas las claves por usuario antiguas
+  const _reloadEncuestasFromSupabase = useCallback(async () => {
+    setLoadingEncuestas(true);
+    try {
+      // 1. Leer clave compartida
+      const r1 = await fetch(
+        `${_SB_URL}/rest/v1/siso_store?key=eq.siso_encuestas&select=value`,
+        { headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` } }
+      );
+      const sharedEncs = r1.ok
+        ? (await r1.json())?.[0]?.value || []
+        : [];
+
+      // 2. Leer claves antiguas por usuario (siso_encuestas_*)
+      const r2 = await fetch(
+        `${_SB_URL}/rest/v1/siso_store?key=like.siso_encuestas_%&select=key,value`,
+        { headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` } }
+      );
+      const userRows = r2.ok ? await r2.json() : [];
+
+      // 3. Fusionar todo — dedup por id
+      const merged = Array.isArray(sharedEncs) ? [...sharedEncs] : [];
+      userRows.forEach(row => {
+        const rowEncs = Array.isArray(row.value) ? row.value : [];
+        rowEncs.forEach(e => { if (e.id && !merged.find(x => x.id === e.id)) merged.push(e); });
+      });
+
+      if (merged.length > 0) {
+        setEncuestas(merged);
+        try { localStorage.setItem("siso_encuestas", JSON.stringify(merged)); } catch {}
+        // Si hay más que la clave compartida, migrar y unificar
+        if (merged.length > (Array.isArray(sharedEncs) ? sharedEncs.length : 0)) {
+          _sbSet("siso_encuestas", merged);
+        }
+      }
+    } catch (err) {
+      console.warn("[encuestas reload]", err.message);
+    } finally {
+      setLoadingEncuestas(false);
+    }
+  }, []); // eslint-disable-line
+
+  // Cargar encuestas desde Supabase al entrar al tab (una vez por visita)
+  const _encuestasTabLoadedRef = useRef(false);
+  useEffect(() => {
+    if (companiesTab === "encuestas" && !_encuestasTabLoadedRef.current) {
+      _encuestasTabLoadedRef.current = true;
+      _reloadEncuestasFromSupabase();
+    }
+    if (companiesTab !== "encuestas") {
+      _encuestasTabLoadedRef.current = false; // resetear para próxima visita
+    }
+  }, [companiesTab, _reloadEncuestasFromSupabase]);
+
   // ── PERF-01: CSS Global — Print + Mobile + content-visibility ─────────────
   useEffect(() => {
     if (document.getElementById("siso-perf-styles")) return;
@@ -28721,9 +28778,44 @@ Esta historia clínica debe conservarse mínimo 20 años.
 
               {/* LISTA DE ENCUESTAS */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-                <p className="text-xs font-black text-gray-700 uppercase mb-3">📊 Encuestas Creadas ({encuestas.length})</p>
+                {/* Cabecera con botones Recargar y Guardar */}
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                  <p className="text-xs font-black text-gray-700 uppercase">
+                    📊 Encuestas Creadas ({encuestas.length})
+                    {loadingEncuestas && <span className="ml-2 text-blue-500">⟳ cargando...</span>}
+                    {encuestasSyncStatus === 'saving' && <span className="ml-2 text-amber-500">☁ guardando...</span>}
+                    {encuestasSyncStatus === 'ok' && <span className="ml-2 text-emerald-600">✓ guardado</span>}
+                    {encuestasSyncStatus === 'error' && <span className="ml-2 text-red-500">✗ error al guardar</span>}
+                  </p>
+                  <div className="flex gap-2">
+                    {/* Botón Recargar */}
+                    <button
+                      disabled={loadingEncuestas}
+                      onClick={() => _reloadEncuestasFromSupabase()}
+                      className="px-3 py-1.5 bg-blue-50 text-blue-700 text-[10px] font-black rounded-lg hover:bg-blue-100 disabled:opacity-40 flex items-center gap-1"
+                    >
+                      {loadingEncuestas ? "⟳ Cargando..." : "⟳ Recargar desde nube"}
+                    </button>
+                    {/* Botón Guardar manual */}
+                    <button
+                      disabled={encuestasSyncStatus === 'saving'}
+                      onClick={() => {
+                        setEncuestasSyncStatus('saving');
+                        _sbSet("siso_encuestas", encuestas)
+                          .then(ok => setEncuestasSyncStatus(ok ? 'ok' : 'error'))
+                          .catch(() => setEncuestasSyncStatus('error'));
+                        try { localStorage.setItem("siso_encuestas", JSON.stringify(encuestas)); } catch {}
+                      }}
+                      className="px-3 py-1.5 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-lg hover:bg-emerald-100 disabled:opacity-40 flex items-center gap-1"
+                    >
+                      {encuestasSyncStatus === 'saving' ? "☁ Guardando..." : "💾 Guardar en nube"}
+                    </button>
+                  </div>
+                </div>
                 {encuestas.length === 0 ? (
-                  <p className="text-center text-gray-400 text-xs py-4 italic">No hay encuestas creadas. Cree una para comenzar.</p>
+                  <p className="text-center text-gray-400 text-xs py-4 italic">
+                    {loadingEncuestas ? "Buscando encuestas en Supabase..." : "No hay encuestas creadas. Cree una para comenzar."}
+                  </p>
                 ) : (
                   <div className="space-y-3">
                     {[...encuestas].reverse().map(enc => (
