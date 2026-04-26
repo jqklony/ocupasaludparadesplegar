@@ -12156,6 +12156,7 @@ const EncuestaPublicaForm = ({ token, sbUrl, sbKey, onVolver }) => {
     celular: "", email: "", direccion: "", ciudad: "Popayán", zonaResidencia: "Urbana",
     eps: "", arl: "", afp: "", estrato: "",
     cargo: "", area: "", antiguedad: "", tipoContrato: "", turnoTrabajo: "Diurno",
+    contactoEmergencia: "", telEmergencia: "",
   });
   const [enviado, setEnviado] = useLocalState(false);
   const [error, setError] = useLocalState("");
@@ -12408,6 +12409,20 @@ const EncuestaPublicaForm = ({ token, sbUrl, sbKey, onVolver }) => {
                     {["Diurno","Nocturno","Rotativo","Mixto"].map(v => <option key={v}>{v}</option>)}
                   </select>
                 </div>
+              </div>
+            </div>
+          </div>
+          {/* CONTACTO DE EMERGENCIA */}
+          <div>
+            <p className="text-xs font-black text-red-800 uppercase mb-2 border-b border-red-200 pb-1">🆘 Contacto de Emergencia</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Nombre Contacto Emergencia</label>
+                <input value={form.contactoEmergencia} onChange={e => u("contactoEmergencia", e.target.value)} className="w-full p-2 border border-gray-200 rounded-lg text-sm" placeholder="Nombre del contacto" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-600 block mb-0.5">Teléfono Emergencia</label>
+                <input type="tel" value={form.telEmergencia} onChange={e => u("telEmergencia", e.target.value)} className="w-full p-2 border border-gray-200 rounded-lg text-sm" placeholder="300 000 0000" />
               </div>
             </div>
           </div>
@@ -13279,6 +13294,7 @@ function PortalEmpresaDocsPeriodos({ nitBusq, sbUrl, sbKey, resultadosEmpresa })
   const [portalDocs, setPortalDocs] = React.useState(null);
   const [docsLoaded, setDocsLoaded] = React.useState(false);
   const [activePi, setActivePi] = React.useState(null);
+  const [certSearch, setCertSearch] = React.useState("");
 
   React.useEffect(() => {
     if (!nitBusq || nitBusq.length < 4 || docsLoaded) return;
@@ -13371,7 +13387,16 @@ function PortalEmpresaDocsPeriodos({ nitBusq, sbUrl, sbKey, resultadosEmpresa })
 
                     {/* Tabla individual */}
                     {(resultadosEmpresa?.length > 0) && (
-                      <div className="border-t border-emerald-200 max-h-72 overflow-y-auto">
+                      <div className="border-t border-emerald-200">
+                        <div className="p-2">
+                          <input
+                            value={certSearch}
+                            onChange={e => setCertSearch(e.target.value)}
+                            placeholder="Buscar por nombre o cédula..."
+                            className="w-full p-2 border border-emerald-300 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                          />
+                        </div>
+                        <div className="max-h-72 overflow-y-auto">
                         <table className="w-full text-xs">
                           <thead className="bg-emerald-100 sticky top-0">
                             <tr>
@@ -13381,7 +13406,7 @@ function PortalEmpresaDocsPeriodos({ nitBusq, sbUrl, sbKey, resultadosEmpresa })
                             </tr>
                           </thead>
                           <tbody>
-                            {resultadosEmpresa.map((p, i) => {
+                            {(certSearch.trim() ? resultadosEmpresa.filter(p => (p.nombres||"").toLowerCase().includes(certSearch.toLowerCase()) || (p.docNumero||"").toLowerCase().includes(certSearch.toLowerCase())) : resultadosEmpresa).map((p, i) => {
                               const cApt = (p.conceptoAptitud || "").toLowerCase();
                               const badgeCls = cApt.includes("no apto") ? "bg-red-100 text-red-800 border-red-300" : cApt.includes("condic") || cApt.includes("restricc") ? "bg-amber-100 text-amber-800 border-amber-300" : cApt.includes("apto") ? "bg-emerald-100 text-emerald-800 border-emerald-300" : "bg-gray-100 text-gray-700 border-gray-200";
                               return (
@@ -13414,6 +13439,7 @@ function PortalEmpresaDocsPeriodos({ nitBusq, sbUrl, sbKey, resultadosEmpresa })
                             })}
                           </tbody>
                         </table>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -16463,7 +16489,7 @@ Hábitos: Tabaquismo ${data.habitos?.fuma} | Alcohol ${
 CONTEXTO ESPECÍFICO DEL TIPO DE EXAMEN: ${_contextoTipo}
 CRITERIOS OBLIGATORIOS: 1) El concepto de aptitud debe citar el artículo de la Res. 1843/2025 correspondiente (norma vigente desde 29 abril 2025 - Res. 2346/2007 derogada). 2) Si es egreso o post-incapacidad, incluir análisis de reintegro laboral. 3) Las restricciones deben ser operativas, cuantificables y con base normativa (GTC-45, GATISO). 4) Las recomendaciones deben ser específicas para el cargo y los riesgos, no genéricas, y deben responder al contexto del tipo de examen indicado arriba.
 JSON REQUERIDO (sin markdown, sin texto adicional):
-{"diagnosticoPrincipal":"Z10.0 - EXAMEN MÉDICO OCUPACIONAL","diagnosticoSecundario1":"CIE-10 - Hallazgo clínico identificado o cadena vacía","diagnosticoSecundario2":"CIE-10 - Segundo hallazgo o cadena vacía","conceptoAptitud":"Concepto de aptitud laboral (APTO/APTO CON RESTRICCIONES/NO APTO) con justificación cargo-hallazgos. NO mencionar diagnósticos específicos, medicamentos, ni tratamientos. Solo aptitud y condiciones laborales. Conforme Res. 1843/2025 Art. 20","vigencia":"X meses con justificación clínica","recomendaciones":"Mínimo 10 recomendaciones de medicina preventiva y salud ocupacional enfocadas en cargo y riesgos. NO incluir medicamentos ni tratamiento farmacológico. NO referir tratamiento médico actual","restriccionesTexto":"Restricciones médico-laborales operativas y cuantificables (mínimo 5 si hay hallazgos), formato: [TIPO] (Segmento) Descripción - Base legal","derivaciones":[{"especialidad":"Especialidad médica requerida","motivo":"Motivo clínico concreto","urgencia":"Electiva"}],"examenesSugeridos":["Examen paraclínico 1"],"interconsultaResumen":"Resumen clínico para interconsulta o cadena vacía","incapacidadSugerida":{"aplica":false,"dias":0,"motivo":"","diagnosticoCIE":""},"analisisClinico":"Análisis clínico detallado con lenguaje técnico-formal de médico especialista en medicina laboral con más de 15 años de experiencia. Incluir: interpretación de hallazgos, correlación cargo-riesgos ocupacionales, referencias a normativa colombiana (Dec. 1072/2015, Res. 2346/2007, Res. 1843/2025). Mínimo 200 palabras.","sveRecomendado":["SVE Osteomuscular si aplica según GATISO-DME Res. 2844/2007","SVE Psicosocial si aplica según Res. 2764/2022","SVE Visual / SVE Respiratorio / SVE Neurológico / SVE Dermatológico según hallazgos"]}`;    try {
+{"diagnosticoPrincipal":"Z10.0 - EXAMEN MÉDICO OCUPACIONAL","diagnosticoSecundario1":"CIE-10 - Hallazgo clínico identificado o cadena vacía","diagnosticoSecundario2":"CIE-10 - Segundo hallazgo o cadena vacía","conceptoAptitud":"Concepto de aptitud laboral (APTO/APTO CON RESTRICCIONES/NO APTO) con justificación cargo-hallazgos. NO mencionar diagnósticos específicos, medicamentos, ni tratamientos. Solo aptitud y condiciones laborales. Conforme Res. 1843/2025 Art. 20","vigencia":"X meses con justificación clínica","recomendaciones":"Mínimo 10 recomendaciones de medicina preventiva y salud ocupacional enfocadas en cargo y riesgos. NO incluir medicamentos ni tratamiento farmacológico. NO referir tratamiento médico actual","restriccionesTexto":"Restricciones médico-laborales operativas y cuantificables (mínimo 5 si hay hallazgos), formato: [TIPO] (Segmento) Descripción - Base legal","derivaciones":[{"especialidad":"Especialidad médica (ej: Ortopedia, Neurología, Psiquiatría, Oftalmología, Cardiología...)","motivo":"Motivo clínico concreto sustentado en hallazgos objetivos de la HC","urgencia":"Urgente/Prioritaria/Electiva","objetivo":"Objetivo específico de la interconsulta"}],"examenesSugeridos":["Examen paraclínico 1"],"interconsultaResumen":"Resumen clínico para interconsulta o cadena vacía","incapacidadSugerida":{"aplica":false,"dias":0,"motivo":"","diagnosticoCIE":""},"analisisClinico":"Análisis clínico estructurado con lenguaje técnico-formal. ESTRUCTURA OBLIGATORIA: [1. INTERPRETACIÓN DE HALLAZGOS] Descripción técnica de todos los hallazgos al examen físico y paraclínicos, correlación fisiopatológica con antecedentes. [2. CORRELACIÓN CARGO-RIESGOS OCUPACIONALES] Relación entre los hallazgos y los riesgos específicos del cargo, exposición laboral y condiciones de trabajo según GTC-45 y GATISO. [3. JUSTIFICACIÓN CLÍNICA DE RESTRICCIONES Y RECOMENDACIONES] Para CADA restricción e instrucción emitida: argumentación clínica detallada del PORQUÉ se establece, sustentada en hallazgos objetivos, normativa (Res. 1843/2025, Dec. 1072/2015, GTC-45, GATISO) y evidencia médica. Si no hay restricciones, argumentar clínicamente el porqué el trabajador es APTO sin restricciones. [4. DERIVACIONES A ESPECIALIDADES SUGERIDAS] Lista numerada de cada especialidad a la cual se sugiere derivar, con: a) especialidad, b) motivo clínico específico sustentado en hallazgos, c) urgencia (Urgente/Prioritaria/Electiva), d) objetivo de la interconsulta. Si no aplica derivación, argumentar clínicamente. [5. NORMATIVA APLICABLE] Referencias específicas a normativa colombiana relevante para el caso. Mínimo 300 palabras totales.","sveRecomendado":["SVE Osteomuscular si aplica según GATISO-DME Res. 2844/2007","SVE Psicosocial si aplica según Res. 2764/2022","SVE Visual / SVE Respiratorio / SVE Neurológico / SVE Dermatológico según hallazgos"]}`;    try {
       let text;
       try {
         text = await callAI(prompt, true);
@@ -28899,8 +28925,8 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                 setEncuestas(updEnc3);
                                 localStorage.setItem("siso_encuestas", JSON.stringify(updEnc3));
                                 _sbSet("siso_encuestas", updEnc3);
-                                showAlert(`✅ ${nuevos.length} trabajador(es) importados como pacientes.\n\n→ Redirigiendo a Historia Clínica...`);
-                                setTimeout(() => goTo("historia"), 1500);
+                                showAlert(`✅ ${nuevos.length} trabajador(es) importados como pacientes.\n\n→ Redirigiendo a la lista de pacientes...`);
+                                setTimeout(() => goTo("pacientes"), 1500);
                               });
                             } catch { showAlert("Error al importar."); }
                           }} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-lg hover:bg-emerald-100">⬆️ Importar Pacientes</button>
@@ -28911,10 +28937,10 @@ Esta historia clínica debe conservarse mínimo 20 años.
                               const d = await r.json();
                               const resps = d[0]?.value || [];
                               if (resps.length === 0) { showAlert("Sin respuestas para exportar."); return; }
-                              const filas = resps.map((r2, i) => `<tr class="${i%2===0?'':'bg-gray-50'}"><td>${i+1}</td><td><b>${r2.nombres||''}</b></td><td>${r2.docTipo||'CC'} ${r2.docNumero||''}</td><td>${r2.genero||'--'}</td><td>${r2.cargo||'--'}</td><td>${r2.eps||'--'}</td><td>${r2.arl||'--'}</td><td>${r2.celular||'--'}</td><td>${r2.email||'--'}</td><td>${r2.direccion||'--'}</td><td>${r2.contactoEmergencia||'--'}<br/><small>${r2.telEmergencia||''}</small></td></tr>`).join('');
+                              const filas = resps.map((r2, i) => `<tr class="${i%2===0?'':'bg-gray-50'}"><td>${i+1}</td><td><b>${r2.nombres||''}</b></td><td>${r2.docTipo||'CC'} ${r2.docNumero||''}</td><td>${r2.fechaNacimiento||'--'}</td><td>${r2.edad||'--'}</td><td>${r2.genero||'--'}</td><td>${r2.estadoCivil||'--'}</td><td>${r2.escolaridad||'--'}</td><td>${r2.grupoEtnico||'--'}</td><td>${r2.lateralidad||'--'}</td><td>${r2.celular||'--'}</td><td>${r2.email||'--'}</td><td>${r2.direccion||'--'}</td><td>${r2.ciudad||'--'}</td><td>${r2.zonaResidencia||'--'}</td><td>${r2.estrato||'--'}</td><td>${r2.eps||'--'}</td><td>${r2.arl||'--'}</td><td>${r2.afp||'--'}</td><td>${r2.cargo||'--'}</td><td>${r2.area||'--'}</td><td>${r2.antiguedad||'--'}</td><td>${r2.tipoContrato||'--'}</td><td>${r2.turnoTrabajo||'--'}</td><td>${r2.contactoEmergencia||'--'}</td><td>${r2.telEmergencia||'--'}</td></tr>`).join('');
                               const w = window.open('','_blank');
                               if(!w){showAlert("Permita ventanas emergentes.");return;}
-                              w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Encuesta - ${enc.empresaNombre}</title><style>body{font-family:Arial,sans-serif;font-size:10px;margin:20px;color:#111}h1{font-size:16px;color:#065f46;margin:0}h2{font-size:11px;color:#555;margin:4px 0 12px 0}table{width:100%;border-collapse:collapse}th{background:#065f46;color:white;padding:5px 6px;text-align:left;font-size:8px;white-space:nowrap}td{padding:4px 6px;border-bottom:1px solid #e5e7eb;font-size:9px;vertical-align:top}.bg-gray-50{background:#f9fafb}tr:hover{background:#f0fdf4}.footer{margin-top:12px;font-size:8px;color:#888;text-align:center}.np{text-align:center;padding:12px}@media print{.np{display:none}@page{size:landscape;margin:8mm}}</style></head><body><h1>📋 ENCUESTA SOCIODEMOGRÁFICA</h1><h2>${enc.empresaNombre} · ${enc.tipoExamen} · ${resps.length} trabajador(es) · Creada: ${enc.fechaCreacion}</h2><table><thead><tr><th>#</th><th>Nombre</th><th>Documento</th><th>Género</th><th>Cargo</th><th>EPS</th><th>ARL</th><th>Celular</th><th>Email</th><th>Dirección</th><th>Emergencia</th></tr></thead><tbody>${filas}</tbody></table><div class="footer">OcupaSalud · Generado: ${new Date().toLocaleString("es-CO")} · Res. 1843/2025</div><div class="np"><button onclick="window.print()" style="background:#065f46;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:900">🖨️ Imprimir / Guardar PDF</button></div></body></html>`);
+                              w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Encuesta - ${enc.empresaNombre}</title><style>@page{size:landscape;margin:8mm}body{font-family:Arial,sans-serif;font-size:9px;margin:10px;color:#111}h1{font-size:14px;color:#065f46;margin:0}h2{font-size:10px;color:#555;margin:4px 0 10px 0}table{width:100%;border-collapse:collapse}th{background:#065f46;color:white;padding:4px 5px;text-align:left;font-size:7px;white-space:nowrap}td{padding:3px 5px;border-bottom:1px solid #e5e7eb;font-size:8px;vertical-align:top}.bg-gray-50{background:#f9fafb}tr:hover{background:#f0fdf4}.footer{margin-top:10px;font-size:7px;color:#888;text-align:center}.np{text-align:center;padding:10px}@media print{.np{display:none}}</style></head><body><h1>&#128203; ENCUESTA SOCIODEMOGRAFICA</h1><h2>${enc.empresaNombre} &middot; ${enc.tipoExamen} &middot; ${resps.length} trabajador(es) &middot; Creada: ${enc.fechaCreacion}</h2><table><thead><tr><th>#</th><th>Nombre</th><th>Documento</th><th>Fec.Nac.</th><th>Edad</th><th>Genero</th><th>Est.Civil</th><th>Escolaridad</th><th>Grupo Etnico</th><th>Lateralidad</th><th>Celular</th><th>Email</th><th>Direccion</th><th>Ciudad</th><th>Zona</th><th>Estrato</th><th>EPS</th><th>ARL</th><th>AFP</th><th>Cargo</th><th>Area</th><th>Antiguedad</th><th>Contrato</th><th>Turno</th><th>Ctc Emergencia</th><th>Tel Emergencia</th></tr></thead><tbody>${filas}</tbody></table><div class="footer">OcupaSalud &middot; Generado: ${new Date().toLocaleString("es-CO")} &middot; Res. 1843/2025</div><div class="np"><button onclick="window.print()" style="background:#065f46;color:white;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-weight:900">Imprimir / Guardar PDF</button></div></body></html>`);
                               w.document.close();
                             } catch { showAlert("Error al generar PDF."); }
                           }} className="px-3 py-1.5 bg-slate-50 text-slate-700 text-[10px] font-black rounded-lg hover:bg-slate-100">📄 Descargar PDF</button>
@@ -40486,7 +40512,10 @@ th{background:#fee2e2;font-weight:900;text-align:left;color:#7f1d1d;}
           </div>
         )}
         {ag.estado === "atendiendo" && (
-          <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse flex-shrink-0 mt-2" />
+          <div className="flex flex-col items-center gap-0.5">
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse flex-shrink-0" />
+            <span className="text-[8px] font-black text-blue-600 whitespace-nowrap">En consulta</span>
+          </div>
         )}
         {ag.estado === "atendido" && (
           <div className="w-7 h-7 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ring-2 ring-emerald-400">
