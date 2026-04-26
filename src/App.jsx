@@ -387,6 +387,7 @@ const _SB_KEY_PREFIXES = [
   "siso_habeas_",
   "siso_patients_",
   "siso_portal_",
+  "siso_adj_",
 ];
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -33817,15 +33818,57 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
       "image/webp",
     ];
 
+    // Comprime imagen a base64 usando Canvas (max 900px, calidad 0.55)
+    // Segunda pasada si sigue >200KB: 600px quality 0.4
+    const _compressImage = (file) =>
+      new Promise((resolve) => {
+        const MAX_PX = 900;
+        const QUALITY = 0.55;
+        const MAX_BYTES = 200 * 1024;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onload = () => {
+            let { width, height } = img;
+            if (width > MAX_PX || height > MAX_PX) {
+              if (width >= height) { height = Math.round(height * MAX_PX / width); width = MAX_PX; }
+              else { width = Math.round(width * MAX_PX / height); height = MAX_PX; }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = width; canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+            canvas.toBlob((blob1) => {
+              if (!blob1) { resolve(ev.target.result); return; }
+              if (blob1.size <= MAX_BYTES) {
+                const r2 = new FileReader();
+                r2.onload = (e2) => resolve(e2.target.result);
+                r2.readAsDataURL(blob1);
+              } else {
+                // Segunda pasada: 600px, quality 0.4
+                const c2 = document.createElement("canvas");
+                const s = Math.min(1, 600 / Math.max(width, height));
+                c2.width = Math.round(width * s); c2.height = Math.round(height * s);
+                const cx2 = c2.getContext("2d");
+                cx2.drawImage(img, 0, 0, c2.width, c2.height);
+                c2.toBlob((blob2) => {
+                  const r3 = new FileReader();
+                  r3.onload = (e3) => resolve(e3.target.result);
+                  r3.readAsDataURL(blob2 || blob1);
+                }, "image/jpeg", 0.4);
+              }
+            }, "image/jpeg", QUALITY);
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+
     const handleSubirAdjunto = async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
       if (!TIPOS_MIME.includes(file.type)) {
         showAlert("⚠️ Solo se permiten PDF, PNG, JPG, TIFF o WebP.");
-        return;
-      }
-      if (file.size > MAX_BYTES) {
-        showAlert(`⚠️ El archivo supera el límite de ${MAX_MB} MB.`);
         return;
       }
 
@@ -33835,54 +33878,97 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
         TIPOS_ADJUNTO.find((t) => t.valor === tipoVal)?.etiqueta || "Documento";
 
       const ts = Date.now();
-      const ext = file.name.split(".").pop().toLowerCase();
       const userId = currentUser?.user || "unknown";
       const hcId = data.id || "hc_" + ts;
-      const storagePath = `${userId}/${hcId}/${ts}-${tipoVal}.${ext}`;
-      const nombreVisible = `${tipoLabel.replace(/[^\w\s]/g, "").trim()} - ${
-        file.name
-      }`;
+      const adjId = `adj_${ts}`;
+      const sbKey = `siso_adj_${hcId}_${adjId}`;
+      const nombreVisible = `${tipoLabel.replace(/[^\w\s]/g, "").trim()} - ${file.name}`;
 
-      showAlert("⏳ Subiendo archivo a Supabase Storage...");
+      showAlert("⏳ Procesando archivo...");
 
-      const result = await _sbStorageUpload(storagePath, file);
-      if (!result.ok) {
-        showAlert(
-          `❌ Error al subir: ${
-            result.error ||
-            "Verifica que el bucket siso-adjuntos esté habilitado en Supabase."
-          }`
-        );
+      let dataUrl;
+      try {
+        if (file.type.startsWith("image/")) {
+          // Comprimir imagen con Canvas
+          dataUrl = await _compressImage(file);
+        } else {
+          // PDF u otro: leer como base64 directo (máx 1.5MB)
+          const PDF_MAX = 1.5 * 1024 * 1024;
+          if (file.size > PDF_MAX) {
+            showAlert(`⚠️ El PDF supera el límite de 1.5 MB. Por favor comprime el archivo antes de subirlo.`);
+            e.target.value = "";
+            return;
+          }
+          dataUrl = await new Promise((res) => {
+            const r = new FileReader();
+            r.onload = (ev) => res(ev.target.result);
+            r.readAsDataURL(file);
+          });
+        }
+      } catch (err) {
+        showAlert(`❌ Error al procesar el archivo: ${err.message}`);
+        e.target.value = "";
         return;
       }
 
+      // Guardar en localStorage como caché
+      try { localStorage.setItem(sbKey, dataUrl); } catch {}
+
+      // Guardar en Supabase siso_store
+      const ok = await _sbSet(sbKey, dataUrl);
+
       const nuevoAdj = {
-        id: `adj_${ts}`,
+        id: adjId,
         nombre: nombreVisible,
         tipo: tipoVal,
         tipoLabel,
-        mimeType: file.type,
-        tamano: file.size,
+        mimeType: file.type.startsWith("image/") ? "image/jpeg" : file.type,
+        tamano: Math.round(dataUrl.length * 0.75), // aprox bytes de base64
         fecha: new Date().toISOString(),
         subidoPor: userId,
-        path: storagePath,
+        sbKey, // clave en siso_store (reemplaza path)
       };
 
       const nuevosAdjuntos = [...adjuntos, nuevoAdj];
       setData((prev) => ({ ...prev, adjuntos: nuevosAdjuntos }));
-      showAlert(`✅ "${file.name}" subido correctamente como ${tipoLabel}.`);
+      const sizeKb = Math.round(nuevoAdj.tamano / 1024);
+      showAlert(`✅ "${file.name}" guardado (${sizeKb} KB) como ${tipoLabel}.${ok ? "" : " (solo local — sin conexión)"}`);
       if (tipoSelect) tipoSelect.value = "otro";
       e.target.value = "";
     };
 
     const handleVerAdjunto = async (adj) => {
-      const url = await _sbStorageGetSignedUrl(adj.path);
-      if (url) {
-        window.open(url, "_blank");
+      // Compatibilidad con adjuntos antiguos que usan path (Supabase Storage)
+      if (!adj.sbKey && adj.path) {
+        showAlert("⚠️ Este adjunto fue guardado con el sistema anterior y no está disponible. Sube el archivo nuevamente.");
+        return;
+      }
+      // Leer desde localStorage (caché) primero
+      let dataUrl = null;
+      try { dataUrl = localStorage.getItem(adj.sbKey); } catch {}
+      if (!dataUrl) {
+        // Leer desde Supabase siso_store
+        try {
+          const r = await fetch(
+            `${_SB_URL}/rest/v1/siso_store?key=eq.${encodeURIComponent(adj.sbKey)}&select=value`,
+            { headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` } }
+          );
+          if (r.ok) {
+            const rows = await r.json();
+            dataUrl = rows?.[0]?.value || null;
+            if (dataUrl) { try { localStorage.setItem(adj.sbKey, dataUrl); } catch {} }
+          }
+        } catch {}
+      }
+      if (dataUrl) {
+        const w = window.open("", "_blank");
+        if (adj.mimeType === "application/pdf") {
+          w.document.write(`<iframe src="${dataUrl}" width="100%" height="100%" style="border:none;position:fixed;top:0;left:0;width:100%;height:100%;"></iframe>`);
+        } else {
+          w.document.write(`<img src="${dataUrl}" style="max-width:100%;display:block;margin:auto;" />`);
+        }
       } else {
-        showAlert(
-          "⚠️ No se pudo obtener el enlace. Verifica la conexión con Supabase."
-        );
+        showAlert("⚠️ No se pudo cargar el archivo. Verifica la conexión.");
       }
     };
 
@@ -33899,7 +33985,11 @@ RESPONDE ÚNICAMENTE JSON VÁLIDO sin texto previo ni bloques markdown:
         })
       );
       if (!ok) return;
-      await _sbStorageDelete(adj.path);
+      // Eliminar de siso_store si tiene sbKey
+      if (adj.sbKey) {
+        await _sbDelete(adj.sbKey);
+        try { localStorage.removeItem(adj.sbKey); } catch {}
+      }
       const filtrados = adjuntos.filter((a) => a.id !== adj.id);
       setData((prev) => ({ ...prev, adjuntos: filtrados }));
       showAlert("🗑 Adjunto eliminado.");

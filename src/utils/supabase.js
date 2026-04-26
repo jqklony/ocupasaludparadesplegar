@@ -86,6 +86,7 @@ const _SB_KEY_PREFIXES = [
   "siso_habeas_",
   "siso_patients_",
   "siso_portal_",
+  "siso_adj_",
 ];
 
 const _sbRl = { count: 0, reset: Date.now() + 60000 };
