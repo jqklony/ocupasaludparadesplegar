@@ -19392,13 +19392,29 @@ Esta historia clínica debe conservarse mínimo 20 años.
     var _enfasisHC = (data.enfasisExamen || "").toUpperCase();
     // ALTURAS — solo si el énfasis es ALTURAS
     var alt = data.examenAlturas || {};
-    if (_enfasisHC === "ALTURAS" && (alt.romberg || alt.marcha || alt.vertigo || alt.coordinacion || alt.nistagmus || alt.testMiedo || alt.observaciones)) {
-      sections.push(sec("🧗", "Énfasis: Trabajo en Alturas") + tb(
-        r2("Romberg", alt.romberg||"--", "Marcha", alt.marcha||"--") +
+    if (_enfasisHC === "ALTURAS" && (alt.romberg || alt.marcha || alt.vertigo || alt.coordinacion || alt.nistagmus || alt.testMiedo || alt.observaciones || alt.audiometriaOido || alt.paracliLab || alt.paracliEkg || alt.paracliEspiro || alt.paracliOptometria || alt.paracliRayosX || alt.paracliPsico || alt.paracliOtros)) {
+      var _altRows =
+        r2("Romberg", alt.romberg||"--", "Marcha Tandem", alt.marcha||"--") +
         r2("Vértigo", alt.vertigo||"No", "Coordinación", alt.coordinacion||"--") +
-        r2("Nistagmus", alt.nistagmus||"No", "Test de Miedo", alt.testMiedo||"--") +
-        (alt.observaciones ? r1("Observaciones", alt.observaciones) : "")
-      ));
+        r2("Nistagmus", alt.nistagmus||"No", "Test de Miedo Alturas", alt.testMiedo||"--") +
+        (alt.observaciones ? r1("Observaciones Neurológicas", alt.observaciones) : "");
+      // Audiometría
+      if (alt.audiometriaOido || alt.audiometriaTipo || alt.audiometriaStatus || alt.audiometriaObs) {
+        _altRows += `<tr><td colspan="4" style="background:#e0f2fe;font-weight:900;font-size:9px;padding:4px 6px;text-transform:uppercase;letter-spacing:.5px;">👂 Audiometría</td></tr>`;
+        _altRows += r2("Resultado Audiometría", alt.audiometriaOido||"--", "Tipo", alt.audiometriaTipo||"--");
+        if (alt.audiometriaStatus) _altRows += r1("Estado Audiometría", alt.audiometriaStatus);
+        if (alt.audiometriaObs) _altRows += r1("Observaciones Audiometría", alt.audiometriaObs);
+      }
+      // Paraclínicos
+      var _hasParacli = alt.paracliLab || alt.paracliEkg || alt.paracliEspiro || alt.paracliOptometria || alt.paracliRayosX || alt.paracliPsico || alt.paracliOtros;
+      if (_hasParacli) {
+        _altRows += `<tr><td colspan="4" style="background:#e0f2fe;font-weight:900;font-size:9px;padding:4px 6px;text-transform:uppercase;letter-spacing:.5px;">🔬 Paraclínicos</td></tr>`;
+        if (alt.paracliLab) _altRows += r2("Laboratorios", alt.paracliLab, "EKG / Holter", alt.paracliEkg||"--");
+        if (alt.paracliEspiro) _altRows += r2("Espirometría", alt.paracliEspiro, "Optometría", alt.paracliOptometria||"--");
+        if (alt.paracliRayosX) _altRows += r2("Rx / Imagen Dx", alt.paracliRayosX, "Psicosensométrico", alt.paracliPsico||"--");
+        if (alt.paracliOtros) _altRows += r1("Otros Paraclínicos", alt.paracliOtros);
+      }
+      sections.push(sec("🧗", "Énfasis: Trabajo en Alturas (Res. 4272/2021)") + tb(_altRows));
     }
     // ALIMENTOS — solo si el énfasis es ALIMENTOS
     var alim = data.examenAlimentos || {};
@@ -22916,7 +22932,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
             </div>
             <input
               className="w-full text-xs p-1 border border-sky-300 rounded mt-2 outline-none"
-              placeholder="Observaciones alturas..."
+              placeholder="Observaciones neurológicas alturas..."
               value={data.examenAlturas?.observaciones || ""}
               onChange={(e) =>
                 setData((p) => ({
@@ -22928,6 +22944,75 @@ Esta historia clínica debe conservarse mínimo 20 años.
                 }))
               }
             />
+
+            {/* ── Audiometría ── */}
+            <div className="mt-3 border-t border-sky-200 pt-2">
+              <p className="font-black text-[10px] text-sky-700 uppercase mb-1">👂 Audiometría</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                {[
+                  { k: "audiometriaOido", l: "Resultado OD/OI", opts: ["Normal", "Hipoacusia Leve", "Hipoacusia Moderada", "Hipoacusia Severa"] },
+                  { k: "audiometriaTipo", l: "Tipo", opts: ["Conductiva", "Sensorioneural", "Mixta", "No Aplica"] },
+                  { k: "audiometriaStatus", l: "Estado", opts: ["Apto", "Con Restricción", "No Realizada"] },
+                ].map((f) => (
+                  <div key={f.k} className="bg-white p-2 rounded border border-sky-100 col-span-1">
+                    <p className="font-bold text-[10px] mb-1">{f.l}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {f.opts.map((o) => (
+                        <label key={o} className={`cursor-pointer text-[10px] flex items-center gap-1 ${o.includes("Hipoacusia") || o === "Con Restricción" ? "text-red-600" : "text-gray-700"}`}>
+                          <input
+                            type="radio"
+                            checked={data.examenAlturas?.[f.k] === o}
+                            onChange={() => setData((p) => ({ ...p, examenAlturas: { ...p.examenAlturas, [f.k]: o } }))}
+                          /> {o}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <input
+                className="w-full text-xs p-1 border border-sky-300 rounded mt-1 outline-none"
+                placeholder="Observaciones audiometría (ej: pérdida 30dB a 4000Hz OD)..."
+                value={data.examenAlturas?.audiometriaObs || ""}
+                onChange={(e) => setData((p) => ({ ...p, examenAlturas: { ...p.examenAlturas, audiometriaObs: e.target.value } }))}
+              />
+            </div>
+
+            {/* ── Paraclínicos ── */}
+            <div className="mt-3 border-t border-sky-200 pt-2">
+              <p className="font-black text-[10px] text-sky-700 uppercase mb-1">🔬 Paraclínicos</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                {[
+                  { k: "paracliLab", l: "Laboratorios", opts: ["Normal", "Alterado", "No Realizado"] },
+                  { k: "paracliEkg", l: "EKG / Holter", opts: ["Normal", "Anormal", "No Realizado"] },
+                  { k: "paracliEspiro", l: "Espirometría", opts: ["Normal", "Obstructivo", "Restrictivo", "Mixto", "No Realizado"] },
+                  { k: "paracliOptometria", l: "Optometría/Visiometría", opts: ["Normal", "Alterada", "No Realizado"] },
+                  { k: "paracliRayosX", l: "Rx / Imagen Dx", opts: ["Normal", "Con Hallazgos", "No Realizado"] },
+                  { k: "paracliPsico", l: "Psicosensométrico", opts: ["Apto", "No Apto", "No Realizado"] },
+                ].map((f) => (
+                  <div key={f.k} className="bg-white p-2 rounded border border-sky-100">
+                    <p className="font-bold text-[10px] mb-1">{f.l}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {f.opts.map((o) => (
+                        <label key={o} className={`cursor-pointer text-[10px] flex items-center gap-1 ${o === "Alterado" || o === "Anormal" || o === "Alterada" || o === "Con Hallazgos" || o === "No Apto" || o.includes("bstructivo") || o.includes("estrictivo") || o.includes("Mixto") ? "text-red-600" : o === "No Realizado" ? "text-gray-400" : "text-gray-700"}`}>
+                          <input
+                            type="radio"
+                            checked={data.examenAlturas?.[f.k] === o}
+                            onChange={() => setData((p) => ({ ...p, examenAlturas: { ...p.examenAlturas, [f.k]: o } }))}
+                          /> {o}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <input
+                className="w-full text-xs p-1 border border-sky-300 rounded mt-1 outline-none"
+                placeholder="Otros paraclínicos / hallazgos relevantes..."
+                value={data.examenAlturas?.paracliOtros || ""}
+                onChange={(e) => setData((p) => ({ ...p, examenAlturas: { ...p.examenAlturas, paracliOtros: e.target.value } }))}
+              />
+            </div>
           </div>
         )}
         {/* Énfasis Alimentos */}
@@ -24999,6 +25084,33 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     {data.examenAlturas?.observaciones && (
                       <div className="col-span-2 mt-1 text-gray-600 italic">
                         {data.examenAlturas.observaciones}
+                      </div>
+                    )}
+                    {/* Audiometría preview */}
+                    {(data.examenAlturas?.audiometriaOido || data.examenAlturas?.audiometriaTipo || data.examenAlturas?.audiometriaStatus) && (
+                      <div className="col-span-2 mt-2 border-t border-sky-100 pt-1">
+                        <p className="text-[9px] font-black text-sky-700 uppercase mb-1">👂 Audiometría</p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-0">
+                          {data.examenAlturas?.audiometriaOido && <div className={rowCls}><span className="text-gray-500">Resultado</span><span className={badNorm(data.examenAlturas.audiometriaOido)}>{data.examenAlturas.audiometriaOido}</span></div>}
+                          {data.examenAlturas?.audiometriaTipo && <div className={rowCls}><span className="text-gray-500">Tipo</span><span>{data.examenAlturas.audiometriaTipo}</span></div>}
+                          {data.examenAlturas?.audiometriaStatus && <div className={rowCls}><span className="text-gray-500">Estado</span><span className={badNorm(data.examenAlturas.audiometriaStatus, "Apto")}>{data.examenAlturas.audiometriaStatus}</span></div>}
+                          {data.examenAlturas?.audiometriaObs && <div className="col-span-2 text-gray-600 italic">{data.examenAlturas.audiometriaObs}</div>}
+                        </div>
+                      </div>
+                    )}
+                    {/* Paraclínicos preview */}
+                    {["paracliLab","paracliEkg","paracliEspiro","paracliOptometria","paracliRayosX","paracliPsico","paracliOtros"].some(k => data.examenAlturas?.[k]) && (
+                      <div className="col-span-2 mt-2 border-t border-sky-100 pt-1">
+                        <p className="text-[9px] font-black text-sky-700 uppercase mb-1">🔬 Paraclínicos</p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-0">
+                          {data.examenAlturas?.paracliLab && <div className={rowCls}><span className="text-gray-500">Laboratorios</span><span className={badNorm(data.examenAlturas.paracliLab)}>{data.examenAlturas.paracliLab}</span></div>}
+                          {data.examenAlturas?.paracliEkg && <div className={rowCls}><span className="text-gray-500">EKG/Holter</span><span className={badNorm(data.examenAlturas.paracliEkg)}>{data.examenAlturas.paracliEkg}</span></div>}
+                          {data.examenAlturas?.paracliEspiro && <div className={rowCls}><span className="text-gray-500">Espirometría</span><span className={badNorm(data.examenAlturas.paracliEspiro)}>{data.examenAlturas.paracliEspiro}</span></div>}
+                          {data.examenAlturas?.paracliOptometria && <div className={rowCls}><span className="text-gray-500">Optometría</span><span className={badNorm(data.examenAlturas.paracliOptometria)}>{data.examenAlturas.paracliOptometria}</span></div>}
+                          {data.examenAlturas?.paracliRayosX && <div className={rowCls}><span className="text-gray-500">Rx / Imagen</span><span className={badNorm(data.examenAlturas.paracliRayosX)}>{data.examenAlturas.paracliRayosX}</span></div>}
+                          {data.examenAlturas?.paracliPsico && <div className={rowCls}><span className="text-gray-500">Psicosensométrico</span><span className={badNorm(data.examenAlturas.paracliPsico, "Apto")}>{data.examenAlturas.paracliPsico}</span></div>}
+                          {data.examenAlturas?.paracliOtros && <div className="col-span-2 text-gray-600 italic">{data.examenAlturas.paracliOtros}</div>}
+                        </div>
                       </div>
                     )}
                   </>
