@@ -17963,14 +17963,20 @@ const handleLogin = (u, p) => {
               : a
           );
           setAgendados(updAg);
-          // PASO 6: clave aislada
+          // PASO 6: clave aislada del usuario actual
           const _hcSuf = currentUser?.empresaId
             ? "empresa_" + currentUser.empresaId
             : currentUser?.user || "shared";
           _sync(`siso_agendados_${_hcSuf}`, JSON.stringify(updAg));
           _sbSet(`siso_agendados_${_hcSuf}`, updAg);
-          // ── Registrar en Atenciones Recientes ────────────────────────────────
+          // ── Sync también en clave del médico asignado (para secretaria) ──────
           const agOrig = agendados.find((a) => a.id === data._agendaId);
+          const _agMedicoKey = agOrig?.medicoId;
+          if (_agMedicoKey && _agMedicoKey !== _hcSuf) {
+            _sync(`siso_agendados_${_agMedicoKey}`, JSON.stringify(updAg));
+            _sbSet(`siso_agendados_${_agMedicoKey}`, updAg);
+          }
+          // ── Registrar en Atenciones Recientes ────────────────────────────────
           const nuevaAtencion = {
             id: "ac_" + Date.now(),
             agendaId: data._agendaId,
@@ -40545,16 +40551,27 @@ th{background:#fee2e2;font-weight:900;text-align:left;color:#7f1d1d;}
           )}
         </div>
         <div className="flex flex-col gap-1.5 flex-shrink-0">
-          {ag.estado === "espera" &&
+          {/* ── Botón Abrir HC — espera y programado ── */}
+          {(ag.estado === "espera" || ag.estado === "programado") &&
             (currentUser?.user === ag.medicoId ||
-              _isAdmin(currentUser?.role)) && (
+              _isAdmin(currentUser?.role) ||
+              currentUser?.role === "secretaria") && (
               <button
                 onClick={() => iniciarAtencion(ag)}
-                className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black hover:bg-blue-700 whitespace-nowrap"
+                className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black hover:bg-blue-700 whitespace-nowrap flex items-center gap-1"
               >
-                ▶ Iniciar
+                📋 {ag.estado === "espera" ? "Iniciar HC" : "Abrir HC"}
               </button>
             )}
+          {/* ── Atendiendo: re-abrir HC + marcar atendido ── */}
+          {ag.estado === "atendiendo" && (
+            <button
+              onClick={() => setHcChoiceAgenda(ag)}
+              className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black hover:bg-indigo-700 whitespace-nowrap"
+            >
+              📋 Reabrir HC
+            </button>
+          )}
           {ag.estado === "atendiendo" && isAdminOrSec && (
             <button
               onClick={() => marcarAtendido(ag.id)}
@@ -51877,13 +51894,18 @@ body{padding-top:52px;}
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[210] p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
             <div className="bg-gradient-to-r from-blue-600 to-teal-600 px-6 py-4 text-white">
-              <h3 className="text-lg font-black">Iniciar Atención Médica</h3>
+              <h3 className="text-lg font-black">Abrir Historia Clínica</h3>
               <p className="text-blue-100 text-xs mt-0.5">
                 Paciente:{" "}
                 <span className="font-bold text-white">
                   {hcChoiceAgenda.nombre}
                 </span>
               </p>
+              {hcChoiceAgenda.medicoNombre && (
+                <p className="text-blue-200 text-[10px] mt-0.5">
+                  👨‍⚕️ {hcChoiceAgenda.medicoNombre} · {hcChoiceAgenda.empresa || ""} · {hcChoiceAgenda.tipoConsulta || ""}
+                </p>
+              )}
             </div>
             <div className="p-6">
               <p className="text-sm text-gray-600 mb-5 text-center font-medium">
