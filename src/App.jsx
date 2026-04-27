@@ -27470,37 +27470,75 @@ Esta historia clínica debe conservarse mínimo 20 años.
                               : null;
                             showAlert(`📥 Generando ${selectedList.length} PDF${selectedList.length > 1 ? 's' : ''}...\n\nPor favor espera, esto puede tardar unos segundos dependiendo de la cantidad.`);
                             
-                            // NUEVA LÓGICA: Usar impresión nativa del navegador para máxima fidelidad y cero repeticiones
+                            // LÓGICA AUTOMATIZADA: Descarga directa de PDFs individuales sin repetición de datos
                             const downloadAllAsPDF = async () => {
                               for (let i = 0; i < selectedList.length; i++) {
                                 const p = selectedList[i];
                                 const fullHtml = _generarCertificadoHTMLNormalizado(p, docData, sig, _miIPSCertSel);
                                 
-                                // Abrimos una ventana temporal para cada certificado
-                                const w = window.open("", "_blank", "width=900,height=1100");
-                                if (!w) {
-                                  showAlert("El navegador bloqueó las ventanas emergentes. Por favor permítalas.");
-                                  break;
+                                // Contenedor temporal para renderizado
+                                const container = document.createElement('div');
+                                container.style.position = 'absolute';
+                                container.style.left = '-9999px';
+                                container.style.top = '0';
+                                container.style.width = '800px'; 
+                                container.innerHTML = fullHtml;
+                                document.body.appendChild(container);
+                                
+                                try {
+                                  // Captura de alta precisión
+                                  const canvas = await html2canvas(container, {
+                                    scale: 2,
+                                    useCORS: true,
+                                    logging: false,
+                                    backgroundColor: '#ffffff',
+                                    windowWidth: 800
+                                  });
+                                  
+                                  const imgData = canvas.toDataURL('image/jpeg', 0.98);
+                                  const pdf = new jsPDF('p', 'mm', 'letter');
+                                  const pageWidth = pdf.internal.pageSize.getWidth();
+                                  const pageHeight = pdf.internal.pageSize.getHeight();
+                                  const margin = 0; // Sin márgenes internos para control total
+                                  const contentWidth = pageWidth;
+                                  const contentHeight = pageHeight;
+                                  
+                                  // Cálculo de dimensiones reales en mm
+                                  const imgWidthPx = canvas.width;
+                                  const imgHeightPx = canvas.height;
+                                  const ratio = contentWidth / (imgWidthPx / 2);
+                                  const totalImgHeightMm = (imgHeightPx / 2) * ratio;
+                                  
+                                  // ESTRATEGIA DEFINITIVA: 
+                                  // 1. Si el contenido cabe en una página (con 10% de margen), lo ajustamos.
+                                  // 2. Si es más largo, dividimos SIN SOLAPAMIENTO (0 píxeles de repetición).
+                                  if (totalImgHeightMm <= contentHeight * 1.1) {
+                                    const scale = totalImgHeightMm > contentHeight ? (contentHeight / totalImgHeightMm) : 1;
+                                    pdf.addImage(imgData, 'JPEG', 0, 0, contentWidth * scale, totalImgHeightMm * scale);
+                                  } else {
+                                    let heightLeft = totalImgHeightMm;
+                                    let position = 0;
+                                    while (heightLeft > 0) {
+                                      pdf.addImage(imgData, 'JPEG', 0, position, contentWidth, totalImgHeightMm);
+                                      heightLeft -= contentHeight;
+                                      position -= contentHeight;
+                                      if (heightLeft > 0) pdf.addPage();
+                                    }
+                                  }
+                                  
+                                  const safeName = (p.nombres || 'Certificado').replace(/[^a-z0-9]/gi, '_').toUpperCase();
+                                  pdf.save(`CERTIFICADO_${safeName}.pdf`);
+                                } catch (err) {
+                                  console.error("Error en PDF:", err);
+                                } finally {
+                                  document.body.removeChild(container);
                                 }
                                 
-                                // Inyectamos el HTML y disparamos la impresión
-                                w.document.write(fullHtml);
-                                w.document.close();
-                                
-                                // Esperamos a que cargue y disparamos el diálogo de impresión
-                                // El usuario solo debe darle a "Guardar" en cada uno
-                                setTimeout(() => {
-                                  w.print();
-                                  // Opcional: cerrar la ventana después de imprimir
-                                  // w.close(); 
-                                }, 500);
-
-                                // Pequeña pausa entre ventanas
                                 if (i < selectedList.length - 1) {
-                                  await new Promise(resolve => setTimeout(resolve, 800));
+                                  await new Promise(resolve => setTimeout(resolve, 500));
                                 }
                               }
-                              showAlert("✅ Proceso de generación completado. Por favor guarda cada PDF en el diálogo de impresión.");
+                              showAlert("✅ Descarga automática completada.");
                             };
                             
                             downloadAllAsPDF();
