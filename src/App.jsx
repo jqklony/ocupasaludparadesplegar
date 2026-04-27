@@ -11911,12 +11911,13 @@ const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : n
     "*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}" +
     'body{font-family:"Segoe UI",Arial,sans-serif;font-size:10.5pt;color:#111;padding:18mm 20mm 14mm;}' +
     "table{border-collapse:collapse;page-break-inside:auto;}" +
-    "tr{page-break-inside:avoid;page-break-after:auto;}" +
-    "td,th{page-break-inside:avoid;}" +
+    "tr{page-break-inside:avoid;page-break-after:auto;break-inside:avoid;}" +
+    "td,th{page-break-inside:avoid;break-inside:avoid;}" +
+    "thead{display:table-row-group;}" +
     ".np-dl{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;align-items:flex-end;gap:6px;}" +
     ".np-dl button{background:#065f46;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:900;font-size:11pt;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2);}" +
     ".np-dl p{font-size:8pt;color:#6b7280;text-align:right;}" +
-    "@media print{.np-dl{display:none!important;}body{padding:0;}}" +
+    "@media print{.np-dl{display:none!important;}body{padding:15mm 20mm;}.pat-box,.concepto-box,.sec,.firma-row,.alerta,.cv-box{break-inside:avoid;page-break-inside:avoid;}}" +
     /* ── HEADER ── */
     ".hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #065f46;padding-bottom:10px;margin-bottom:14px;}" +
     ".hdr-brand{display:flex;align-items:center;gap:10px;}" +
@@ -27385,9 +27386,9 @@ Esta historia clínica debe conservarse mínimo 20 años.
                   w.document.write(
                     '<!DOCTYPE html><html lang="es"><head>' +
                       sharedHead +
-                      "<style>@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}" +
+                      "<style>@page{size:letter portrait;margin:15mm 18mm 18mm 18mm;}" +
                       "*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}" +
-                      "table{border-collapse:collapse;page-break-inside:auto;}tr{page-break-inside:avoid;page-break-after:auto;}td,th{page-break-inside:avoid;}" +
+                      "table{border-collapse:collapse;page-break-inside:auto;}tr{page-break-inside:avoid;page-break-after:auto;break-inside:avoid;}td,th{page-break-inside:avoid;break-inside:avoid;}thead{display:table-row-group;}.pat-box,.concepto-box,.sec,.firma-row,.alerta{break-inside:avoid;page-break-inside:avoid;}" +
                       ".np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;" +
                       "padding:7px 14px;display:flex;align-items:center;gap:10px;z-index:9999;}" +
                       ".np-bar span{flex:1;font-size:9pt;font-weight:700;}" +
@@ -27461,66 +27462,77 @@ Esta historia clínica debe conservarse mínimo 20 años.
                         </button>
                         {/* Botón descargar SELECCIONADOS como archivos PDF individuales */}
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             if (selectedList.length === 0) { showAlert("Seleccione al menos un certificado con el checkbox."); return; }
                             const docData = activeDoctorData || {};
                             const sig = activeSignature || "";
                             const _miIPSCertSel = currentUser?.empresaId
                               ? companies.find((c) => c.id === currentUser.empresaId) || null
                               : null;
-                            showAlert(`📥 Generando ${selectedList.length} PDF${selectedList.length > 1 ? 's' : ''}...\n\nPor favor espera, esto puede tardar unos segundos dependiendo de la cantidad.`);
-                            
-                            // SOLUCIÓN DEFINITIVA: Descarga unitaria automática mediante impresión nativa silenciosa
-                            // Esta técnica garantiza 0 repeticiones y márgenes perfectos.
-                            const downloadAllAsPDF = async () => {
-                              for (let i = 0; i < selectedList.length; i++) {
-                                const p = selectedList[i];
-                                const fullHtml = _generarCertificadoHTMLNormalizado(p, docData, sig, _miIPSCertSel);
-                                
-                                // Creamos un iframe invisible para cada certificado
-                                const iframe = document.createElement('iframe');
-                                iframe.style.position = 'fixed';
-                                iframe.style.right = '0';
-                                iframe.style.bottom = '0';
-                                iframe.style.width = '0';
-                                iframe.style.height = '0';
-                                iframe.style.border = '0';
-                                document.body.appendChild(iframe);
-                                
-                                const doc = iframe.contentWindow.document;
-                                doc.open();
-                                doc.write(fullHtml);
-                                doc.close();
-
-                                // Esperamos a que el contenido cargue y disparamos la impresión
-                                await new Promise(resolve => {
-                                  iframe.onload = () => {
-                                    setTimeout(() => {
-                                      iframe.contentWindow.focus();
-                                      iframe.contentWindow.print();
-                                      resolve();
-                                    }, 500);
-                                  };
-                                  // Fallback por si onload no dispara
-                                  setTimeout(resolve, 1500);
-                                });
-
-                                // Limpiamos el iframe después de un tiempo prudente
-                                setTimeout(() => {
-                                  if (document.body.contains(iframe)) {
-                                    document.body.removeChild(iframe);
+                            showAlert(`📥 Generando ${selectedList.length} PDF${selectedList.length > 1 ? 's' : ''} individual${selectedList.length > 1 ? 'es' : ''}...\n\nSe guardarán automáticamente en tu carpeta de descargas, uno por uno.`);
+                            for (let i = 0; i < selectedList.length; i++) {
+                              const p = selectedList[i];
+                              const fullHtml = _generarCertificadoHTMLNormalizado(p, docData, sig, _miIPSCertSel);
+                              // Renderizar en iframe oculto para capturar con html2canvas
+                              const iframe = document.createElement('iframe');
+                              iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:816px;height:1px;border:0;visibility:hidden;';
+                              document.body.appendChild(iframe);
+                              await new Promise(resolve => {
+                                const _timeout = setTimeout(resolve, 10000);
+                                iframe.onload = async () => {
+                                  try {
+                                    const iDoc = iframe.contentDocument;
+                                    // Ocultar botones no imprimibles
+                                    const btnEl = iDoc.querySelector('.np-dl');
+                                    if (btnEl) btnEl.style.display = 'none';
+                                    // Ajustar iframe al alto real del contenido
+                                    const scrollH = iDoc.documentElement.scrollHeight;
+                                    iframe.style.height = scrollH + 'px';
+                                    await new Promise(r => setTimeout(r, 300));
+                                    const canvas = await html2canvas(iDoc.body, {
+                                      scale: 2,
+                                      useCORS: true,
+                                      allowTaint: true,
+                                      backgroundColor: '#ffffff',
+                                      width: 816,
+                                      windowWidth: 816,
+                                      scrollX: 0,
+                                      scrollY: 0,
+                                      height: scrollH,
+                                      windowHeight: scrollH,
+                                    });
+                                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                                    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+                                    const pdfW = pdf.internal.pageSize.getWidth();
+                                    const pdfH = pdf.internal.pageSize.getHeight();
+                                    const margin = 15;
+                                    const contentW = pdfW - margin * 2;
+                                    const contentH = (canvas.height * contentW) / canvas.width;
+                                    const pageContentH = pdfH - margin * 2;
+                                    let page = 0;
+                                    pdf.addImage(imgData, 'JPEG', margin, margin, contentW, contentH);
+                                    while (contentH > pageContentH * (page + 1)) {
+                                      page++;
+                                      pdf.addPage();
+                                      pdf.addImage(imgData, 'JPEG', margin, margin - page * pageContentH, contentW, contentH);
+                                    }
+                                    const nombre = (p.nombres || 'Paciente').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+                                    const cc = (p.docNumero || p.cedula || '').replace(/\D/g, '');
+                                    pdf.save(`Certificado_${nombre}_${cc}.pdf`);
+                                  } catch (err) {
+                                    console.error('[PDF] Error generando certificado:', err);
+                                  } finally {
+                                    clearTimeout(_timeout);
+                                    setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 500);
+                                    resolve();
                                   }
-                                }, 10000);
-
-                                // Pausa entre certificados para que el usuario pueda gestionar las ventanas de guardado
-                                if (i < selectedList.length - 1) {
-                                  await new Promise(resolve => setTimeout(resolve, 1000));
-                                }
-                              }
-                              showAlert("✅ Proceso de descarga iniciado. Por favor, confirma el guardado de cada archivo.");
-                            };
-                            
-                            downloadAllAsPDF();
+                                };
+                                iframe.srcdoc = fullHtml;
+                              });
+                              // Pausa entre descargas para que el navegador gestione cada archivo
+                              if (i < selectedList.length - 1) await new Promise(r => setTimeout(r, 1200));
+                            }
+                            showAlert(`✅ ${selectedList.length} PDF${selectedList.length > 1 ? 's descargados' : ' descargado'} en tu carpeta de descargas.`);
                           }}
                           disabled={selectedList.length === 0}
                           className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl flex items-center gap-1.5 transition"
@@ -27557,9 +27569,9 @@ Esta historia clínica debe conservarse mínimo 20 años.
                             w.document.write(
                               '<!DOCTYPE html><html lang="es"><head>' + sharedHeadAll +
                               '<style>' +
-                              '@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}' +
+                              '@page{size:letter portrait;margin:15mm 18mm 18mm 18mm;}' +
                               '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}' +
-                              'table{border-collapse:collapse;page-break-inside:auto;}tr{page-break-inside:avoid;page-break-after:auto;}td,th{page-break-inside:avoid;}' +
+                              'table{border-collapse:collapse;page-break-inside:auto;}tr{page-break-inside:avoid;page-break-after:auto;break-inside:avoid;}td,th{page-break-inside:avoid;break-inside:avoid;}thead{display:table-row-group;}.pat-box,.concepto-box,.sec,.firma-row,.alerta{break-inside:avoid;page-break-inside:avoid;}' +
                               '.np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;padding:8px 16px;display:flex;align-items:center;gap:10px;z-index:9999;}' +
                               '.np-bar span{flex:1;font-size:9pt;font-weight:700;}' +
                               '.np-bar button{border:none;padding:6px 16px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;}' +
