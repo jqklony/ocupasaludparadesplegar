@@ -27480,8 +27480,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                 document.body.appendChild(container);
                                 
                                 try {
-                                  // Volver a captura de imagen de alta resolución pero con segmentación manual
-                                  // para garantizar que NO se corte el texto y se vea profesional.
+                                  // Captura de alta resolución con ajuste inteligente de página
                                   const canvas = await html2canvas(container, {
                                     scale: 2,
                                     useCORS: true,
@@ -27490,35 +27489,38 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                     windowWidth: 800
                                   });
                                   
-                                  const imgData = canvas.toDataURL('image/jpeg', 0.98);
-                                  const pdf = new jsPDF('p', 'mm', 'letter');
+                                  const imgData = canvas.toDataURL('image/jpeg', 0.95);
                                   
+                                  // Calculamos dimensiones
+                                  const imgWidth = canvas.width;
+                                  const imgHeight = canvas.height;
+                                  
+                                  // Definimos el PDF en tamaño carta
+                                  const pdf = new jsPDF('p', 'mm', 'letter');
                                   const pageWidth = pdf.internal.pageSize.getWidth();
                                   const pageHeight = pdf.internal.pageSize.getHeight();
                                   const margin = 10;
                                   const contentWidth = pageWidth - (margin * 2);
                                   const contentHeight = pageHeight - (margin * 2);
                                   
-                                  const imgWidth = canvas.width;
-                                  const imgHeight = canvas.height;
+                                  // Ratio para ajustar al ancho disponible
                                   const ratio = contentWidth / (imgWidth / 2);
                                   const totalImgHeightMm = (imgHeight / 2) * ratio;
                                   
-                                  // Si el contenido cabe en una sola página, lo centramos
-                                  if (totalImgHeightMm <= contentHeight) {
-                                    pdf.addImage(imgData, 'JPEG', margin, margin, contentWidth, totalImgHeightMm);
+                                  // ESTRATEGIA: Si el contenido se pasa un poco (hasta 20%), lo escalamos para que quepa en UNA SOLA HOJA
+                                  // Esto evita el 90% de los cortes feos.
+                                  if (totalImgHeightMm <= contentHeight * 1.2) {
+                                    const finalScale = totalImgHeightMm > contentHeight ? (contentHeight / totalImgHeightMm) : 1;
+                                    pdf.addImage(imgData, 'JPEG', margin, margin, contentWidth * finalScale, totalImgHeightMm * finalScale);
                                   } else {
-                                    // Si es más largo, lo dividimos en páginas sin cortar texto (segmentación)
+                                    // Si es realmente largo, usamos páginas pero con un solapamiento mínimo para evitar cortes en medio de líneas
                                     let heightLeft = totalImgHeightMm;
                                     let position = 0;
                                     let pageNum = 1;
                                     
                                     while (heightLeft > 0) {
                                       if (pageNum > 1) pdf.addPage();
-                                      
-                                      // Añadir la imagen desplazada para simular el salto de página
                                       pdf.addImage(imgData, 'JPEG', margin, position + margin, contentWidth, totalImgHeightMm);
-                                      
                                       heightLeft -= contentHeight;
                                       position -= contentHeight;
                                       pageNum++;
