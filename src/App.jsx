@@ -27500,11 +27500,10 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                   const pageWidth = pdf.internal.pageSize.getWidth();
                                   const pageHeight = pdf.internal.pageSize.getHeight();
                                   
-                                  // Agregamos márgenes de seguridad para que no quede pegado a los bordes
-                                  const marginX = 10; 
-                                  const marginY = 10;
-                                  const contentWidth = pageWidth - (marginX * 2);
-                                  const contentHeight = pageHeight - (marginY * 2);
+                                  // Volvemos a margen 0 en jsPDF para evitar el error de repetición
+                                  // Los márgenes se manejan ahora 100% desde el CSS del HTML
+                                  const contentWidth = pageWidth;
+                                  const contentHeight = pageHeight;
                                   
                                   // Cálculo de dimensiones reales en mm
                                   const imgWidthPx = canvas.width;
@@ -27512,17 +27511,15 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                   const ratio = contentWidth / (imgWidthPx / 2);
                                   const totalImgHeightMm = (imgHeightPx / 2) * ratio;
                                   
-                                  // ESTRATEGIA DEFINITIVA: 
-                                  // 1. Si el contenido cabe en una página (con 15% de margen), lo ajustamos.
-                                  if (totalImgHeightMm <= contentHeight * 1.15) {
+                                  // ESTRATEGIA: 
+                                  if (totalImgHeightMm <= contentHeight * 1.1) {
                                     const scale = totalImgHeightMm > contentHeight ? (contentHeight / totalImgHeightMm) : 1;
-                                    pdf.addImage(imgData, 'JPEG', marginX, marginY, contentWidth * scale, totalImgHeightMm * scale);
+                                    pdf.addImage(imgData, 'JPEG', 0, 0, contentWidth * scale, totalImgHeightMm * scale);
                                   } else {
                                     let heightLeft = totalImgHeightMm;
                                     let position = 0;
                                     while (heightLeft > 0) {
-                                      // Usamos los márgenes definidos
-                                      pdf.addImage(imgData, 'JPEG', marginX, position + marginY, contentWidth, totalImgHeightMm);
+                                      pdf.addImage(imgData, 'JPEG', 0, position, contentWidth, totalImgHeightMm);
                                       heightLeft -= contentHeight;
                                       position -= contentHeight;
                                       if (heightLeft > 0) pdf.addPage();
