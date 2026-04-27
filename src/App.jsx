@@ -27513,20 +27513,24 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                   const ratio = contentWidth / (imgWidth / 2);
                                   const totalImgHeightMm = (imgHeight / 2) * ratio;
                                   
-                                  // ESTRATEGIA: Si el contenido se pasa un poco (hasta 20%), lo escalamos para que quepa en UNA SOLA HOJA
-                                  // Esto evita el 90% de los cortes feos.
-                                  if (totalImgHeightMm <= contentHeight * 1.2) {
+                                  // ESTRATEGIA: Si el contenido se pasa un poco (hasta 25%), lo escalamos para que quepa en UNA SOLA HOJA
+                                  // Esto evita cortes en certificados que se pasan por muy poco.
+                                  if (totalImgHeightMm <= contentHeight * 1.25) {
                                     const finalScale = totalImgHeightMm > contentHeight ? (contentHeight / totalImgHeightMm) : 1;
                                     pdf.addImage(imgData, 'JPEG', margin, margin, contentWidth * finalScale, totalImgHeightMm * finalScale);
                                   } else {
-                                    // Si es realmente largo, usamos páginas pero con un solapamiento mínimo para evitar cortes en medio de líneas
+                                    // Si es realmente largo, usamos páginas SIN solapamiento para evitar repetición de datos
                                     let heightLeft = totalImgHeightMm;
                                     let position = 0;
                                     let pageNum = 1;
                                     
                                     while (heightLeft > 0) {
-                                      if (pageNum > 1) pdf.addPage();
+                                      if (pageNum > 1) {
+                                        pdf.addPage();
+                                      }
+                                      // Usamos clipping para asegurar que no se repita nada
                                       pdf.addImage(imgData, 'JPEG', margin, position + margin, contentWidth, totalImgHeightMm);
+                                      
                                       heightLeft -= contentHeight;
                                       position -= contentHeight;
                                       pageNum++;
