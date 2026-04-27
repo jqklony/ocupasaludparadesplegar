@@ -27470,58 +27470,73 @@ Esta historia clínica debe conservarse mínimo 20 años.
                               : null;
                             showAlert(`📥 Generando ${selectedList.length} PDF${selectedList.length > 1 ? 's' : ''}...\n\nPor favor espera, esto puede tardar unos segundos dependiendo de la cantidad.`);
                             
-                            // ESTRATEGIA DEFINITIVA: Generar un único documento organizado con todos los certificados
-                            // Cada certificado empieza en una página nueva y respeta los saltos de línea naturales.
+                            // LÓGICA DE DESCARGA UNITARIA AUTOMÁTICA: Alta precisión y sin repeticiones
                             const downloadAllAsPDF = async () => {
-                              const w = window.open("", "_blank", "width=920,height=1150");
-                              if (!w) { showAlert("El navegador bloqueó la ventana emergente. Permita los popups."); return; }
-                              
-                              const certsHtml = selectedList.map((p, idx) => {
-                                const html = _generarCertificadoHTMLNormalizado(p, docData, sig, _miIPSCertSel);
-                                // Extraer solo el contenido del body para unificarlo
-                                const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/);
-                                const content = bodyMatch ? bodyMatch[1] : html;
-                                // Forzar salto de página antes de cada certificado excepto el primero
-                                return `<div style="${idx > 0 ? 'page-break-before:always;' : ''}">${content}</div>`;
-                              }).join("");
-
-                              // Usar el CSS corregido con márgenes amplios y control de saltos
-                              const finalHtml = `
-                                <!DOCTYPE html>
-                                <html lang="es">
-                                <head>
-                                  <meta charset="UTF-8">
-                                  <style>
-                                    @page { size: letter portrait; margin: 18mm 20mm; }
-                                    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact!important; print-color-adjust: exact!important; }
-                                    body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10.5pt; color: #111; }
-                                    table { width: 100%; border-collapse: collapse; page-break-inside: auto; table-layout: fixed; }
-                                    tr { page-break-inside: avoid; page-break-after: auto; }
-                                    td, th { page-break-inside: avoid; border: 1px solid #e5e7eb; padding: 5px; }
-                                    .sec { margin-bottom: 15px; page-break-inside: avoid; }
-                                    .sec-title { font-weight: 900; color: #065f46; border-bottom: 2px solid #065f46; padding-bottom: 3px; margin-bottom: 8px; text-transform: uppercase; font-size: 10pt; }
-                                    .hdr { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #065f46; padding-bottom: 10px; margin-bottom: 14px; }
-                                    .hdr-name { font-size: 13pt; font-weight: 900; color: #065f46; text-transform: uppercase; }
-                                    .np-bar { position: fixed; top: 0; left: 0; right: 0; background: #065f46; color: #fff; padding: 10px; display: flex; align-items: center; gap: 15px; z-index: 9999; }
-                                    .np-bar button { background: #10b981; color: white; border: none; padding: 8px 20px; border-radius: 8px; font-weight: 900; cursor: pointer; }
-                                    @media print { .np-bar { display: none!important; } body { padding: 0!important; } }
-                                    body { padding-top: 60px; }
-                                  </style>
-                                </head>
-                                <body>
-                                  <div class="np-bar">
-                                    <span style="flex:1; font-weight:bold;">📄 ${selectedList.length} Certificados Listos para Descargar</span>
-                                    <button onclick="window.print()">📥 GUARDAR TODO EN UN SOLO PDF</button>
-                                    <button onclick="window.close()" style="background:#ef4444;">Cerrar</button>
-                                  </div>
-                                  ${certsHtml}
-                                </body>
-                                </html>
-                              `;
-
-                              w.document.write(finalHtml);
-                              w.document.close();
-                              showAlert("✅ Documento unificado generado. Haz clic en 'GUARDAR TODO' para descargar.");
+                              for (let i = 0; i < selectedList.length; i++) {
+                                const p = selectedList[i];
+                                const fullHtml = _generarCertificadoHTMLNormalizado(p, docData, sig, _miIPSCertSel);
+                                
+                                // Contenedor temporal invisible
+                                const container = document.createElement('div');
+                                container.style.position = 'absolute';
+                                container.style.left = '-9999px';
+                                container.style.top = '0';
+                                container.style.width = '800px'; 
+                                container.innerHTML = fullHtml;
+                                document.body.appendChild(container);
+                                
+                                try {
+                                  // Captura de alta resolución
+                                  const canvas = await html2canvas(container, {
+                                    scale: 2,
+                                    useCORS: true,
+                                    logging: false,
+                                    backgroundColor: '#ffffff',
+                                    windowWidth: 800
+                                  });
+                                  
+                                  const imgData = canvas.toDataURL('image/jpeg', 0.98);
+                                  const pdf = new jsPDF('p', 'mm', 'letter');
+                                  const pageWidth = pdf.internal.pageSize.getWidth();
+                                  const pageHeight = pdf.internal.pageSize.getHeight();
+                                  
+                                  // Cálculo de dimensiones exactas
+                                  const imgWidthPx = canvas.width;
+                                  const imgHeightPx = canvas.height;
+                                  const ratio = pageWidth / (imgWidthPx / 2);
+                                  const totalImgHeightMm = (imgHeightPx / 2) * ratio;
+                                  
+                                  // Si el contenido es un poco más largo que una página, lo escalamos para que quepa en una sola.
+                                  // Esto evita el 99% de los problemas de cortes y repeticiones.
+                                  if (totalImgHeightMm <= pageHeight * 1.2) {
+                                    const finalScale = totalImgHeightMm > pageHeight ? (pageHeight / totalImgHeightMm) : 1;
+                                    pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth * finalScale, totalImgHeightMm * finalScale);
+                                  } else {
+                                    // Si es realmente largo, dividimos sin solapamiento
+                                    let heightLeft = totalImgHeightMm;
+                                    let position = 0;
+                                    while (heightLeft > 0) {
+                                      pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, totalImgHeightMm);
+                                      heightLeft -= pageHeight;
+                                      position -= pageHeight;
+                                      if (heightLeft > 0) pdf.addPage();
+                                    }
+                                  }
+                                  
+                                  const safeName = (p.nombres || 'Certificado').replace(/[^a-z0-9]/gi, '_').toUpperCase();
+                                  pdf.save(`CERTIFICADO_${safeName}.pdf`);
+                                } catch (err) {
+                                  console.error("Error en PDF unitario:", err);
+                                } finally {
+                                  document.body.removeChild(container);
+                                }
+                                
+                                // Pausa para no saturar el navegador
+                                if (i < selectedList.length - 1) {
+                                  await new Promise(resolve => setTimeout(resolve, 600));
+                                }
+                              }
+                              showAlert("✅ Descarga unitaria completada.");
                             };
                             
                             downloadAllAsPDF();
