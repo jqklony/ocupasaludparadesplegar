@@ -12050,18 +12050,18 @@ const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : n
       const _enfasis = (data.enfasisExamen || "").toUpperCase();
       const alt = data.examenAlturas || {};
       if (_enfasis === "ALTURAS" && (alt.romberg || alt.marcha || alt.vertigo || alt.coordinacion || alt.nistagmus || alt.testMiedo || alt.observaciones || alt.audiometriaOido || alt.paracliLab || alt.paracliEkg || alt.paracliEspiro || alt.paracliOptometria || alt.paracliRayosX || alt.paracliPsico || alt.paracliOtros)) {
-        let alturaHtml = '<div class="sec"><div class="sec-title">🧗 Énfasis: Trabajo en Alturas (Res. 4272/2021)</div>';
+        let alturaHtml = '<div class="sec"><div class="sec-title">🧗 &Eacute;nfasis: Trabajo en Alturas (Res. 4272/2021)</div>';
         alturaHtml += '<table style="width:100%;border-collapse:collapse;font-size:9.5pt;">';
         // Pruebas neurológicas
         alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;width:25%;">Romberg</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.romberg || "--") + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;width:25%;">Marcha Tandem</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.marcha || "--") + '</td></tr>';
-        alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Vértigo</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.vertigo || "No") + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Coordinación</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.coordinacion || "--") + '</td></tr>';
+        alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">V&eacute;rtigo</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.vertigo || "No") + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Coordinaci&oacute;n</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.coordinacion || "--") + '</td></tr>';
         alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Nistagmus</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.nistagmus || "No") + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Test Miedo Alturas</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.testMiedo || "--") + '</td></tr>';
         if (alt.observaciones) {
-          alturaHtml += '<tr><td colspan="4" style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Observaciones Neurológicas</td></tr><tr><td colspan="4" style="border:1px solid #e5e7eb;padding:5px;">' + alt.observaciones + '</td></tr>';
+          alturaHtml += '<tr><td colspan="4" style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Observaciones Neurol&oacute;gicas</td></tr><tr><td colspan="4" style="border:1px solid #e5e7eb;padding:5px;">' + alt.observaciones + '</td></tr>';
         }
         // Audiometría
         if (alt.audiometriaOido || alt.audiometriaTipo || alt.audiometriaStatus || alt.audiometriaObs) {
-          alturaHtml += '<tr><td colspan="4" style="border:1px solid #e5e7eb;padding:5px;font-weight:900;background:#e0f2fe;text-transform:uppercase;font-size:8.5pt;letter-spacing:.5px;">👂 Audiometría</td></tr>';
+          alturaHtml += '<tr><td colspan="4" style="border:1px solid #e5e7eb;padding:5px;font-weight:900;background:#e0f2fe;text-transform:uppercase;font-size:8.5pt;letter-spacing:.5px;">👂 Audiometr&iacute;a</td></tr>';
           alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Resultado</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.audiometriaOido || "--") + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Tipo</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.audiometriaTipo || "--") + '</td></tr>';
           if (alt.audiometriaStatus) {
             alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Estado</td><td colspan="3" style="border:1px solid #e5e7eb;padding:5px;">' + alt.audiometriaStatus + '</td></tr>';
@@ -12073,15 +12073,15 @@ const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : n
         // Paraclínicos
         const hasParacli = alt.paracliLab || alt.paracliEkg || alt.paracliEspiro || alt.paracliOptometria || alt.paracliRayosX || alt.paracliPsico || alt.paracliOtros;
         if (hasParacli) {
-          alturaHtml += '<tr><td colspan="4" style="border:1px solid #e5e7eb;padding:5px;font-weight:900;background:#e0f2fe;text-transform:uppercase;font-size:8.5pt;letter-spacing:.5px;">🔬 Paraclínicos</td></tr>';
+          alturaHtml += '<tr><td colspan="4" style="border:1px solid #e5e7eb;padding:5px;font-weight:900;background:#e0f2fe;text-transform:uppercase;font-size:8.5pt;letter-spacing:.5px;">🔬 Paracl&iacute;nicos</td></tr>';
           if (alt.paracliLab) {
             alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Laboratorios</td><td style="border:1px solid #e5e7eb;padding:5px;">' + alt.paracliLab + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">EKG / Holter</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.paracliEkg || "--") + '</td></tr>';
           }
           if (alt.paracliEspiro) {
-            alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Espirometría</td><td style="border:1px solid #e5e7eb;padding:5px;">' + alt.paracliEspiro + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Optometría</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.paracliOptometria || "--") + '</td></tr>';
+            alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Espirometr&iacute;a</td><td style="border:1px solid #e5e7eb;padding:5px;">' + alt.paracliEspiro + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Optometr&iacute;a</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.paracliOptometria || "--") + '</td></tr>';
           }
           if (alt.paracliRayosX) {
-            alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Rx / Imagen Dx</td><td style="border:1px solid #e5e7eb;padding:5px;">' + alt.paracliRayosX + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Psicosensométrico</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.paracliPsico || "--") + '</td></tr>';
+            alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Rx / Imagen Dx</td><td style="border:1px solid #e5e7eb;padding:5px;">' + alt.paracliRayosX + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Psicosensom&eacute;trico</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.paracliPsico || "--") + '</td></tr>';
           }
           if (alt.paracliOtros) {
             alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Otros</td><td colspan="3" style="border:1px solid #e5e7eb;padding:5px;">' + alt.paracliOtros + '</td></tr>';
@@ -27480,45 +27480,53 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                 document.body.appendChild(container);
                                 
                                 try {
-                                  // Usar el método html() de jsPDF que maneja mejor los saltos de página nativos
-                                  // en lugar de capturar una sola imagen larga que se corta.
-                                  const pdf = new jsPDF('p', 'mm', 'letter');
-                                  const pageWidth = pdf.internal.pageSize.getWidth();
-                                  const margin = 12; // Márgenes un poco más amplios para profesionalismo
-                                  const contentWidth = pageWidth - (margin * 2);
-
-                                  // Ajustar estilos del contenedor para el renderizado de jsPDF
-                                  container.style.width = `${contentWidth}mm`;
-                                  container.style.left = '0';
-                                  container.style.top = '0';
-                                  container.style.position = 'relative';
-                                  container.style.padding = '0';
-                                  container.style.margin = '0';
+                                  // Volver a captura de imagen de alta resolución pero con segmentación manual
+                                  // para garantizar que NO se corte el texto y se vea profesional.
+                                  const canvas = await html2canvas(container, {
+                                    scale: 2,
+                                    useCORS: true,
+                                    logging: false,
+                                    backgroundColor: '#ffffff',
+                                    windowWidth: 800
+                                  });
                                   
-                                  // Forzar que las secciones no se corten (page-break-inside: avoid)
-                                  const sections = container.querySelectorAll('.sec, table, .firma-row');
-                                  sections.forEach(s => {
-                                    s.style.pageBreakInside = 'avoid';
-                                    s.style.breakInside = 'avoid';
-                                  });
-
-                                  await pdf.html(container, {
-                                    callback: function (doc) {
-                                      const safeName = (p.nombres || 'Certificado').replace(/[^a-z0-9]/gi, '_').toUpperCase();
-                                      doc.save(`CERTIFICADO_${safeName}.pdf`);
-                                    },
-                                    x: margin,
-                                    y: margin,
-                                    width: contentWidth,
-                                    windowWidth: 800, // Mantener el ancho de referencia para estilos
-                                    autoPaging: 'text', // Salto de página inteligente basado en texto/bloques
-                                    html2canvas: {
-                                      scale: 0.26, // Ajuste de escala para mm
-                                      useCORS: true,
-                                      logging: false,
-                                      letterRendering: true
+                                  const imgData = canvas.toDataURL('image/jpeg', 0.98);
+                                  const pdf = new jsPDF('p', 'mm', 'letter');
+                                  
+                                  const pageWidth = pdf.internal.pageSize.getWidth();
+                                  const pageHeight = pdf.internal.pageSize.getHeight();
+                                  const margin = 10;
+                                  const contentWidth = pageWidth - (margin * 2);
+                                  const contentHeight = pageHeight - (margin * 2);
+                                  
+                                  const imgWidth = canvas.width;
+                                  const imgHeight = canvas.height;
+                                  const ratio = contentWidth / (imgWidth / 2);
+                                  const totalImgHeightMm = (imgHeight / 2) * ratio;
+                                  
+                                  // Si el contenido cabe en una sola página, lo centramos
+                                  if (totalImgHeightMm <= contentHeight) {
+                                    pdf.addImage(imgData, 'JPEG', margin, margin, contentWidth, totalImgHeightMm);
+                                  } else {
+                                    // Si es más largo, lo dividimos en páginas sin cortar texto (segmentación)
+                                    let heightLeft = totalImgHeightMm;
+                                    let position = 0;
+                                    let pageNum = 1;
+                                    
+                                    while (heightLeft > 0) {
+                                      if (pageNum > 1) pdf.addPage();
+                                      
+                                      // Añadir la imagen desplazada para simular el salto de página
+                                      pdf.addImage(imgData, 'JPEG', margin, position + margin, contentWidth, totalImgHeightMm);
+                                      
+                                      heightLeft -= contentHeight;
+                                      position -= contentHeight;
+                                      pageNum++;
                                     }
-                                  });
+                                  }
+                                  
+                                  const safeName = (p.nombres || 'Certificado').replace(/[^a-z0-9]/gi, '_').toUpperCase();
+                                  pdf.save(`CERTIFICADO_${safeName}.pdf`);
                                 } catch (err) {
                                   console.error("Error generando PDF para:", p.nombres, err);
                                 } finally {
