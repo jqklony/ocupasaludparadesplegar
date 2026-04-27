@@ -11907,9 +11907,9 @@ const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : n
     (data.nombres || "") +
     "</title>" +
     "<style>" +
-    "@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}" +
+    "@page{size:letter portrait;margin:18mm 20mm 18mm 20mm;}" +
     "*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}" +
-    'body{font-family:"Segoe UI",Arial,sans-serif;font-size:10.5pt;color:#111;padding:14mm 16mm 10mm;}' +
+    'body{font-family:"Segoe UI",Arial,sans-serif;font-size:10.5pt;color:#111;padding:18mm 20mm 14mm;}' +
     "table{border-collapse:collapse;page-break-inside:auto;}" +
     "tr{page-break-inside:avoid;page-break-after:auto;}" +
     "td,th{page-break-inside:avoid;}" +
@@ -27499,9 +27499,12 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                   const pdf = new jsPDF('p', 'mm', 'letter');
                                   const pageWidth = pdf.internal.pageSize.getWidth();
                                   const pageHeight = pdf.internal.pageSize.getHeight();
-                                  const margin = 0; // Sin márgenes internos para control total
-                                  const contentWidth = pageWidth;
-                                  const contentHeight = pageHeight;
+                                  
+                                  // Agregamos márgenes de seguridad para que no quede pegado a los bordes
+                                  const marginX = 10; 
+                                  const marginY = 10;
+                                  const contentWidth = pageWidth - (marginX * 2);
+                                  const contentHeight = pageHeight - (marginY * 2);
                                   
                                   // Cálculo de dimensiones reales en mm
                                   const imgWidthPx = canvas.width;
@@ -27510,16 +27513,16 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                   const totalImgHeightMm = (imgHeightPx / 2) * ratio;
                                   
                                   // ESTRATEGIA DEFINITIVA: 
-                                  // 1. Si el contenido cabe en una página (con 10% de margen), lo ajustamos.
-                                  // 2. Si es más largo, dividimos SIN SOLAPAMIENTO (0 píxeles de repetición).
-                                  if (totalImgHeightMm <= contentHeight * 1.1) {
+                                  // 1. Si el contenido cabe en una página (con 15% de margen), lo ajustamos.
+                                  if (totalImgHeightMm <= contentHeight * 1.15) {
                                     const scale = totalImgHeightMm > contentHeight ? (contentHeight / totalImgHeightMm) : 1;
-                                    pdf.addImage(imgData, 'JPEG', 0, 0, contentWidth * scale, totalImgHeightMm * scale);
+                                    pdf.addImage(imgData, 'JPEG', marginX, marginY, contentWidth * scale, totalImgHeightMm * scale);
                                   } else {
                                     let heightLeft = totalImgHeightMm;
                                     let position = 0;
                                     while (heightLeft > 0) {
-                                      pdf.addImage(imgData, 'JPEG', 0, position, contentWidth, totalImgHeightMm);
+                                      // Usamos los márgenes definidos
+                                      pdf.addImage(imgData, 'JPEG', marginX, position + marginY, contentWidth, totalImgHeightMm);
                                       heightLeft -= contentHeight;
                                       position -= contentHeight;
                                       if (heightLeft > 0) pdf.addPage();
