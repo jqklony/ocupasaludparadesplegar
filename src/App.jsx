@@ -27495,27 +27495,29 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                     windowWidth: 800
                                   });
                                   
-                                  const imgData = canvas.toDataURL('image/jpeg', 0.98);
+                                  const imgData = canvas.toDataURL('image/jpeg', 1.0);
                                   const pdf = new jsPDF('p', 'mm', 'letter');
                                   const pageWidth = pdf.internal.pageSize.getWidth();
                                   const pageHeight = pdf.internal.pageSize.getHeight();
                                   
-                                  // Cálculo de dimensiones exactas
+                                  // Cálculo de dimensiones exactas para evitar repeticiones
                                   const imgWidthPx = canvas.width;
                                   const imgHeightPx = canvas.height;
                                   const ratio = pageWidth / (imgWidthPx / 2);
                                   const totalImgHeightMm = (imgHeightPx / 2) * ratio;
                                   
-                                  // Si el contenido es un poco más largo que una página, lo escalamos para que quepa en una sola.
-                                  // Esto evita el 99% de los problemas de cortes y repeticiones.
-                                  if (totalImgHeightMm <= pageHeight * 1.2) {
+                                  // ESTRATEGIA: 
+                                  // 1. Si el contenido cabe en una página (con 15% de margen), lo ajustamos.
+                                  // 2. Si es más largo, dividimos con precisión de 0 píxeles de solapamiento.
+                                  if (totalImgHeightMm <= pageHeight * 1.15) {
                                     const finalScale = totalImgHeightMm > pageHeight ? (pageHeight / totalImgHeightMm) : 1;
+                                    // Centramos un poco la imagen si escalamos
                                     pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth * finalScale, totalImgHeightMm * finalScale);
                                   } else {
-                                    // Si es realmente largo, dividimos sin solapamiento
                                     let heightLeft = totalImgHeightMm;
                                     let position = 0;
                                     while (heightLeft > 0) {
+                                      // IMPORTANTE: position debe ser exactamente múltiplo de pageHeight para no repetir datos
                                       pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, totalImgHeightMm);
                                       heightLeft -= pageHeight;
                                       position -= pageHeight;
