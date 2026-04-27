@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
+import JSZip from "jszip";
 import CartaCustodia from "./pages/CartaCustodia";
 import {
   User,
@@ -19723,13 +19724,23 @@ Esta historia clínica debe conservarse mínimo 20 años.
               scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff',
               width: 870, windowWidth: 870, scrollX: 0, scrollY: 0, height: sh, windowHeight: sh
             });
-            const imgData = canvas.toDataURL('image/jpeg', 0.92);
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
             const pW = pdf.internal.pageSize.getWidth(), pH = pdf.internal.pageSize.getHeight();
-            const mg = 15, cW = pW - mg*2, cH = (canvas.height * cW) / canvas.width, pcH = pH - mg*2;
-            let pg = 0;
-            pdf.addImage(imgData, 'JPEG', mg, mg, cW, cH);
-            while (cH > pcH * (pg+1)) { pg++; pdf.addPage(); pdf.addImage(imgData, 'JPEG', mg, mg - pg*pcH, cW, cH); }
+            const mg = 15, cW = pW - mg*2, pcH = pH - mg*2;
+            const pxPerMm = canvas.width / cW;
+            const pcHpx = Math.round(pcH * pxPerMm);
+            const totalPages = Math.ceil(canvas.height / pcHpx);
+            for (let pg = 0; pg < totalPages; pg++) {
+              if (pg > 0) pdf.addPage();
+              const y0 = pg * pcHpx, y1 = Math.min(y0 + pcHpx, canvas.height);
+              const slicePx = y1 - y0;
+              const tmp = document.createElement('canvas');
+              tmp.width = canvas.width; tmp.height = slicePx;
+              const ctx = tmp.getContext('2d');
+              ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, tmp.width, tmp.height);
+              ctx.drawImage(canvas, 0, y0, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
+              pdf.addImage(tmp.toDataURL('image/jpeg', 0.93), 'JPEG', mg, mg, cW, slicePx / pxPerMm);
+            }
             pdf.save(_hcPdfName);
           } catch(e) { console.error('[PDF-HC]', e); }
           finally { clearTimeout(_to); setTimeout(() => { if(document.body.contains(_ifr)) document.body.removeChild(_ifr); }, 500); res(); }
@@ -27506,70 +27517,69 @@ Esta historia clínica debe conservarse mínimo 20 años.
                             const _miIPSCertSel = currentUser?.empresaId
                               ? companies.find((c) => c.id === currentUser.empresaId) || null
                               : null;
-                            showAlert(`📥 Generando ${selectedList.length} PDF${selectedList.length > 1 ? 's' : ''} individual${selectedList.length > 1 ? 'es' : ''}...\n\nSe guardarán automáticamente en tu carpeta de descargas, uno por uno.`);
+                            showAlert(`📦 Generando ZIP con ${selectedList.length} certificado${selectedList.length > 1 ? 's' : ''}...\nEspera, esto puede tardar unos segundos.`);
+                            // Helper: renderiza HTML en iframe → canvas → jsPDF blob (sub-canvas por página, sin overlap)
+                            const _htmlToPdfBlob = (htmlContent) => new Promise((resolve, reject) => {
+                              const ifr = document.createElement('iframe');
+                              ifr.style.cssText = 'position:fixed;left:-9999px;top:0;width:816px;height:1px;border:0;visibility:hidden;';
+                              document.body.appendChild(ifr);
+                              const cleanup = () => { setTimeout(() => { if(document.body.contains(ifr)) document.body.removeChild(ifr); }, 300); };
+                              const _to = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 20000);
+                              ifr.onload = async () => {
+                                try {
+                                  const iDoc = ifr.contentDocument;
+                                  const nb = iDoc.querySelector('.np-dl,.np-bar'); if(nb) nb.style.display='none';
+                                  const sh = iDoc.documentElement.scrollHeight;
+                                  ifr.style.height = sh + 'px';
+                                  await new Promise(r => setTimeout(r, 350));
+                                  const canvas = await html2canvas(iDoc.body, {
+                                    scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff',
+                                    width: 816, windowWidth: 816, scrollX: 0, scrollY: 0, height: sh, windowHeight: sh
+                                  });
+                                  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+                                  const pW = pdf.internal.pageSize.getWidth(), pH = pdf.internal.pageSize.getHeight();
+                                  const mg = 15, cW = pW - mg*2, pcH = pH - mg*2;
+                                  const pxPerMm = canvas.width / cW;
+                                  const pcHpx = Math.round(pcH * pxPerMm);
+                                  const totalPages = Math.ceil(canvas.height / pcHpx);
+                                  for (let pg = 0; pg < totalPages; pg++) {
+                                    if (pg > 0) pdf.addPage();
+                                    const y0 = pg * pcHpx, y1 = Math.min(y0 + pcHpx, canvas.height);
+                                    const slicePx = y1 - y0;
+                                    const tmp = document.createElement('canvas');
+                                    tmp.width = canvas.width; tmp.height = slicePx;
+                                    const ctx = tmp.getContext('2d');
+                                    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, tmp.width, tmp.height);
+                                    ctx.drawImage(canvas, 0, y0, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
+                                    pdf.addImage(tmp.toDataURL('image/jpeg', 0.93), 'JPEG', mg, mg, cW, slicePx / pxPerMm);
+                                  }
+                                  clearTimeout(_to); cleanup();
+                                  resolve(pdf.output('blob'));
+                                } catch(e) { clearTimeout(_to); cleanup(); reject(e); }
+                              };
+                              ifr.srcdoc = htmlContent;
+                            });
+                            const zip = new JSZip();
+                            let errCount = 0;
                             for (let i = 0; i < selectedList.length; i++) {
                               const p = selectedList[i];
-                              const fullHtml = _generarCertificadoHTMLNormalizado(p, docData, sig, _miIPSCertSel);
-                              // Renderizar en iframe oculto para capturar con html2canvas
-                              const iframe = document.createElement('iframe');
-                              iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:816px;height:1px;border:0;visibility:hidden;';
-                              document.body.appendChild(iframe);
-                              await new Promise(resolve => {
-                                const _timeout = setTimeout(resolve, 10000);
-                                iframe.onload = async () => {
-                                  try {
-                                    const iDoc = iframe.contentDocument;
-                                    // Ocultar botones no imprimibles
-                                    const btnEl = iDoc.querySelector('.np-dl');
-                                    if (btnEl) btnEl.style.display = 'none';
-                                    // Ajustar iframe al alto real del contenido
-                                    const scrollH = iDoc.documentElement.scrollHeight;
-                                    iframe.style.height = scrollH + 'px';
-                                    await new Promise(r => setTimeout(r, 300));
-                                    const canvas = await html2canvas(iDoc.body, {
-                                      scale: 2,
-                                      useCORS: true,
-                                      allowTaint: true,
-                                      backgroundColor: '#ffffff',
-                                      width: 816,
-                                      windowWidth: 816,
-                                      scrollX: 0,
-                                      scrollY: 0,
-                                      height: scrollH,
-                                      windowHeight: scrollH,
-                                    });
-                                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-                                    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
-                                    const pdfW = pdf.internal.pageSize.getWidth();
-                                    const pdfH = pdf.internal.pageSize.getHeight();
-                                    const margin = 15;
-                                    const contentW = pdfW - margin * 2;
-                                    const contentH = (canvas.height * contentW) / canvas.width;
-                                    const pageContentH = pdfH - margin * 2;
-                                    let page = 0;
-                                    pdf.addImage(imgData, 'JPEG', margin, margin, contentW, contentH);
-                                    while (contentH > pageContentH * (page + 1)) {
-                                      page++;
-                                      pdf.addPage();
-                                      pdf.addImage(imgData, 'JPEG', margin, margin - page * pageContentH, contentW, contentH);
-                                    }
-                                    const nombre = (p.nombres || 'Paciente').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
-                                    const cc = (p.docNumero || p.cedula || '').replace(/\D/g, '');
-                                    pdf.save(`Certificado_${nombre}_${cc}.pdf`);
-                                  } catch (err) {
-                                    console.error('[PDF] Error generando certificado:', err);
-                                  } finally {
-                                    clearTimeout(_timeout);
-                                    setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 500);
-                                    resolve();
-                                  }
-                                };
-                                iframe.srcdoc = fullHtml;
-                              });
-                              // Pausa entre descargas para que el navegador gestione cada archivo
-                              if (i < selectedList.length - 1) await new Promise(r => setTimeout(r, 1200));
+                              try {
+                                const html = _generarCertificadoHTMLNormalizado(p, docData, sig, _miIPSCertSel);
+                                const blob = await _htmlToPdfBlob(html);
+                                const nombre = (p.nombres || 'Paciente').replace(/[^a-zA-Z0-9]/g,'_').substring(0,30);
+                                const cc = (p.docNumero || p.cedula || '').replace(/\D/g,'');
+                                zip.file(`${String(i+1).padStart(2,'0')}_${nombre}_${cc}.pdf`, blob);
+                              } catch(e) { console.error('[ZIP] cert',i,e); errCount++; }
                             }
-                            showAlert(`✅ ${selectedList.length} PDF${selectedList.length > 1 ? 's descargados' : ' descargado'} en tu carpeta de descargas.`);
+                            try {
+                              const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+                              const url = URL.createObjectURL(zipBlob);
+                              const a = document.createElement('a');
+                              a.href = url; a.download = `Certificados_${(compName||'empresa').replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.zip`;
+                              document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                              setTimeout(() => URL.revokeObjectURL(url), 3000);
+                              showAlert(`✅ ZIP descargado con ${selectedList.length - errCount} certificado${selectedList.length - errCount !== 1 ? 's' : ''}${errCount > 0 ? ` (${errCount} con error)` : ''}.\n\nAbre el ZIP para acceder a cada PDF por separado.`);
+                            } catch(e) { console.error('[ZIP] generate',e); showAlert('❌ Error generando el ZIP. Intenta de nuevo.'); }
                           }}
                           disabled={selectedList.length === 0}
                           className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl flex items-center gap-1.5 transition"
