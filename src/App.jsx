@@ -12043,6 +12043,53 @@ const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : n
         fmtBlocks(recomendacionesText) +
         "</div>"
       : "") +
+    /* ── ÉNFASIS EN ALTURAS ────────────────────────────────────── */
+    (() => {
+      const _enfasis = (data.enfasisExamen || "").toUpperCase();
+      const alt = data.examenAlturas || {};
+      if (_enfasis === "ALTURAS" && (alt.romberg || alt.marcha || alt.vertigo || alt.coordinacion || alt.nistagmus || alt.testMiedo || alt.observaciones || alt.audiometriaOido || alt.paracliLab || alt.paracliEkg || alt.paracliEspiro || alt.paracliOptometria || alt.paracliRayosX || alt.paracliPsico || alt.paracliOtros)) {
+        let alturaHtml = '<div class="sec"><div class="sec-title">🧗 Énfasis: Trabajo en Alturas (Res. 4272/2021)</div>';
+        alturaHtml += '<table style="width:100%;border-collapse:collapse;font-size:9.5pt;">';
+        // Pruebas neurológicas
+        alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;width:25%;">Romberg</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.romberg || "--") + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;width:25%;">Marcha Tandem</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.marcha || "--") + '</td></tr>';
+        alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Vértigo</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.vertigo || "No") + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Coordinación</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.coordinacion || "--") + '</td></tr>';
+        alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Nistagmus</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.nistagmus || "No") + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Test Miedo Alturas</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.testMiedo || "--") + '</td></tr>';
+        if (alt.observaciones) {
+          alturaHtml += '<tr><td colspan="4" style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Observaciones Neurológicas</td></tr><tr><td colspan="4" style="border:1px solid #e5e7eb;padding:5px;">' + alt.observaciones + '</td></tr>';
+        }
+        // Audiometría
+        if (alt.audiometriaOido || alt.audiometriaTipo || alt.audiometriaStatus || alt.audiometriaObs) {
+          alturaHtml += '<tr><td colspan="4" style="border:1px solid #e5e7eb;padding:5px;font-weight:900;background:#e0f2fe;text-transform:uppercase;font-size:8.5pt;letter-spacing:.5px;">👂 Audiometría</td></tr>';
+          alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Resultado</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.audiometriaOido || "--") + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Tipo</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.audiometriaTipo || "--") + '</td></tr>';
+          if (alt.audiometriaStatus) {
+            alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Estado</td><td colspan="3" style="border:1px solid #e5e7eb;padding:5px;">' + alt.audiometriaStatus + '</td></tr>';
+          }
+          if (alt.audiometriaObs) {
+            alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Observaciones</td><td colspan="3" style="border:1px solid #e5e7eb;padding:5px;">' + alt.audiometriaObs + '</td></tr>';
+          }
+        }
+        // Paraclínicos
+        const hasParacli = alt.paracliLab || alt.paracliEkg || alt.paracliEspiro || alt.paracliOptometria || alt.paracliRayosX || alt.paracliPsico || alt.paracliOtros;
+        if (hasParacli) {
+          alturaHtml += '<tr><td colspan="4" style="border:1px solid #e5e7eb;padding:5px;font-weight:900;background:#e0f2fe;text-transform:uppercase;font-size:8.5pt;letter-spacing:.5px;">🔬 Paraclínicos</td></tr>';
+          if (alt.paracliLab) {
+            alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Laboratorios</td><td style="border:1px solid #e5e7eb;padding:5px;">' + alt.paracliLab + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">EKG / Holter</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.paracliEkg || "--") + '</td></tr>';
+          }
+          if (alt.paracliEspiro) {
+            alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Espirometría</td><td style="border:1px solid #e5e7eb;padding:5px;">' + alt.paracliEspiro + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Optometría</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.paracliOptometria || "--") + '</td></tr>';
+          }
+          if (alt.paracliRayosX) {
+            alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Rx / Imagen Dx</td><td style="border:1px solid #e5e7eb;padding:5px;">' + alt.paracliRayosX + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Psicosensométrico</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.paracliPsico || "--") + '</td></tr>';
+          }
+          if (alt.paracliOtros) {
+            alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Otros</td><td colspan="3" style="border:1px solid #e5e7eb;padding:5px;">' + alt.paracliOtros + '</td></tr>';
+          }
+        }
+        alturaHtml += '</table></div>';
+        return alturaHtml;
+      }
+      return '';
+    })() +
     /* ── RESTRICCIONES ──────────────────────────────────────── */
     (restriccionesText || restCheck.length > 0
       ? '<div class="sec"><div class="sec-title">Restricciones Laborales</div>' +
@@ -27403,6 +27450,61 @@ Esta historia clínica debe conservarse mínimo 20 años.
                         >
                           <Printer className="w-3.5 h-3.5" />
                           Imprimir ({selectedList.length})
+                        </button>
+                        {/* Botón descargar SELECCIONADOS en un solo PDF */}
+                        <button
+                          onClick={() => {
+                            if (selectedList.length === 0) { showAlert("Seleccione al menos un certificado con el checkbox."); return; }
+                            const docData = activeDoctorData || {};
+                            const sig = activeSignature || "";
+                            const _miIPSCertSel = currentUser?.empresaId
+                              ? companies.find((c) => c.id === currentUser.empresaId) || null
+                              : null;
+                            // Extraer head compartido
+                            const sampleSel = _generarCertificadoHTMLNormalizado(
+                              { nombres: "_sample_" }, docData, sig, _miIPSCertSel
+                            );
+                            const headMatchSel = sampleSel.match(/<head>([\s\S]*?)<\/head>/i);
+                            const sharedHeadSel = headMatchSel ? headMatchSel[1] : "";
+                            // Generar solo los certificados seleccionados concatenados
+                            const certsSel = selectedList.map((p, idx) => {
+                              const full = _generarCertificadoHTMLNormalizado(p, docData, sig, _miIPSCertSel);
+                              const bm = full.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+                              const body = bm ? bm[1] : full;
+                              const isLast = idx === selectedList.length - 1;
+                              return '<div style="' + (isLast ? "" : "page-break-after:always;") + '">' + body + "</div>";
+                            }).join("");
+                            const w = window.open("", "_blank", "width=920,height=1150");
+                            if (!w) { showAlert("El navegador bloqueó la ventana emergente. Permita los popups."); return; }
+                            w.document.write(
+                              '<!DOCTYPE html><html lang="es"><head>' + sharedHeadSel +
+                              '<style>' +
+                              '@page{size:letter portrait;margin:1cm 1.2cm;}' +
+                              '-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;' +
+                              '.np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;padding:8px 16px;display:flex;align-items:center;gap:10px;z-index:9999;}' +
+                              '.np-bar span{flex:1;font-size:9pt;font-weight:700;}' +
+                              '.np-bar button{border:none;padding:6px 16px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;}' +
+                              '.np-bp{background:#10b981;color:#fff;}.np-bc{background:#ef4444;color:#fff;}' +
+                              'body{padding-top:52px!important;}' +
+                              '@media print{.np-bar{display:none!important;}body{padding-top:0!important;}}' +
+                              '</style></head><body>' +
+                              '<div class="np-bar">' +
+                              '<span>📄 Certificados Seleccionados — ' + compName + ' (' + selectedList.length + ' trabajadores)</span>' +
+                              '<button class="np-bp" onclick="window.print()">📥 Guardar en PDF</button>' +
+                              '<button class="np-bc" onclick="window.close()">✕ Cerrar</button>' +
+                              '</div>' +
+                              certsSel +
+                              '</body></html>'
+                            );
+                            w.document.close();
+                            w.focus();
+                          }}
+                          disabled={selectedList.length === 0}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl flex items-center gap-1.5 transition"
+                          title={`Descargar los ${selectedList.length} certificados seleccionados en un solo PDF`}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                          Seleccionados en PDF ({selectedList.length})
                         </button>
                         {/* Botón descargar TODOS en un solo PDF */}
                         <button
