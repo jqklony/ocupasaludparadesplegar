@@ -16388,33 +16388,48 @@ function AppInner() {
         ...PRIORITY_ORDER.filter((k) => k !== activeKey),
       ].filter((v, i, a) => a.indexOf(v) === i); // deduplicar
       let lastError = null;
+      // ── MEJORA RESILIENCIA: intentar cada proveedor con manejo inteligente de errores ──
       for (const providerKey of fallbackOrder) {
         const provider = AI_PROVIDERS[providerKey];
         if (!provider) continue;
         const key = aiConfig.keys?.[providerKey];
         if (!key || key === "auto") continue; // skip si no tiene key válida
         try {
-          // [SEGURIDAD] log eliminado
           const text = await provider.call(prompt, systemPrompt, key);
           if (text && text.trim().length > 10) {
             setAiStatus("ok");
-            // [SEGURIDAD] log eliminado
-            return text; // ← BUG CORREGIDO: return siempre, no solo si no es activeKey
+            return text;
           }
         } catch (e) {
-          console.warn(`[IA] ${providerKey} falló: ${e.message}`);
+          const msg = e.message || "";
+          // Rate limit (429): pasar inmediatamente al siguiente proveedor sin log de error
+          const isRateLimit = msg.includes("429") || msg.toLowerCase().includes("rate limit") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("too many");
+          // Key inválida (401/403): pasar al siguiente proveedor
+          const isAuthError = msg.includes("401") || msg.includes("403") || msg.toLowerCase().includes("invalid") || msg.toLowerCase().includes("unauthorized");
+          if (isRateLimit) {
+            console.warn(`[IA] ${providerKey}: límite de peticiones alcanzado (429) → probando siguiente proveedor`);
+          } else if (isAuthError) {
+            console.warn(`[IA] ${providerKey}: key inválida o expirada → probando siguiente proveedor`);
+          } else {
+            console.warn(`[IA] ${providerKey} falló: ${msg}`);
+          }
           lastError = e;
+          // Continuar con el siguiente proveedor en todos los casos
         }
       }
       setAiStatus("error");
       const providerNames = fallbackOrder
         .map((k) => AI_PROVIDERS[k]?.name || k)
         .join(", ");
+      // Determinar si el error fue por límite de peticiones
+      const wasRateLimit = (lastError?.message || "").includes("429") ||
+        (lastError?.message || "").toLowerCase().includes("rate limit") ||
+        (lastError?.message || "").toLowerCase().includes("quota");
       throw new Error(
         `⚠️ IA no disponible. Probados: ${providerNames}\n` +
-          `Último error: ${lastError?.message || "sin respuesta"}\n\n` +
-          `SOLUCIÓN: Abra ⚙️ IA → use el botón "Probar" en cada proveedor → obtenga una key nueva gratis en el enlace que aparece → guarde.\n` +
-          `Las keys gratuitas expiran o alcanzan su límite. Renovarlas toma menos de 2 minutos.`
+          (wasRateLimit
+            ? `Causa: Límite de peticiones gratuitas alcanzado en todos los proveedores.\n\nSOLUCIÓN RÁPIDA: Espere 1 minuto y vuelva a intentarlo. Si persiste, abra ⚙️ IA y renueve las keys gratuitas (toma menos de 2 minutos).`
+            : `Último error: ${lastError?.message || "sin respuesta"}\n\nSOLUCIÓN: Abra ⚙️ IA → use el botón "Probar" en cada proveedor → obtenga una key nueva gratis en el enlace que aparece → guarde.\nLas keys gratuitas expiran o alcanzan su límite. Renovarlas toma menos de 2 minutos.`)
       );
     },
     [aiConfig]
@@ -16862,11 +16877,13 @@ JSON REQUERIDO (sin markdown, sin texto adicional):
       "\n\n3. RECOMENDACIONES (mínimo 250 palabras): Acciones correctivas específicas. Programas de vigilancia epidemiológica (PVE/SVE) sugeridos con base normativa. Ajustes en el SG-SST conforme Res. 0312/2019. Seguimiento médico prioritario por grupos de riesgo. Cronograma sugerido de intervenciones." +
       '\n\nDevuelve ÚNICAMENTE JSON válido sin markdown: {"analisisJustificado":"texto completo sección 1","conclusiones":"texto completo sección 2","recomendacionesInforme":"texto completo sección 3"}';
     try {
-      const [text1, text2] = await Promise.all([
-        callAI(prompt1, true),
-        callAI(prompt2, true),
-      ]);
+      // ── MEJORA: llamadas secuenciales para no saturar el Rate Limit del proveedor ──
+      // Antes era Promise.all (simultáneo) → ahora es secuencial para evitar error 429
+      const text1 = await callAI(prompt1, true);
       const parte1 = parseAIJSON(text1);
+      // Pequeña pausa entre llamadas para respetar los límites de peticiones
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const text2 = await callAI(prompt2, true);
       const parte2 = parseAIJSON(text2);
       setReportAIResult({ ...parte1, conclusiones: parte2.conclusiones || "", analisisJustificado: parte2.analisisJustificado || "", recomendacionesInforme: parte2.recomendacionesInforme || "" });
     } catch (e) {
@@ -27387,6 +27404,60 @@ Esta historia clínica debe conservarse mínimo 20 años.
                           <Printer className="w-3.5 h-3.5" />
                           Imprimir ({selectedList.length})
                         </button>
+                        {/* Botón descargar TODOS en un solo PDF */}
+                        <button
+                          onClick={() => {
+                            if (filtered.length === 0) { showAlert("No hay certificados en el período seleccionado."); return; }
+                            const docData = activeDoctorData || {};
+                            const sig = activeSignature || "";
+                            const _miIPSCertAll = currentUser?.empresaId
+                              ? companies.find((c) => c.id === currentUser.empresaId) || null
+                              : null;
+                            // Extraer head compartido
+                            const sampleAll = _generarCertificadoHTMLNormalizado(
+                              { nombres: "_sample_" }, docData, sig, _miIPSCertAll
+                            );
+                            const headMatchAll = sampleAll.match(/<head>([\s\S]*?)<\/head>/i);
+                            const sharedHeadAll = headMatchAll ? headMatchAll[1] : "";
+                            // Generar todos los certificados concatenados
+                            const certsAll = filtered.map((p, idx) => {
+                              const full = _generarCertificadoHTMLNormalizado(p, docData, sig, _miIPSCertAll);
+                              const bm = full.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+                              const body = bm ? bm[1] : full;
+                              const isLast = idx === filtered.length - 1;
+                              return '<div style="' + (isLast ? "" : "page-break-after:always;") + '">' + body + "</div>";
+                            }).join("");
+                            const w = window.open("", "_blank", "width=920,height=1150");
+                            if (!w) { showAlert("El navegador bloqueó la ventana emergente. Permita los popups."); return; }
+                            w.document.write(
+                              '<!DOCTYPE html><html lang="es"><head>' + sharedHeadAll +
+                              '<style>' +
+                              '@page{size:letter portrait;margin:1cm 1.2cm;}' +
+                              '-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;' +
+                              '.np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;padding:8px 16px;display:flex;align-items:center;gap:10px;z-index:9999;}' +
+                              '.np-bar span{flex:1;font-size:9pt;font-weight:700;}' +
+                              '.np-bar button{border:none;padding:6px 16px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;}' +
+                              '.np-bp{background:#10b981;color:#fff;}.np-bc{background:#ef4444;color:#fff;}' +
+                              'body{padding-top:52px!important;}' +
+                              '@media print{.np-bar{display:none!important;}body{padding-top:0!important;}}' +
+                              '</style></head><body>' +
+                              '<div class="np-bar">' +
+                              '<span>📄 Todos los Certificados — ' + compName + ' (' + filtered.length + ' trabajadores)</span>' +
+                              '<button class="np-bp" onclick="window.print()">📥 Guardar todos en PDF</button>' +
+                              '<button class="np-bc" onclick="window.close()">✕ Cerrar</button>' +
+                              '</div>' +
+                              certsAll +
+                              '</body></html>'
+                            );
+                            w.document.close();
+                            w.focus();
+                          }}
+                          className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-black rounded-xl flex items-center gap-1.5 transition"
+                          title={`Descargar los ${filtered.length} certificados del período en un solo PDF`}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                          Todos en PDF ({filtered.length})
+                        </button>
                         {/* Botón config email */}
                         <button onClick={() => setShowEmailConfig(true)} className={`px-2 py-2 rounded-xl text-xs font-black flex items-center gap-1 ${emailConfig.configurado ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-gray-100 text-gray-500 border border-gray-200"}`} title="Configurar email">
                           ✉️ {emailConfig.configurado ? emailConfig.email.split("@")[0] : "Config"}
@@ -27572,13 +27643,18 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                     );
                                     return;
                                   }
-                                  w.document.write(html);
+                                  // ── Inyectar botón de descarga PDF individual ──
+                                  const htmlConBtn = html.replace(
+                                    "</body>",
+                                    `<div class="np-dl"><button onclick="window.print()">📥 Guardar / Imprimir PDF</button><p>En el diálogo, selecciona <b>Guardar como PDF</b></p></div></body>`
+                                  );
+                                  w.document.write(htmlConBtn);
                                   w.document.close();
                                   w.focus();
                                 }}
                                 className="shrink-0 no-print bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg px-2.5 py-1.5 text-[10px] font-bold flex items-center gap-1 transition"
                               >
-                                <Printer className="w-3 h-3" /> Ver
+                                <Printer className="w-3 h-3" /> Ver / PDF
                               </button>
                             </div>
                           );

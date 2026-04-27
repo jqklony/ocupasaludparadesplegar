@@ -64,6 +64,8 @@ const AI_PROVIDERS = {
                 msg.includes("API key"))
             )
               break;
+            // 429 Rate Limit: lanzar error inmediatamente para que callAI pase al siguiente proveedor
+            if (res.status === 429) throw lastErr;
             continue; // 404 = modelo no disponible → probar siguiente
           }
           const data = await res.json();
@@ -133,7 +135,9 @@ const AI_PROVIDERS = {
             const msg = errData?.error?.message || res.statusText;
             lastErr = new Error(`Groq/${model} [${res.status}]: ${msg}`);
             if (res.status === 401 || res.status === 403) break;
-            continue; // 404/429 → probar siguiente modelo
+            // 429 Rate Limit: lanzar error inmediatamente para que callAI pase al siguiente proveedor
+            if (res.status === 429) throw lastErr;
+            continue; // 404 → probar siguiente modelo
           }
           const data = await res.json();
           const text = data.choices?.[0]?.message?.content;
@@ -216,6 +220,8 @@ const AI_PROVIDERS = {
                 `Together AI [401]: API Key inválida. Ve a api.together.ai → Settings → API Keys y copia SOLO la key (texto largo, no el código Python).`
               );
             }
+            // 429 Rate Limit: lanzar error inmediatamente para que callAI pase al siguiente proveedor
+            if (res.status === 429) throw lastErr;
             continue;
           }
           const data = await res.json();
@@ -298,6 +304,8 @@ const AI_PROVIDERS = {
             const msg = errData?.error?.message || res.statusText;
             lastErr = new Error(`OpenRouter/${model} [${res.status}]: ${msg}`);
             if (res.status === 401 || res.status === 403) break; // key inválida
+            // 429 Rate Limit: lanzar error inmediatamente para que callAI pase al siguiente proveedor
+            if (res.status === 429) throw lastErr;
             continue; // 404 = modelo deprecado → probar siguiente
           }
           const data = await res.json();
