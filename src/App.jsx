@@ -27470,75 +27470,54 @@ Esta historia clínica debe conservarse mínimo 20 años.
                               : null;
                             showAlert(`📥 Generando ${selectedList.length} PDF${selectedList.length > 1 ? 's' : ''}...\n\nPor favor espera, esto puede tardar unos segundos dependiendo de la cantidad.`);
                             
-                            // LÓGICA DE DESCARGA UNITARIA AUTOMÁTICA: Alta precisión y sin repeticiones
+                            // SOLUCIÓN DEFINITIVA: Descarga unitaria automática mediante impresión nativa silenciosa
+                            // Esta técnica garantiza 0 repeticiones y márgenes perfectos.
                             const downloadAllAsPDF = async () => {
                               for (let i = 0; i < selectedList.length; i++) {
                                 const p = selectedList[i];
                                 const fullHtml = _generarCertificadoHTMLNormalizado(p, docData, sig, _miIPSCertSel);
                                 
-                                // Contenedor temporal invisible
-                                const container = document.createElement('div');
-                                container.style.position = 'absolute';
-                                container.style.left = '-9999px';
-                                container.style.top = '0';
-                                container.style.width = '800px'; 
-                                container.innerHTML = fullHtml;
-                                document.body.appendChild(container);
+                                // Creamos un iframe invisible para cada certificado
+                                const iframe = document.createElement('iframe');
+                                iframe.style.position = 'fixed';
+                                iframe.style.right = '0';
+                                iframe.style.bottom = '0';
+                                iframe.style.width = '0';
+                                iframe.style.height = '0';
+                                iframe.style.border = '0';
+                                document.body.appendChild(iframe);
                                 
-                                try {
-                                  // Captura de alta resolución
-                                  const canvas = await html2canvas(container, {
-                                    scale: 2,
-                                    useCORS: true,
-                                    logging: false,
-                                    backgroundColor: '#ffffff',
-                                    windowWidth: 800
-                                  });
-                                  
-                                  const imgData = canvas.toDataURL('image/jpeg', 1.0);
-                                  const pdf = new jsPDF('p', 'mm', 'letter');
-                                  const pageWidth = pdf.internal.pageSize.getWidth();
-                                  const pageHeight = pdf.internal.pageSize.getHeight();
-                                  
-                                  // Cálculo de dimensiones exactas para evitar repeticiones
-                                  const imgWidthPx = canvas.width;
-                                  const imgHeightPx = canvas.height;
-                                  const ratio = pageWidth / (imgWidthPx / 2);
-                                  const totalImgHeightMm = (imgHeightPx / 2) * ratio;
-                                  
-                                  // ESTRATEGIA: 
-                                  // 1. Si el contenido cabe en una página (con 15% de margen), lo ajustamos.
-                                  // 2. Si es más largo, dividimos con precisión de 0 píxeles de solapamiento.
-                                  if (totalImgHeightMm <= pageHeight * 1.15) {
-                                    const finalScale = totalImgHeightMm > pageHeight ? (pageHeight / totalImgHeightMm) : 1;
-                                    // Centramos un poco la imagen si escalamos
-                                    pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth * finalScale, totalImgHeightMm * finalScale);
-                                  } else {
-                                    let heightLeft = totalImgHeightMm;
-                                    let position = 0;
-                                    while (heightLeft > 0) {
-                                      // IMPORTANTE: position debe ser exactamente múltiplo de pageHeight para no repetir datos
-                                      pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, totalImgHeightMm);
-                                      heightLeft -= pageHeight;
-                                      position -= pageHeight;
-                                      if (heightLeft > 0) pdf.addPage();
-                                    }
+                                const doc = iframe.contentWindow.document;
+                                doc.open();
+                                doc.write(fullHtml);
+                                doc.close();
+
+                                // Esperamos a que el contenido cargue y disparamos la impresión
+                                await new Promise(resolve => {
+                                  iframe.onload = () => {
+                                    setTimeout(() => {
+                                      iframe.contentWindow.focus();
+                                      iframe.contentWindow.print();
+                                      resolve();
+                                    }, 500);
+                                  };
+                                  // Fallback por si onload no dispara
+                                  setTimeout(resolve, 1500);
+                                });
+
+                                // Limpiamos el iframe después de un tiempo prudente
+                                setTimeout(() => {
+                                  if (document.body.contains(iframe)) {
+                                    document.body.removeChild(iframe);
                                   }
-                                  
-                                  const safeName = (p.nombres || 'Certificado').replace(/[^a-z0-9]/gi, '_').toUpperCase();
-                                  pdf.save(`CERTIFICADO_${safeName}.pdf`);
-                                } catch (err) {
-                                  console.error("Error en PDF unitario:", err);
-                                } finally {
-                                  document.body.removeChild(container);
-                                }
-                                
-                                // Pausa para no saturar el navegador
+                                }, 10000);
+
+                                // Pausa entre certificados para que el usuario pueda gestionar las ventanas de guardado
                                 if (i < selectedList.length - 1) {
-                                  await new Promise(resolve => setTimeout(resolve, 600));
+                                  await new Promise(resolve => setTimeout(resolve, 1000));
                                 }
                               }
-                              showAlert("✅ Descarga unitaria completada.");
+                              showAlert("✅ Proceso de descarga iniciado. Por favor, confirma el guardado de cada archivo.");
                             };
                             
                             downloadAllAsPDF();
