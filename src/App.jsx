@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 import CartaCustodia from "./pages/CartaCustodia";
 import {
   User,
@@ -27460,33 +27462,57 @@ Esta historia clínica debe conservarse mínimo 20 años.
                             const _miIPSCertSel = currentUser?.empresaId
                               ? companies.find((c) => c.id === currentUser.empresaId) || null
                               : null;
-                            showAlert(`📥 Iniciando descarga de ${selectedList.length} certificado${selectedList.length > 1 ? 's' : ''}...\n\nLos archivos se guardarán directamente en tu carpeta de descargas.`);
+                            showAlert(`📥 Generando ${selectedList.length} PDF${selectedList.length > 1 ? 's' : ''}...\n\nPor favor espera, esto puede tardar unos segundos dependiendo de la cantidad.`);
                             
-                            selectedList.forEach((p, idx) => {
-                              setTimeout(() => {
+                            // Función asíncrona para procesar uno por uno y no bloquear el navegador
+                            const downloadAllAsPDF = async () => {
+                              for (let i = 0; i < selectedList.length; i++) {
+                                const p = selectedList[i];
                                 const fullHtml = _generarCertificadoHTMLNormalizado(p, docData, sig, _miIPSCertSel);
                                 
-                                // Crear un Blob con el contenido HTML
-                                const blob = new Blob([fullHtml], { type: 'text/html' });
-                                const url = URL.createObjectURL(blob);
+                                // Crear un contenedor temporal invisible para renderizar el HTML
+                                const container = document.createElement('div');
+                                container.style.position = 'absolute';
+                                container.style.left = '-9999px';
+                                container.style.top = '0';
+                                container.style.width = '800px'; // Ancho estándar para evitar saltos raros
+                                container.innerHTML = fullHtml;
+                                document.body.appendChild(container);
                                 
-                                // Crear un enlace de descarga invisible
-                                const link = document.createElement('a');
-                                link.href = url;
+                                try {
+                                  // Capturar el contenido como imagen
+                                  const canvas = await html2canvas(container, {
+                                    scale: 2, // Alta calidad
+                                    useCORS: true,
+                                    logging: false,
+                                    backgroundColor: '#ffffff'
+                                  });
+                                  
+                                  const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                                  const pdf = new jsPDF('p', 'mm', 'letter');
+                                  const imgProps = pdf.getImageProperties(imgData);
+                                  const pdfWidth = pdf.internal.pageSize.getWidth();
+                                  const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                                  
+                                  pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                                  
+                                  const safeName = (p.nombres || 'Certificado').replace(/[^a-z0-9]/gi, '_').toUpperCase();
+                                  pdf.save(`CERTIFICADO_${safeName}.pdf`);
+                                } catch (err) {
+                                  console.error("Error generando PDF para:", p.nombres, err);
+                                } finally {
+                                  document.body.removeChild(container);
+                                }
                                 
-                                // Limpiar el nombre para el archivo
-                                const safeName = (p.nombres || 'Certificado').replace(/[^a-z0-9]/gi, '_').toUpperCase();
-                                link.download = `CERTIFICADO_${safeName}.html`;
-                                
-                                // Añadir al documento, hacer clic y eliminar
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                                
-                                // Liberar la URL
-                                setTimeout(() => URL.revokeObjectURL(url), 100);
-                              }, idx * 500); // 0.5 segundos entre descargas para no saturar
-                            });
+                                // Pequeña pausa para dejar respirar al navegador
+                                if (i < selectedList.length - 1) {
+                                  await new Promise(resolve => setTimeout(resolve, 300));
+                                }
+                              }
+                              showAlert("✅ Descarga de PDFs completada.");
+                            };
+                            
+                            downloadAllAsPDF();
                           }}
                           disabled={selectedList.length === 0}
                           className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl flex items-center gap-1.5 transition"
