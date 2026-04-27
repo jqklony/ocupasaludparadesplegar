@@ -27451,7 +27451,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                           <Printer className="w-3.5 h-3.5" />
                           Imprimir ({selectedList.length})
                         </button>
-                        {/* Botón descargar SELECCIONADOS en un solo PDF */}
+                        {/* Botón descargar SELECCIONADOS como archivos PDF individuales */}
                         <button
                           onClick={() => {
                             if (selectedList.length === 0) { showAlert("Seleccione al menos un certificado con el checkbox."); return; }
@@ -27460,51 +27460,30 @@ Esta historia clínica debe conservarse mínimo 20 años.
                             const _miIPSCertSel = currentUser?.empresaId
                               ? companies.find((c) => c.id === currentUser.empresaId) || null
                               : null;
-                            // Extraer head compartido
-                            const sampleSel = _generarCertificadoHTMLNormalizado(
-                              { nombres: "_sample_" }, docData, sig, _miIPSCertSel
-                            );
-                            const headMatchSel = sampleSel.match(/<head>([\s\S]*?)<\/head>/i);
-                            const sharedHeadSel = headMatchSel ? headMatchSel[1] : "";
-                            // Generar solo los certificados seleccionados concatenados
-                            const certsSel = selectedList.map((p, idx) => {
-                              const full = _generarCertificadoHTMLNormalizado(p, docData, sig, _miIPSCertSel);
-                              const bm = full.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-                              const body = bm ? bm[1] : full;
-                              const isLast = idx === selectedList.length - 1;
-                              return '<div style="' + (isLast ? "" : "page-break-after:always;") + '">' + body + "</div>";
-                            }).join("");
-                            const w = window.open("", "_blank", "width=920,height=1150");
-                            if (!w) { showAlert("El navegador bloqueó la ventana emergente. Permita los popups."); return; }
-                            w.document.write(
-                              '<!DOCTYPE html><html lang="es"><head>' + sharedHeadSel +
-                              '<style>' +
-                              '@page{size:letter portrait;margin:1cm 1.2cm;}' +
-                              '-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;' +
-                              '.np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;padding:8px 16px;display:flex;align-items:center;gap:10px;z-index:9999;}' +
-                              '.np-bar span{flex:1;font-size:9pt;font-weight:700;}' +
-                              '.np-bar button{border:none;padding:6px 16px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;}' +
-                              '.np-bp{background:#10b981;color:#fff;}.np-bc{background:#ef4444;color:#fff;}' +
-                              'body{padding-top:52px!important;}' +
-                              '@media print{.np-bar{display:none!important;}body{padding-top:0!important;}}' +
-                              '</style></head><body>' +
-                              '<div class="np-bar">' +
-                              '<span>📄 Certificados Seleccionados — ' + compName + ' (' + selectedList.length + ' trabajadores)</span>' +
-                              '<button class="np-bp" onclick="window.print()">📥 Guardar en PDF</button>' +
-                              '<button class="np-bc" onclick="window.close()">✕ Cerrar</button>' +
-                              '</div>' +
-                              certsSel +
-                              '</body></html>'
-                            );
-                            w.document.close();
-                            w.focus();
+                            showAlert(`📄 Descargando ${selectedList.length} certificado${selectedList.length > 1 ? 's' : ''}...\n\nSe abrirá una ventana para cada certificado.`);
+                            // Descargar cada certificado de forma individual con retraso
+                            selectedList.forEach((p, idx) => {
+                              setTimeout(() => {
+                                const fullHtml = _generarCertificadoHTMLNormalizado(p, docData, sig, _miIPSCertSel);
+                                const w = window.open("", "_blank", "width=920,height=1150");
+                                if (!w) { console.warn(`No se pudo abrir ventana para ${p.nombres}`); return; }
+                                w.document.write(fullHtml);
+                                w.document.close();
+                                // Disparar descarga automática
+                                setTimeout(() => {
+                                  w.print();
+                                  // El usuario debe hacer clic en "Guardar" en el diálogo de impresión
+                                  // o usar Ctrl+S para descargar como PDF
+                                }, 500);
+                              }, idx * 1200); // 1.2 segundos entre descargas
+                            });
                           }}
                           disabled={selectedList.length === 0}
                           className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl flex items-center gap-1.5 transition"
-                          title={`Descargar los ${selectedList.length} certificados seleccionados en un solo PDF`}
+                          title={`Descargar los ${selectedList.length} certificados seleccionados como PDFs individuales`}
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                          Seleccionados en PDF ({selectedList.length})
+                          Descargar Seleccionados ({selectedList.length})
                         </button>
                         {/* Botón descargar TODOS en un solo PDF */}
                         <button
