@@ -27480,49 +27480,45 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                 document.body.appendChild(container);
                                 
                                 try {
-                                  // Capturar el contenido como imagen con alta calidad
-                                  const canvas = await html2canvas(container, {
-                                    scale: 2,
-                                    useCORS: true,
-                                    logging: false,
-                                    backgroundColor: '#ffffff',
-                                    windowWidth: 800
-                                  });
-                                  
-                                  const imgData = canvas.toDataURL('image/jpeg', 0.98);
+                                  // Usar el método html() de jsPDF que maneja mejor los saltos de página nativos
+                                  // en lugar de capturar una sola imagen larga que se corta.
                                   const pdf = new jsPDF('p', 'mm', 'letter');
-                                  
                                   const pageWidth = pdf.internal.pageSize.getWidth();
-                                  const pageHeight = pdf.internal.pageSize.getHeight();
-                                  
-                                  // Definir márgenes (en mm)
-                                  const margin = 10; 
+                                  const margin = 12; // Márgenes un poco más amplios para profesionalismo
                                   const contentWidth = pageWidth - (margin * 2);
+
+                                  // Ajustar estilos del contenedor para el renderizado de jsPDF
+                                  container.style.width = `${contentWidth}mm`;
+                                  container.style.left = '0';
+                                  container.style.top = '0';
+                                  container.style.position = 'relative';
+                                  container.style.padding = '0';
+                                  container.style.margin = '0';
                                   
-                                  const imgWidth = canvas.width;
-                                  const imgHeight = canvas.height;
-                                  
-                                  // Calcular altura proporcional del contenido
-                                  const ratio = contentWidth / (imgWidth / 2);
-                                  const totalImgHeightMm = (imgHeight / 2) * ratio;
-                                  
-                                  let heightLeft = totalImgHeightMm;
-                                  let position = margin; // Iniciar con margen superior
-                                  
-                                  // Primera página
-                                  pdf.addImage(imgData, 'JPEG', margin, position, contentWidth, totalImgHeightMm);
-                                  heightLeft -= (pageHeight - margin * 2);
-                                  
-                                  // Añadir páginas adicionales si es necesario
-                                  while (heightLeft > 0) {
-                                    pdf.addPage();
-                                    position = heightLeft - totalImgHeightMm + margin;
-                                    pdf.addImage(imgData, 'JPEG', margin, position, contentWidth, totalImgHeightMm);
-                                    heightLeft -= (pageHeight - margin * 2);
-                                  }
-                                  
-                                  const safeName = (p.nombres || 'Certificado').replace(/[^a-z0-9]/gi, '_').toUpperCase();
-                                  pdf.save(`CERTIFICADO_${safeName}.pdf`);
+                                  // Forzar que las secciones no se corten (page-break-inside: avoid)
+                                  const sections = container.querySelectorAll('.sec, table, .firma-row');
+                                  sections.forEach(s => {
+                                    s.style.pageBreakInside = 'avoid';
+                                    s.style.breakInside = 'avoid';
+                                  });
+
+                                  await pdf.html(container, {
+                                    callback: function (doc) {
+                                      const safeName = (p.nombres || 'Certificado').replace(/[^a-z0-9]/gi, '_').toUpperCase();
+                                      doc.save(`CERTIFICADO_${safeName}.pdf`);
+                                    },
+                                    x: margin,
+                                    y: margin,
+                                    width: contentWidth,
+                                    windowWidth: 800, // Mantener el ancho de referencia para estilos
+                                    autoPaging: 'text', // Salto de página inteligente basado en texto/bloques
+                                    html2canvas: {
+                                      scale: 0.26, // Ajuste de escala para mm
+                                      useCORS: true,
+                                      logging: false,
+                                      letterRendering: true
+                                    }
+                                  });
                                 } catch (err) {
                                   console.error("Error generando PDF para:", p.nombres, err);
                                 } finally {
