@@ -11907,12 +11907,13 @@ const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : n
     (data.nombres || "") +
     "</title>" +
     "<style>" +
-    "*{margin:0;padding:0;box-sizing:border-box;}" +
+    "@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}" +
+    "*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}" +
     'body{font-family:"Segoe UI",Arial,sans-serif;font-size:10.5pt;color:#111;padding:14mm 16mm 10mm;}' +
     ".np-dl{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;align-items:flex-end;gap:6px;}" +
     ".np-dl button{background:#065f46;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:900;font-size:11pt;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2);}" +
     ".np-dl p{font-size:8pt;color:#6b7280;text-align:right;}" +
-    "@media print{.np-dl{display:none!important;}body{padding:10mm 14mm;}}" +
+    "@media print{.np-dl{display:none!important;}body{padding:0;}}" +
     /* ── HEADER ── */
     ".hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #065f46;padding-bottom:10px;margin-bottom:14px;}" +
     ".hdr-brand{display:flex;align-items:center;gap:10px;}" +
@@ -11925,7 +11926,7 @@ const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : n
     ".subtitle{text-align:center;font-size:9pt;color:#6b7280;margin-bottom:10px;}" +
     ".intro{font-size:9.5pt;color:#374151;margin-bottom:10px;line-height:1.5;}" +
     /* ── PATIENT BOX ── */
-    ".pat-box{border:1.5px solid #d1d5db;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:grid;grid-template-columns:1fr 1fr;gap:5px 20px;}" +
+    ".pat-box{border:1.5px solid #d1d5db;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:grid;grid-template-columns:1fr 1fr;gap:5px 20px;page-break-inside:avoid;}" +
     ".pat-field{display:flex;flex-direction:column;}" +
     ".pat-label{font-size:7.5pt;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px;}" +
     ".pat-val{font-size:10.5pt;font-weight:700;color:#111;}" +
@@ -11935,7 +11936,7 @@ const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : n
     aptBg +
     ";border-radius:8px;padding:14px 20px;text-align:center;margin-bottom:10px;background:" +
     aptBg +
-    ";}" +
+    ";page-break-inside:avoid;}" +
     ".concepto-txt{font-size:16pt;font-weight:900;text-transform:uppercase;color:#fff;line-height:1.3;}" +
     ".concepto-note{font-size:8pt;color:#e5e7eb;margin-top:4px;}" +
     /* ── SECTIONS ── */
@@ -11944,9 +11945,9 @@ const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : n
     ".pill{display:inline-block;background:#fef9c3;border:1px solid #fde047;color:#78350f;padding:2px 8px;border-radius:4px;font-size:8.5pt;margin:2px;}" +
     ".pill.ok{background:#f0fdf4;border-color:#86efac;color:#14532d;}" +
     /* ── ALERTA ── */
-    ".alerta{background:#fef9c3;border:1px solid #fde047;padding:7px 12px;border-radius:6px;font-size:8.5pt;color:#713f12;margin-bottom:10px;}" +
+    ".alerta{background:#fef9c3;border:1px solid #fde047;padding:7px 12px;border-radius:6px;font-size:8.5pt;color:#713f12;margin-bottom:10px;page-break-inside:avoid;}" +
     /* ── FIRMA ROW ── */
-    ".firma-row{display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:end;border-top:2px solid #d1d5db;padding-top:12px;margin-top:4px;}" +
+    ".firma-row{display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:end;border-top:2px solid #d1d5db;padding-top:12px;margin-top:4px;page-break-inside:avoid;}" +
     ".firma-col{display:flex;flex-direction:column;align-items:center;text-align:center;}" +
     ".firma-line{width:180px;border-top:1px solid #374151;margin-top:50px;padding-top:5px;}" +
     ".firma-med-box{text-align:center;}" +
@@ -13426,7 +13427,7 @@ function PortalEmpresaDocsPeriodos({ nitBusq, sbUrl, sbKey, resultadosEmpresa })
                           const firstCert = _generarCertificadoDesdePortal(pacs[0]);
                           const styleMatch = firstCert.match(/<style>([\s\S]*?)<\/style>/);
                           const styles = styleMatch ? styleMatch[1] : "";
-                          w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Certificados — ${portalDocs.nombre}</title><style>${styles}.np-dl{position:fixed;top:10px;right:10px;z-index:9999;}@media print{.np-dl{display:none!important;}}</style></head><body><div class="np-dl"><button onclick="window.print()" style="background:#065f46;color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:900;cursor:pointer;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.2);">📥 Guardar PDF / Imprimir (${pacs.length} certificados)</button></div>${certs}</body></html>`);
+                          w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Certificados — ${portalDocs.nombre}</title><style>@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}${styles}.np-dl{position:fixed;top:10px;right:10px;z-index:9999;}@media print{.np-dl{display:none!important;}body{padding:0!important;}}</style></head><body><div class="np-dl"><button onclick="window.print()" style="background:#065f46;color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:900;cursor:pointer;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.2);">📥 Guardar PDF / Imprimir (${pacs.length} certificados)</button></div>${certs}</body></html>`);
                           w.document.close();
                         }}
                         className="w-full py-2 bg-emerald-700 text-white text-xs font-black rounded-xl hover:bg-emerald-800 flex items-center justify-center gap-2"
@@ -13995,7 +13996,7 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
                   const firstCert = _generarCertificadoDesdePortal(pacs[0]);
                   const styleMatch = firstCert.match(/<style>([\s\S]*?)<\/style>/);
                   const styles = styleMatch ? styleMatch[1] : "";
-                  w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Certificados - ${pacs[0]?.empresaNombre || "Empresa"}</title><style>${styles} .np-dl{position:fixed;top:10px;right:10px;z-index:9999;} @media print{.np-dl{display:none!important;}}</style></head><body><div class="np-dl"><button onclick="window.print()" style="background:#065f46;color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:900;cursor:pointer;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.2);">📥 Guardar PDF / Imprimir (${pacs.length} certificados)</button></div>${certs}</body></html>`);
+                  w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Certificados - ${pacs[0]?.empresaNombre || "Empresa"}</title><style>@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}${styles} .np-dl{position:fixed;top:10px;right:10px;z-index:9999;} @media print{.np-dl{display:none!important;}body{padding:0!important;}}</style></head><body><div class="np-dl"><button onclick="window.print()" style="background:#065f46;color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:900;cursor:pointer;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.2);">📥 Guardar PDF / Imprimir (${pacs.length} certificados)</button></div>${certs}</body></html>`);
                   w.document.close();
                 }} className="px-3 py-1 bg-emerald-500 text-white text-[10px] font-black rounded-lg hover:bg-emerald-600">
                   📥 Descargar {Object.keys(certSeleccionados).length > 0 ? `(${Object.keys(certSeleccionados).length})` : `todos (${resultadosEmpresa.length})`}
@@ -27381,7 +27382,8 @@ Esta historia clínica debe conservarse mínimo 20 años.
                   w.document.write(
                     '<!DOCTYPE html><html lang="es"><head>' +
                       sharedHead +
-                      "<style>@page{size:letter portrait;margin:1cm 1.2cm;}" +
+                      "<style>@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}" +
+                      "*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}" +
                       ".np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;" +
                       "padding:7px 14px;display:flex;align-items:center;gap:10px;z-index:9999;}" +
                       ".np-bar span{flex:1;font-size:9pt;font-weight:700;}" +
@@ -27580,8 +27582,8 @@ Esta historia clínica debe conservarse mínimo 20 años.
                             w.document.write(
                               '<!DOCTYPE html><html lang="es"><head>' + sharedHeadAll +
                               '<style>' +
-                              '@page{size:letter portrait;margin:1cm 1.2cm;}' +
-                              '-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;' +
+                              '@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}' +
+                              '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}' +
                               '.np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;padding:8px 16px;display:flex;align-items:center;gap:10px;z-index:9999;}' +
                               '.np-bar span{flex:1;font-size:9pt;font-weight:700;}' +
                               '.np-bar button{border:none;padding:6px 16px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;}' +
