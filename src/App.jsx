@@ -27460,22 +27460,32 @@ Esta historia clínica debe conservarse mínimo 20 años.
                             const _miIPSCertSel = currentUser?.empresaId
                               ? companies.find((c) => c.id === currentUser.empresaId) || null
                               : null;
-                            showAlert(`📄 Descargando ${selectedList.length} certificado${selectedList.length > 1 ? 's' : ''}...\n\nSe abrirá una ventana para cada certificado.`);
-                            // Descargar cada certificado de forma individual con retraso
+                            showAlert(`📥 Iniciando descarga de ${selectedList.length} certificado${selectedList.length > 1 ? 's' : ''}...\n\nLos archivos se guardarán directamente en tu carpeta de descargas.`);
+                            
                             selectedList.forEach((p, idx) => {
                               setTimeout(() => {
                                 const fullHtml = _generarCertificadoHTMLNormalizado(p, docData, sig, _miIPSCertSel);
-                                const w = window.open("", "_blank", "width=920,height=1150");
-                                if (!w) { console.warn(`No se pudo abrir ventana para ${p.nombres}`); return; }
-                                w.document.write(fullHtml);
-                                w.document.close();
-                                // Disparar descarga automática
-                                setTimeout(() => {
-                                  w.print();
-                                  // El usuario debe hacer clic en "Guardar" en el diálogo de impresión
-                                  // o usar Ctrl+S para descargar como PDF
-                                }, 500);
-                              }, idx * 1200); // 1.2 segundos entre descargas
+                                
+                                // Crear un Blob con el contenido HTML
+                                const blob = new Blob([fullHtml], { type: 'text/html' });
+                                const url = URL.createObjectURL(blob);
+                                
+                                // Crear un enlace de descarga invisible
+                                const link = document.createElement('a');
+                                link.href = url;
+                                
+                                // Limpiar el nombre para el archivo
+                                const safeName = (p.nombres || 'Certificado').replace(/[^a-z0-9]/gi, '_').toUpperCase();
+                                link.download = `CERTIFICADO_${safeName}.html`;
+                                
+                                // Añadir al documento, hacer clic y eliminar
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                
+                                // Liberar la URL
+                                setTimeout(() => URL.revokeObjectURL(url), 100);
+                              }, idx * 500); // 0.5 segundos entre descargas para no saturar
                             });
                           }}
                           disabled={selectedList.length === 0}
