@@ -19704,10 +19704,43 @@ Esta historia clínica debe conservarse mínimo 20 años.
     window._lastHCCleanBody = _hcBody;
     // silentMode: solo genera HTML sin abrir ventana (para combinar con otros docs)
     if (silentMode) return;
+    // Exponer función de descarga jsPDF — la ventana emergente la invoca via window.opener
+    const _hcPdfName = 'HC_' + (data.nombres||'Paciente').replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf';
+    window._sisoDownloadHCPDF = async (srcHtml) => {
+      const _ifr = document.createElement('iframe');
+      _ifr.style.cssText = 'position:fixed;left:-9999px;top:0;width:870px;height:1px;border:0;visibility:hidden;';
+      document.body.appendChild(_ifr);
+      await new Promise(res => {
+        const _to = setTimeout(res, 20000);
+        _ifr.onload = async () => {
+          try {
+            const iDoc = _ifr.contentDocument;
+            const nb = iDoc.querySelector('.np-bar'); if (nb) nb.style.display='none';
+            const sh = iDoc.documentElement.scrollHeight;
+            _ifr.style.height = sh + 'px';
+            await new Promise(r => setTimeout(r, 500));
+            const canvas = await html2canvas(iDoc.body, {
+              scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff',
+              width: 870, windowWidth: 870, scrollX: 0, scrollY: 0, height: sh, windowHeight: sh
+            });
+            const imgData = canvas.toDataURL('image/jpeg', 0.92);
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+            const pW = pdf.internal.pageSize.getWidth(), pH = pdf.internal.pageSize.getHeight();
+            const mg = 15, cW = pW - mg*2, cH = (canvas.height * cW) / canvas.width, pcH = pH - mg*2;
+            let pg = 0;
+            pdf.addImage(imgData, 'JPEG', mg, mg, cW, cH);
+            while (cH > pcH * (pg+1)) { pg++; pdf.addPage(); pdf.addImage(imgData, 'JPEG', mg, mg - pg*pcH, cW, cH); }
+            pdf.save(_hcPdfName);
+          } catch(e) { console.error('[PDF-HC]', e); }
+          finally { clearTimeout(_to); setTimeout(() => { if(document.body.contains(_ifr)) document.body.removeChild(_ifr); }, 500); res(); }
+        };
+        _ifr.srcdoc = srcHtml;
+      });
+    };
     var w = window.open("", "_blank", "width=870,height=1100");
     if (!w) { showAlert("Permita las ventanas emergentes para imprimir."); return; }
-    w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>[OCUPASALUD] ' + _e(data.nombres||"HC") + '</title><style>' + _hcStyles + '</style></head><body>' +
-    '<div class="np-bar"><span style="flex:1;font-weight:700;">\uD83D\uDCCB HC ' + _e(data.nombres||"") + ' \u2014 ' + _e(data.codigoVerificacion||"") + '</span><button onclick="window.print()">\uD83D\uDCE5 Guardar / Imprimir PDF</button><button onclick="window.close()" style="background:#ef4444;">\u2715 Cerrar</button></div>' +
+    w.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>[OCUPASALUD] ' + _e(data.nombres||"HC") + '</title><style>' + _hcStyles + '</style><script>function _dlHC(btn){btn.textContent="\u23F3 Generando...";btn.disabled=true;var o=window.opener;if(o&&o._sisoDownloadHCPDF){o._sisoDownloadHCPDF(document.documentElement.outerHTML).then(function(){btn.textContent="\u2705 Descargado";setTimeout(function(){btn.textContent="\uD83D\uDCE5 Descargar PDF";btn.disabled=false;},3000);});}else{window.print();btn.disabled=false;btn.textContent="\uD83D\uDCE5 Descargar PDF";}}<\/script></head><body>' +
+    '<div class="np-bar"><span style="flex:1;font-weight:700;">\uD83D\uDCCB HC ' + _e(data.nombres||"") + ' \u2014 ' + _e(data.codigoVerificacion||"") + '</span><button onclick="_dlHC(this)" style="background:#6d28d9;">\uD83D\uDCE5 Descargar PDF</button><button onclick="window.print()" style="background:#374151;">\uD83D\uDDA8\uFE0F Imprimir</button><button onclick="window.close()" style="background:#ef4444;">\u2715 Cerrar</button></div>' +
     '<div style="margin-top:50px;">' + _hcBody + '</div></body></html>');
     w.document.close();
     w.focus();
