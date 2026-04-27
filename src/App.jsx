@@ -27492,29 +27492,33 @@ Esta historia clínica debe conservarse mínimo 20 años.
                                   const imgData = canvas.toDataURL('image/jpeg', 0.98);
                                   const pdf = new jsPDF('p', 'mm', 'letter');
                                   
-                                  const pdfWidth = pdf.internal.pageSize.getWidth();
-                                  const pdfHeight = pdf.internal.pageSize.getHeight();
+                                  const pageWidth = pdf.internal.pageSize.getWidth();
+                                  const pageHeight = pdf.internal.pageSize.getHeight();
+                                  
+                                  // Definir márgenes (en mm)
+                                  const margin = 10; 
+                                  const contentWidth = pageWidth - (margin * 2);
                                   
                                   const imgWidth = canvas.width;
                                   const imgHeight = canvas.height;
                                   
-                                  // Calcular altura de la imagen en mm para el PDF
-                                  const ratio = pdfWidth / (imgWidth / 2); // /2 por el scale:2
+                                  // Calcular altura proporcional del contenido
+                                  const ratio = contentWidth / (imgWidth / 2);
                                   const totalImgHeightMm = (imgHeight / 2) * ratio;
                                   
                                   let heightLeft = totalImgHeightMm;
-                                  let position = 0;
+                                  let position = margin; // Iniciar con margen superior
                                   
                                   // Primera página
-                                  pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, totalImgHeightMm);
-                                  heightLeft -= pdfHeight;
+                                  pdf.addImage(imgData, 'JPEG', margin, position, contentWidth, totalImgHeightMm);
+                                  heightLeft -= (pageHeight - margin * 2);
                                   
-                                  // Añadir páginas adicionales si el contenido es muy largo (evita cortes)
+                                  // Añadir páginas adicionales si es necesario
                                   while (heightLeft > 0) {
-                                    position = heightLeft - totalImgHeightMm;
                                     pdf.addPage();
-                                    pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, totalImgHeightMm);
-                                    heightLeft -= pdfHeight;
+                                    position = heightLeft - totalImgHeightMm + margin;
+                                    pdf.addImage(imgData, 'JPEG', margin, position, contentWidth, totalImgHeightMm);
+                                    heightLeft -= (pageHeight - margin * 2);
                                   }
                                   
                                   const safeName = (p.nombres || 'Certificado').replace(/[^a-z0-9]/gi, '_').toUpperCase();
