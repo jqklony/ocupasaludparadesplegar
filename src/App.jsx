@@ -19248,7 +19248,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
     const sec = (icon, text) => '<div style="background:#ecfdf5;border-left:4px solid #065f46;padding:6px 12px;margin:14px 0 6px 0;font-weight:900;font-size:9.5pt;text-transform:uppercase;color:#065f46;">' + icon + " " + _e(text) + '</div>';
     const r2 = (l1,v1,l2,v2) => '<tr><th style="background:#d1fae5;font-weight:700;width:20%;font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">' + _e(l1) + '</th><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:30%;">' + _e(v1) + '</td><th style="background:#d1fae5;font-weight:700;width:20%;font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">' + _e(l2) + '</th><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;width:30%;">' + _e(v2) + '</td></tr>';
     const r1 = (l,v) => '<tr><th style="background:#d1fae5;font-weight:700;width:28%;font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;">' + _e(l) + '</th><td style="font-size:8.5pt;padding:4px 8px;border:1px solid #ccc;" colspan="3">' + (typeof v === "string" && v.includes("<") ? v : _e(v)) + '</td></tr>';
-    const tb = (rows) => '<table style="width:100%;border-collapse:collapse;">' + rows + '</table>';
+    const tb = (rows) => '<table style="width:100%;border-collapse:collapse;break-inside:avoid;page-break-inside:avoid;">' + rows + '</table>';
     const pill = (txt, color) => '<span style="display:inline-block;background:' + color + ';color:white;padding:2px 8px;border-radius:10px;font-size:7.5pt;margin:2px;font-weight:700;">' + _e(txt) + '</span>';
 
     const sections = [];
@@ -19464,28 +19464,32 @@ Esta historia clínica debe conservarse mínimo 20 años.
     // ALTURAS — solo si el énfasis es ALTURAS
     var alt = data.examenAlturas || {};
     if (_enfasisHC === "ALTURAS" && (alt.romberg || alt.marcha || alt.vertigo || alt.coordinacion || alt.nistagmus || alt.testMiedo || alt.observaciones || alt.audiometriaOido || alt.paracliLab || alt.paracliEkg || alt.paracliEspiro || alt.paracliOptometria || alt.paracliRayosX || alt.paracliPsico || alt.paracliOtros)) {
-      var _altRows =
+      // Bloque neurológico — tabla independiente (evita duplicación al cambiar de hoja)
+      var _altContent = sec("🧗", "Énfasis: Trabajo en Alturas (Res. 4272/2021)") + tb(
         r2("Romberg", alt.romberg||"--", "Marcha Tandem", alt.marcha||"--") +
         r2("Vértigo", alt.vertigo||"No", "Coordinación", alt.coordinacion||"--") +
         r2("Nistagmus", alt.nistagmus||"No", "Test de Miedo Alturas", alt.testMiedo||"--") +
-        (alt.observaciones ? r1("Observaciones Neurológicas", alt.observaciones) : "");
-      // Audiometría
+        (alt.observaciones ? r1("Observaciones Neurológicas", alt.observaciones) : "")
+      );
+      // Bloque Audiometría — tabla independiente
       if (alt.audiometriaOido || alt.audiometriaTipo || alt.audiometriaStatus || alt.audiometriaObs) {
-        _altRows += `<tr><td colspan="4" style="background:#e0f2fe;font-weight:900;font-size:9px;padding:4px 6px;text-transform:uppercase;letter-spacing:.5px;">👂 Audiometría</td></tr>`;
-        _altRows += r2("Resultado Audiometría", alt.audiometriaOido||"--", "Tipo", alt.audiometriaTipo||"--");
-        if (alt.audiometriaStatus) _altRows += r1("Estado Audiometría", alt.audiometriaStatus);
-        if (alt.audiometriaObs) _altRows += r1("Observaciones Audiometría", alt.audiometriaObs);
+        _altContent += sec("👂", "Audiometría") + tb(
+          r2("Resultado", alt.audiometriaOido||"--", "Tipo", alt.audiometriaTipo||"--") +
+          (alt.audiometriaStatus ? r1("Estado", alt.audiometriaStatus) : "") +
+          (alt.audiometriaObs ? r1("Observaciones", alt.audiometriaObs) : "")
+        );
       }
-      // Paraclínicos
+      // Bloque Paraclínicos — tabla independiente
       var _hasParacli = alt.paracliLab || alt.paracliEkg || alt.paracliEspiro || alt.paracliOptometria || alt.paracliRayosX || alt.paracliPsico || alt.paracliOtros;
       if (_hasParacli) {
-        _altRows += `<tr><td colspan="4" style="background:#e0f2fe;font-weight:900;font-size:9px;padding:4px 6px;text-transform:uppercase;letter-spacing:.5px;">🔬 Paraclínicos</td></tr>`;
-        if (alt.paracliLab) _altRows += r2("Laboratorios", alt.paracliLab, "EKG / Holter", alt.paracliEkg||"--");
-        if (alt.paracliEspiro) _altRows += r2("Espirometría", alt.paracliEspiro, "Optometría", alt.paracliOptometria||"--");
-        if (alt.paracliRayosX) _altRows += r2("Rx / Imagen Dx", alt.paracliRayosX, "Psicosensométrico", alt.paracliPsico||"--");
-        if (alt.paracliOtros) _altRows += r1("Otros Paraclínicos", alt.paracliOtros);
+        var _pRows = "";
+        if (alt.paracliLab || alt.paracliEkg) _pRows += r2("Laboratorios", alt.paracliLab||"--", "EKG / Holter", alt.paracliEkg||"--");
+        if (alt.paracliEspiro || alt.paracliOptometria) _pRows += r2("Espirometría", alt.paracliEspiro||"--", "Optometría", alt.paracliOptometria||"--");
+        if (alt.paracliRayosX || alt.paracliPsico) _pRows += r2("Rx / Imagen Dx", alt.paracliRayosX||"--", "Psicosensométrico", alt.paracliPsico||"--");
+        if (alt.paracliOtros) _pRows += r1("Otros Paraclínicos", alt.paracliOtros);
+        _altContent += sec("🔬", "Paraclínicos") + tb(_pRows);
       }
-      sections.push(sec("🧗", "Énfasis: Trabajo en Alturas (Res. 4272/2021)") + tb(_altRows));
+      sections.push(_altContent);
     }
     // ALIMENTOS — solo si el énfasis es ALIMENTOS
     var alim = data.examenAlimentos || {};
