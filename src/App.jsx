@@ -11910,6 +11910,9 @@ const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : n
     "@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}" +
     "*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}" +
     'body{font-family:"Segoe UI",Arial,sans-serif;font-size:10.5pt;color:#111;padding:14mm 16mm 10mm;}' +
+    "table{border-collapse:collapse;page-break-inside:auto;}" +
+    "tr{page-break-inside:avoid;page-break-after:auto;}" +
+    "td,th{page-break-inside:avoid;}" +
     ".np-dl{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;align-items:flex-end;gap:6px;}" +
     ".np-dl button{background:#065f46;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:900;font-size:11pt;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2);}" +
     ".np-dl p{font-size:8pt;color:#6b7280;text-align:right;}" +
@@ -12052,7 +12055,7 @@ const _dateRef = data.fechaCierre ? new Date(data.fechaCierre + "T12:00:00") : n
       const alt = data.examenAlturas || {};
       if (_enfasis === "ALTURAS" && (alt.romberg || alt.marcha || alt.vertigo || alt.coordinacion || alt.nistagmus || alt.testMiedo || alt.observaciones || alt.audiometriaOido || alt.paracliLab || alt.paracliEkg || alt.paracliEspiro || alt.paracliOptometria || alt.paracliRayosX || alt.paracliPsico || alt.paracliOtros)) {
         let alturaHtml = '<div class="sec"><div class="sec-title">🧗 &Eacute;nfasis: Trabajo en Alturas (Res. 4272/2021)</div>';
-        alturaHtml += '<table style="width:100%;border-collapse:collapse;font-size:9.5pt;">';
+        alturaHtml += '<table style="width:100%;border-collapse:collapse;font-size:9.5pt;table-layout:fixed;">';
         // Pruebas neurológicas
         alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;width:25%;">Romberg</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.romberg || "--") + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;width:25%;">Marcha Tandem</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.marcha || "--") + '</td></tr>';
         alturaHtml += '<tr><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">V&eacute;rtigo</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.vertigo || "No") + '</td><td style="border:1px solid #e5e7eb;padding:5px;font-weight:700;background:#f9fafb;">Coordinaci&oacute;n</td><td style="border:1px solid #e5e7eb;padding:5px;">' + (alt.coordinacion || "--") + '</td></tr>';
@@ -13427,7 +13430,7 @@ function PortalEmpresaDocsPeriodos({ nitBusq, sbUrl, sbKey, resultadosEmpresa })
                           const firstCert = _generarCertificadoDesdePortal(pacs[0]);
                           const styleMatch = firstCert.match(/<style>([\s\S]*?)<\/style>/);
                           const styles = styleMatch ? styleMatch[1] : "";
-                          w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Certificados — ${portalDocs.nombre}</title><style>@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}${styles}.np-dl{position:fixed;top:10px;right:10px;z-index:9999;}@media print{.np-dl{display:none!important;}body{padding:0!important;}}</style></head><body><div class="np-dl"><button onclick="window.print()" style="background:#065f46;color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:900;cursor:pointer;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.2);">📥 Guardar PDF / Imprimir (${pacs.length} certificados)</button></div>${certs}</body></html>`);
+                          w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Certificados — ${portalDocs.nombre}</title><style>@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}table{border-collapse:collapse;page-break-inside:auto;}tr{page-break-inside:avoid;page-break-after:auto;}td,th{page-break-inside:avoid;}${styles}.np-dl{position:fixed;top:10px;right:10px;z-index:9999;}@media print{.np-dl{display:none!important;}body{padding:0!important;}}</style></head><body><div class="np-dl"><button onclick="window.print()" style="background:#065f46;color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:900;cursor:pointer;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.2);">📥 Guardar PDF / Imprimir (${pacs.length} certificados)</button></div>${certs}</body></html>`);
                           w.document.close();
                         }}
                         className="w-full py-2 bg-emerald-700 text-white text-xs font-black rounded-xl hover:bg-emerald-800 flex items-center justify-center gap-2"
@@ -13996,7 +13999,7 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
                   const firstCert = _generarCertificadoDesdePortal(pacs[0]);
                   const styleMatch = firstCert.match(/<style>([\s\S]*?)<\/style>/);
                   const styles = styleMatch ? styleMatch[1] : "";
-                  w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Certificados - ${pacs[0]?.empresaNombre || "Empresa"}</title><style>@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}${styles} .np-dl{position:fixed;top:10px;right:10px;z-index:9999;} @media print{.np-dl{display:none!important;}body{padding:0!important;}}</style></head><body><div class="np-dl"><button onclick="window.print()" style="background:#065f46;color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:900;cursor:pointer;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.2);">📥 Guardar PDF / Imprimir (${pacs.length} certificados)</button></div>${certs}</body></html>`);
+                  w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Certificados - ${pacs[0]?.empresaNombre || "Empresa"}</title><style>@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}table{border-collapse:collapse;page-break-inside:auto;}tr{page-break-inside:avoid;page-break-after:auto;}td,th{page-break-inside:avoid;}${styles} .np-dl{position:fixed;top:10px;right:10px;z-index:9999;} @media print{.np-dl{display:none!important;}body{padding:0!important;}}</style></head><body><div class="np-dl"><button onclick="window.print()" style="background:#065f46;color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:900;cursor:pointer;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.2);">📥 Guardar PDF / Imprimir (${pacs.length} certificados)</button></div>${certs}</body></html>`);
                   w.document.close();
                 }} className="px-3 py-1 bg-emerald-500 text-white text-[10px] font-black rounded-lg hover:bg-emerald-600">
                   📥 Descargar {Object.keys(certSeleccionados).length > 0 ? `(${Object.keys(certSeleccionados).length})` : `todos (${resultadosEmpresa.length})`}
@@ -27384,6 +27387,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                       sharedHead +
                       "<style>@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}" +
                       "*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}" +
+                      "table{border-collapse:collapse;page-break-inside:auto;}tr{page-break-inside:avoid;page-break-after:auto;}td,th{page-break-inside:avoid;}" +
                       ".np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;" +
                       "padding:7px 14px;display:flex;align-items:center;gap:10px;z-index:9999;}" +
                       ".np-bar span{flex:1;font-size:9pt;font-weight:700;}" +
@@ -27584,6 +27588,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                               '<style>' +
                               '@page{size:letter portrait;margin:12mm 14mm 14mm 14mm;}' +
                               '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}' +
+                              'table{border-collapse:collapse;page-break-inside:auto;}tr{page-break-inside:avoid;page-break-after:auto;}td,th{page-break-inside:avoid;}' +
                               '.np-bar{position:fixed;top:0;left:0;right:0;background:#065f46;color:#fff;padding:8px 16px;display:flex;align-items:center;gap:10px;z-index:9999;}' +
                               '.np-bar span{flex:1;font-size:9pt;font-weight:700;}' +
                               '.np-bar button{border:none;padding:6px 16px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;}' +
