@@ -9957,6 +9957,7 @@ const TabFormulaDerivacion = ({
   activeDoctorData,
   activeSignature,
   forceTab,
+  renderExamenes,
 }) => {
   const [activeSubTab, setActiveSubTab] = React.useState(forceTab || "formula");
   // When forceTab changes (switching between separate tabs), update active sub-tab
@@ -10469,6 +10470,7 @@ body{padding-top:52px;}
           {[
             { k: "formula", l: "💊 Fórmula Médica" },
             { k: "derivacion", l: "🏥 Derivaciones" },
+            ...(renderExamenes ? [{ k: "examenes", l: "🔬 Exámenes" }] : []),
           ].map((t) => (
             <button
               key={t.k}
@@ -10500,6 +10502,14 @@ body{padding-top:52px;}
               className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700"
             >
               <Printer className="w-3 h-3" /> Imprimir Derivación
+            </button>
+          )}
+          {activeSubTab === "examenes" && (
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1 bg-teal-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-teal-700"
+            >
+              <Printer className="w-3 h-3" /> Imprimir Exámenes
             </button>
           )}
         </div>
@@ -10960,6 +10970,12 @@ body{padding-top:52px;}
           </div>
         </div>
       </div>
+      {/* ══ EXÁMENES (sub-tab) ══ */}
+      {activeSubTab === "examenes" && renderExamenes && (
+        <div className="mt-2">
+          {renderExamenes()}
+        </div>
+      )}
     </div>
   );
 };
@@ -14663,6 +14679,9 @@ function AppInner() {
   });
   const [showAIConfig, setShowAIConfig] = useState(false);
   const [aiStatus, setAiStatus] = useState(null); // null | 'ok' | 'error'
+  const [aiCallsCount, setAiCallsCount] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("siso_ai_calls_count") || "{}"); } catch { return {}; }
+  });
   const [companies, setCompanies] = useState([]);
   const [usersList, setUsersList] = useState(initialUsers);
   const [usersReady, setUsersReady] = useState(false); // FIX: esperar Supabase antes de login
@@ -16456,6 +16475,12 @@ function AppInner() {
           const text = await provider.call(prompt, systemPrompt, key);
           if (text && text.trim().length > 10) {
             setAiStatus("ok");
+            // ── Contador de llamadas por proveedor ──
+            setAiCallsCount(prev => {
+              const updated = { ...prev, [providerKey]: (prev[providerKey] || 0) + 1 };
+              try { localStorage.setItem("siso_ai_calls_count", JSON.stringify(updated)); } catch {}
+              return updated;
+            });
             return text;
           }
         } catch (e) {
@@ -20096,6 +20121,12 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     Orden/Formula
                   </button>
                   <button
+                    onClick={() => setActiveTab("solicitudExamenes")}
+                    className={_tabBlue("solicitudExamenes")}
+                  >
+                    🔬 Exámenes
+                  </button>
+                  <button
                     onClick={() => setActiveTab("incapacidadGeneral")}
                     className={_tabBlue("incapacidadGeneral")}
                   >
@@ -20144,8 +20175,47 @@ Esta historia clínica debe conservarse mínimo 20 años.
                           <button onClick={() => {
                             const sel = Object.entries(enviarChecklist).filter(([,v]) => v).map(([k]) => k);
                             if (sel.length === 0) { showAlert("Seleccione al menos un documento."); return; }
-                            if (sel.length === 1 && sel[0] === "historia") { _printHCClean(); }
-                            else { handlePrint(data.nombres || "HC General"); }
+                            // ── Historia sola → usar _printHCClean (máxima calidad) ──
+                            if (sel.length === 1 && sel[0] === "historia") { _printHCClean(); setShowEnviarPanel(false); return; }
+                            // ── Premium HTML builder para HC General ──
+                            const _miIPSGn = currentUser?.empresaId ? companies.find(c => c.id === currentUser.empresaId) : null;
+                            const _doc = activeDoctorData || {};
+                            const _sig = activeSignature || null;
+                            const _acGn = (col) => /^#[0-9a-fA-F]{3,6}$/.test(col) ? col : "#059669";
+                            const _hdrGn = (title, col) => {
+                              const ac = _acGn(col);
+                              const left = _ipsDocLeftHtml(_miIPSGn, _doc, ac);
+                              const fd = data.fechaConsulta || new Date().toLocaleDateString("es-CO");
+                              return `<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid ${ac};padding-bottom:10px;margin-bottom:14px;">${left}<div style="width:34%;text-align:center;border-left:1px solid #ddd;border-right:1px solid #ddd;padding:0 10px;"><p style="font-size:13pt;font-weight:900;color:${ac};text-transform:uppercase;margin:2px 0;">${_sanitize(title)}</p><p style="font-size:7pt;color:#888;margin:2px 0;">Res. 1995/1999 · Cons. General</p><p style="font-size:8pt;font-weight:700;color:#333;margin:5px 0 2px 0;">Fecha: ${_sanitize(fd)}</p></div><div style="width:32%;text-align:right;padding-left:8px;"><p style="font-size:10.5pt;font-weight:900;color:${ac};text-transform:uppercase;margin:0 0 3px 0;">${_sanitize(data.nombres||"---")}</p><p style="font-size:7.5pt;color:#444;margin:1px 0;">${_sanitize(data.docTipo||"CC")}: <b>${_sanitize(data.docNumero||"---")}</b> · Edad: <b>${_sanitize(String(data.edad||"--"))} años</b></p><p style="font-size:7.5pt;color:#444;margin:1px 0;">Sexo: ${_sanitize(data.genero||"---")} · EPS: <b>${_sanitize(data.eps||"---")}</b></p></div></div>`;
+                            };
+                            const _sigGn = `<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:18mm;"><div style="text-align:center;width:42%;"><div style="border-top:2px solid #222;padding-top:4px;font-size:7.5pt;font-weight:700;">Firma Paciente / Responsable</div><p style="font-size:7.5pt;color:#6b7280;margin:2px 0;">Nombre: ___________________</p></div><div style="text-align:center;width:42%;">${_sig ? `<img src="${_sig}" style="max-height:55px;max-width:150px;display:block;margin:0 auto 4px;"/>` : '<div style="height:55px;border-bottom:2px solid #222;"></div>'}<p style="font-size:8.5pt;font-weight:900;margin:3px 0;">${_sanitize(_doc.nombre||"")}</p><p style="font-size:7.5pt;color:#555;margin:1px 0;">${_sanitize(_doc.titulo||"")}</p></div></div>`;
+                            const _baseGn = `@page{size:letter portrait;margin:1.1cm 1.3cm 1.3cm 1.3cm;}*{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#111;margin:0;padding:14mm 16mm;line-height:1.45;}.sec{font-size:8.5pt;font-weight:900;text-transform:uppercase;border-bottom:1.5px solid currentColor;padding-bottom:3px;margin:12px 0 6px 0;}.mc{border:1px solid #d1fae5;border-left:4px solid #059669;border-radius:4px;padding:6px 10px;margin-bottom:7px;page-break-inside:avoid;background:#f0fdf4;}.dc{border:1px solid #bfdbfe;border-left:4px solid #2563eb;border-radius:4px;padding:8px 10px;margin-bottom:7px;page-break-inside:avoid;background:#eff6ff;}.pb{page-break-before:always;padding-top:14mm;}.ba{page-break-inside:avoid;}@media print{body{padding:0;}}`;
+                            const pages = [];
+                            if (sel.includes("prescripcion")) {
+                              const meds = data.formulaMedicamentos || [];
+                              const medsH = meds.length > 0 ? meds.map((m,i) => `<div class="mc" style="display:flex;gap:8px;align-items:flex-start;"><span style="background:#059669;color:white;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:8pt;font-weight:900;flex-shrink:0;">${i+1}</span><div style="flex:1;"><p style="font-size:10pt;font-weight:900;color:#065f46;margin:0 0 2px 0;">${_sanitize(m.nombre||"")} <span style="font-size:8pt;font-weight:400;color:#6b7280;">${_sanitize(m.presentacion||"")}</span></p><p style="font-size:8.5pt;color:#374151;margin:1px 0;"><b>Dosis:</b> ${_sanitize(m.dosis||"--")} · <b>Frec:</b> ${_sanitize(m.frecuencia||"--")} · <b>Dur:</b> ${_sanitize(m.duracion||"--")}</p>${m.indicaciones?`<p style="font-size:8pt;color:#92400e;font-style:italic;margin:2px 0;">⚠ ${_sanitize(m.indicaciones)}</p>`:""}</div></div>`).join("") : '<p style="color:#9ca3af;font-style:italic;text-align:center;padding:12px;">Sin medicamentos prescritos.</p>';
+                              const dx = _sanitize(data.diagnosticoPrincipal||(data.diagnosticos||[])[0]?.descripcion||"--");
+                              pages.push(`${pages.length>0?'<div class="pb">':''}<div>${_hdrGn("Prescripción Médica","#059669")}<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:4px;padding:10px 12px;margin-bottom:12px;"><p class="sec" style="color:#065f46;">💊 Prescripción Médica</p>${medsH}<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;border-top:1px solid #a7f3d0;padding-top:8px;"><p style="font-size:8.5pt;"><b>Diagnóstico:</b> ${dx}</p><p style="font-size:8.5pt;"><b>Control en:</b> ${_sanitize(data.plan?.controlEn||data.frecuenciaSeguimiento||"--")}</p></div></div>${_sigGn}</div>${pages.length>0?'</div>':''}`);
+                            }
+                            if (sel.includes("examenes")) {
+                              const dxs = (data.diagnosticos||[]).map(d => `<p class="ba" style="font-size:8.5pt;margin:2px 0;"><b>${d.cie10||""}</b>${d.cie10?" - ":""} ${d.descripcion||""}</p>`).join("");
+                              const cond = data.plan?.conducta ? `<div class="ba" style="margin-top:10px;"><p class="sec" style="color:#0d9488;">📋 Conducta Médica</p><p style="font-size:8.5pt;white-space:pre-wrap;">${_sanitize(data.plan.conducta)}</p></div>` : "";
+                              const paracl = data.plan?.paraclinicosSolicitados ? `<div class="ba" style="margin-top:10px;"><p class="sec" style="color:#0d9488;">🔬 Paraclínicos / Exámenes Solicitados</p><p style="font-size:8.5pt;white-space:pre-wrap;line-height:1.5;">${_sanitize(data.plan.paraclinicosSolicitados)}</p></div>` : "";
+                              const recos = data.plan?.recomendaciones ? `<div class="ba" style="margin-top:10px;"><p class="sec" style="color:#0d9488;">✅ Recomendaciones</p><p style="font-size:8.5pt;white-space:pre-wrap;line-height:1.6;">${_sanitize(data.plan.recomendaciones)}</p></div>` : "";
+                              pages.push(`<div class="${pages.length>0?"pb":""}">${_hdrGn("Exámenes y Recomendaciones","#0d9488")}<div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:4px;padding:10px 12px;margin-bottom:12px;">${dxs?`<div style="margin-bottom:8px;"><p class="sec" style="color:#0d9488;">📋 Diagnósticos</p>${dxs}</div>`:""}${cond}${paracl}${recos}</div>${_sigGn}</div>`);
+                            }
+                            if (sel.includes("derivaciones")) {
+                              const derivs = data.derivaciones || [];
+                              const derivH = derivs.length > 0 ? derivs.map((d,i) => `<div class="dc"><p style="font-weight:900;font-size:9.5pt;margin:0 0 2px;">${_sanitize(d.especialidad||"--")} <span style="font-size:8pt;color:#888;font-weight:400;">(${_sanitize(d.urgencia||"Electiva")})</span></p><p style="font-size:8pt;color:#444;margin:1px 0;"><b>Motivo:</b> ${_sanitize(d.motivo||"--")}</p>${d.observaciones?`<p style="font-size:7.5pt;color:#666;font-style:italic;">${_sanitize(d.observaciones)}</p>`:""}</div>`).join("") : '<p style="color:#888;font-style:italic;font-size:8.5pt;">Sin derivaciones.</p>';
+                              pages.push(`<div class="${pages.length>0?"pb":""}">${_hdrGn("Derivaciones / Interconsultas","#7c3aed")}<div style="background:#faf5ff;border:1px solid #ddd6fe;border-radius:4px;padding:10px 12px;margin-bottom:12px;">${derivH}</div>${_sigGn}</div>`);
+                            }
+                            if (pages.length === 0) { showAlert("No hay contenido para imprimir."); return; }
+                            const _combHtml = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Documentos - ${_sanitize(data.nombres||"")}</title><style>${_baseGn}.np-bar{position:fixed;bottom:20px;right:20px;z-index:9999;}.np-bar button{background:#065f46;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:900;font-size:11pt;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2);}@media print{.np-bar{display:none!important;}}</style></head><body>${pages.join("")}<div class="np-bar"><button onclick="window.print()">📥 Imprimir / Guardar PDF</button></div></body></html>`;
+                            const _b = new Blob([_combHtml], {type:"text/html;charset=utf-8"});
+                            const _u = URL.createObjectURL(_b);
+                            const _w = window.open(_u, "_blank", "width=920,height=1200");
+                            if (!_w) { URL.revokeObjectURL(_u); showAlert("Permita ventanas emergentes."); return; }
+                            setTimeout(() => URL.revokeObjectURL(_u), 60000);
                             setShowEnviarPanel(false);
                           }} className="flex-1 px-2 py-1.5 bg-emerald-600 text-white text-[9px] font-black rounded-lg hover:bg-emerald-700">🖨️ PDF</button>
                           <button onClick={() => {
@@ -23764,7 +23834,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
         />
         <div className="bg-gradient-to-r from-emerald-50 to-white p-2 rounded-xl border border-emerald-200 shadow-sm">
           {/* Botones IA */}
-          <div className="flex flex-wrap gap-2 mb-2 no-print">
+          <div className="flex flex-wrap gap-2 mb-2 no-print items-center">
             <button
               onClick={generateAIAnalysis}
               disabled={isGenerating}
@@ -23818,6 +23888,22 @@ Esta historia clínica debe conservarse mínimo 20 años.
               )}{" "}
               Restricciones
             </button>
+            {/* ── Contador de llamadas IA ── */}
+            {(() => {
+              const _ap = aiConfig.activeProvider || "gemini";
+              const _pNames = { gemini: "Gemini", openrouter: "OpenRouter", groq: "Groq", together: "Together" };
+              const _chips = Object.entries(aiCallsCount).filter(([,v]) => v > 0);
+              if (!_chips.length) return null;
+              return (
+                <div className="flex flex-wrap gap-1 ml-auto">
+                  {_chips.map(([prov, n]) => (
+                    <span key={prov} className={`text-[8px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-0.5 ${prov === _ap ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
+                      🤖 {_pNames[prov] || prov}: <b>{n}</b> {n === 1 ? "llamada" : "llamadas"}
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
           {/* NORMATIVO: CIE-10 activo + CIE-11 en transición - Res. 1442/2024 */}
           <div className="mb-2">
@@ -24813,7 +24899,21 @@ Esta historia clínica debe conservarse mínimo 20 años.
             color="blue"
           />
           <div className="bg-blue-50 p-2 rounded-xl border border-blue-200">
-            <div className="flex justify-end mb-2 no-print">
+            <div className="flex justify-end items-center gap-2 mb-2 no-print">
+              {/* Contador IA */}
+              {Object.values(aiCallsCount).some(v => v > 0) && (() => {
+                const _ap = aiConfig.activeProvider || "gemini";
+                const _pNames = { gemini: "Gemini", openrouter: "OpenRouter", groq: "Groq", together: "Together" };
+                return (
+                  <div className="flex gap-1 flex-wrap">
+                    {Object.entries(aiCallsCount).filter(([,v]) => v > 0).map(([prov, n]) => (
+                      <span key={prov} className={`text-[8px] font-bold px-2 py-0.5 rounded-full border ${prov === _ap ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
+                        🤖 {_pNames[prov] || prov}: <b>{n}</b>
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
               <button
                 onClick={generateAIGeneral}
                 disabled={isGenerating}
@@ -50967,9 +51067,12 @@ body{padding-top:52px;}
                       <TabFormulaDerivacion
                         data={data}
                         setData={setData}
+                        activeDoctorData={_billDocData}
+                        activeSignature={_billDocSig}
                         _billDocData={_billDocData}
                         _billDocSig={_billDocSig}
                         onPrint={handlePrint}
+                        renderExamenes={() => renderTabSolicitudExamenes()}
                       />
                     </div>
                     {/* ══ BARRA SELECCIÓN DE SECCIONES ══ */}
