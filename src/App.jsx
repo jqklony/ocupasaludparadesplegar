@@ -5110,8 +5110,8 @@ const AI_PROVIDERS = {
                 systemInstruction: { parts: [{ text: systemPrompt }] },
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 generationConfig: {
-                  maxOutputTokens: 4096,
-                  temperature: 0.3,
+                  maxOutputTokens: 8192,
+                  temperature: 0.25,
                   ...(systemPrompt.includes("ÚNICAMENTE CON JSON") ||
                   systemPrompt.includes("ÚNICAMENTE JSON")
                     ? { responseMimeType: "application/json" }
@@ -5188,8 +5188,8 @@ const AI_PROVIDERS = {
               },
               body: JSON.stringify({
                 model,
-                max_tokens: 4096,
-                temperature: 0.3,
+                max_tokens: 8192,
+                temperature: 0.25,
                 messages: [
                   { role: "system", content: systemPrompt },
                   { role: "user", content: prompt },
@@ -5266,8 +5266,8 @@ const AI_PROVIDERS = {
               },
               body: JSON.stringify({
                 model,
-                max_tokens: 4096,
-                temperature: 0.3,
+                max_tokens: 8192,
+                temperature: 0.25,
                 messages: [
                   { role: "system", content: systemPrompt },
                   { role: "user", content: prompt },
@@ -5353,8 +5353,8 @@ const AI_PROVIDERS = {
               },
               body: JSON.stringify({
                 model,
-                max_tokens: 4096,
-                temperature: 0.3,
+                max_tokens: 8192,
+                temperature: 0.25,
                 messages: [
                   { role: "system", content: systemPrompt },
                   { role: "user", content: prompt },
@@ -14679,6 +14679,8 @@ function AppInner() {
   });
   const [showAIConfig, setShowAIConfig] = useState(false);
   const [aiStatus, setAiStatus] = useState(null); // null | 'ok' | 'error'
+  const [aiProviderStatus, setAiProviderStatus] = useState(""); // "🔄 Intentando con Gemini..."
+  const _aiRunningRef = React.useRef(false); // Ref sync para evitar doble-click race condition
   const [aiCallsCount, setAiCallsCount] = useState(() => {
     try { return JSON.parse(localStorage.getItem("siso_ai_calls_count") || "{}"); } catch { return {}; }
   });
@@ -16465,16 +16467,28 @@ function AppInner() {
         ...PRIORITY_ORDER.filter((k) => k !== activeKey),
       ].filter((v, i, a) => a.indexOf(v) === i); // deduplicar
       let lastError = null;
+      const _pLabels = { gemini: "Gemini", openrouter: "OpenRouter", groq: "Groq", together: "Together AI" };
+      const _validProviders = fallbackOrder.filter(k => {
+        const key = aiConfig.keys?.[k];
+        return AI_PROVIDERS[k] && key && key !== "auto";
+      });
+      if (_validProviders.length === 0) {
+        setAiStatus("error");
+        throw new Error("⚠️ No hay proveedores IA configurados.\n\nAbra ⚙️ IA → obtenga una key gratuita en cualquier proveedor → guarde.");
+      }
       // ── MEJORA RESILIENCIA: intentar cada proveedor con manejo inteligente de errores ──
-      for (const providerKey of fallbackOrder) {
+      for (let _pi = 0; _pi < _validProviders.length; _pi++) {
+        const providerKey = _validProviders[_pi];
         const provider = AI_PROVIDERS[providerKey];
-        if (!provider) continue;
         const key = aiConfig.keys?.[providerKey];
-        if (!key || key === "auto") continue; // skip si no tiene key válida
+        const _label = _pLabels[providerKey] || providerKey;
+        const _isLast = _pi === _validProviders.length - 1;
+        setAiProviderStatus(`🔄 ${_label}${_validProviders.length > 1 ? ` (${_pi + 1}/${_validProviders.length})` : ""}...`);
         try {
           const text = await provider.call(prompt, systemPrompt, key);
           if (text && text.trim().length > 10) {
             setAiStatus("ok");
+            setAiProviderStatus(`✅ ${_label}`);
             // ── Contador de llamadas por proveedor ──
             setAiCallsCount(prev => {
               const updated = { ...prev, [providerKey]: (prev[providerKey] || 0) + 1 };
@@ -16483,17 +16497,20 @@ function AppInner() {
             });
             return text;
           }
+          // Respuesta vacía: continuar con siguiente
+          setAiProviderStatus(`⚠️ ${_label}: sin respuesta → ${_isLast ? "sin más proveedores" : "probando siguiente..."}`);
         } catch (e) {
           const msg = e.message || "";
-          // Rate limit (429): pasar inmediatamente al siguiente proveedor sin log de error
           const isRateLimit = msg.includes("429") || msg.toLowerCase().includes("rate limit") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("too many");
-          // Key inválida (401/403): pasar al siguiente proveedor
           const isAuthError = msg.includes("401") || msg.includes("403") || msg.toLowerCase().includes("invalid") || msg.toLowerCase().includes("unauthorized");
           if (isRateLimit) {
+            setAiProviderStatus(`⏱️ ${_label}: cuota agotada → ${_isLast ? "sin más proveedores" : "probando siguiente..."}`);
             console.warn(`[IA] ${providerKey}: límite de peticiones alcanzado (429) → probando siguiente proveedor`);
           } else if (isAuthError) {
+            setAiProviderStatus(`🔑 ${_label}: key inválida → ${_isLast ? "sin más proveedores" : "probando siguiente..."}`);
             console.warn(`[IA] ${providerKey}: key inválida o expirada → probando siguiente proveedor`);
           } else {
+            setAiProviderStatus(`❌ ${_label}: ${msg.substring(0, 50)} → ${_isLast ? "sin más proveedores" : "probando siguiente..."}`);
             console.warn(`[IA] ${providerKey} falló: ${msg}`);
           }
           lastError = e;
@@ -16501,6 +16518,7 @@ function AppInner() {
         }
       }
       setAiStatus("error");
+      setAiProviderStatus("");
       const providerNames = fallbackOrder
         .map((k) => AI_PROVIDERS[k]?.name || k)
         .join(", ");
@@ -16519,6 +16537,7 @@ function AppInner() {
   );
   // ── GENERACIÓN IA COMPLETA (Concepto + Diagnósticos) ─────────────────────
   const generateAIAnalysis = async () => {
+    if (_aiRunningRef.current) return; // guard síncrono contra doble-click
     if (!_canUse("ia_analisis", currentUser)) {
       showAlert(
         "🔒 El análisis IA está disponible en el plan ⭐ Pro ($79.000/mes).\n\nMenú → ⭐ Ver Planes para actualizar."
@@ -16529,7 +16548,9 @@ function AppInner() {
       showAlert("Ingrese el cargo del trabajador para usar el análisis IA.");
       return;
     }
+    _aiRunningRef.current = true;
     setIsGenerating(true);
+    setAiProviderStatus("⏳ Iniciando análisis...");
     const hallazgos =
       Object.entries(data.examenFisicoSistemas || {})
         .filter(([, v]) => v.estado === "Anormal")
@@ -16749,7 +16770,9 @@ JSON REQUERIDO (sin markdown, sin texto adicional):
         `Error IA: ${e.message}\n\nConfigure un proveedor de IA en el botón ⚙️ IA o verifique su conexión.`
       );
     } finally {
+      _aiRunningRef.current = false;
       setIsGenerating(false);
+      setAiProviderStatus("");
     }
   };
   // ── GENERACIÓN IA SOLO RESTRICCIONES ─────────────────────────────────────
@@ -16884,6 +16907,7 @@ Lenguaje técnico-médico-ocupacional, formal, directo y puntual. Cada recomenda
   };
   // ── GENERACIÓN IA MEDICINA GENERAL ───────────────────────────────────────
   const generateAIGeneral = async () => {
+    if (_aiRunningRef.current) return; // guard síncrono contra doble-click
     if (!_canUse("ia_analisis", currentUser)) {
       showAlert(
         "🔒 El análisis IA está disponible en el plan ⭐ Pro ($79.000/mes).\n\nMenú → ⭐ Ver Planes para actualizar."
@@ -16894,7 +16918,9 @@ Lenguaje técnico-médico-ocupacional, formal, directo y puntual. Cada recomenda
       showAlert("Ingrese el motivo de consulta para usar IA.");
       return;
     }
+    _aiRunningRef.current = true;
     setIsGenerating(true);
+    setAiProviderStatus("⏳ Iniciando análisis clínico...");
     const _fmtSistemas = (rs) => {
       if (!rs) return "Sin datos";
       const keys = { general:"General", cardiovascular:"Cardiovascular", respiratorio:"Respiratorio", digestivo:"Digestivo", genitourinario:"Genitourinario", musculoesqueletico:"Musculoesquelético", neurologico:"Neurológico", dermatologico:"Dermatológico", endocrinologico:"Endocrinológico" };
@@ -17008,7 +17034,9 @@ JSON REQUERIDO (estructura exacta):
     } catch (e) {
       showAlert(`Error IA: ${e.message}`);
     } finally {
+      _aiRunningRef.current = false;
       setIsGenerating(false);
+      setAiProviderStatus("");
     }
   };
   // ── GENERACIÓN REPORTE IA ─────────────────────────────────────────────────
@@ -24029,6 +24057,12 @@ Esta historia clínica debe conservarse mínimo 20 años.
               )}{" "}
               Restricciones
             </button>
+            {/* ── Status proveedor IA en tiempo real ── */}
+            {aiProviderStatus && isGenerating && (
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 flex items-center gap-1 animate-pulse">
+                {aiProviderStatus}
+              </span>
+            )}
             {/* ── Contador de llamadas IA ── */}
             {(() => {
               const _ap = aiConfig.activeProvider || "gemini";
@@ -25046,7 +25080,13 @@ Esta historia clínica debe conservarse mínimo 20 años.
             color="blue"
           />
           <div className="bg-blue-50 p-2 rounded-xl border border-blue-200">
-            <div className="flex justify-end items-center gap-2 mb-2 no-print">
+            <div className="flex justify-end items-center gap-2 mb-2 no-print flex-wrap">
+              {/* Status proveedor IA en tiempo real */}
+              {aiProviderStatus && isGenerating && (
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 flex items-center gap-1 animate-pulse mr-auto">
+                  {aiProviderStatus}
+                </span>
+              )}
               {/* Contador IA */}
               {Object.values(aiCallsCount).some(v => v > 0) && (() => {
                 const _ap = aiConfig.activeProvider || "gemini";
