@@ -20163,6 +20163,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                             { k: "prescripcion", l: "💊 Prescripción", av: hasMedsGN },
                             { k: "examenes", l: "🔬 Exámenes/Recom.", av: hasPlanGN },
                             { k: "derivaciones", l: "🔀 Derivaciones", av: hasDerivGN },
+                            { k: "incapacidad", l: "🏥 Incapacidad", av: !!data.incapacidad?.aplica },
                           ].map(item => (
                             <label key={item.k} className={`flex items-center gap-2 rounded px-1.5 py-1 ${item.av ? "cursor-pointer hover:bg-gray-50" : "opacity-40 cursor-not-allowed"}`}>
                               <input type="checkbox" checked={item.av ? !!enviarChecklist[item.k] : false} disabled={!item.av} onChange={() => { if (item.av) setEnviarChecklist(p => ({...p, [item.k]: !p[item.k]})); }} className="w-3.5 h-3.5 accent-blue-600" />
@@ -20208,6 +20209,12 @@ Esta historia clínica debe conservarse mínimo 20 años.
                               const derivs = data.derivaciones || [];
                               const derivH = derivs.length > 0 ? derivs.map((d,i) => `<div class="dc"><p style="font-weight:900;font-size:9.5pt;margin:0 0 2px;">${_sanitize(d.especialidad||"--")} <span style="font-size:8pt;color:#888;font-weight:400;">(${_sanitize(d.urgencia||"Electiva")})</span></p><p style="font-size:8pt;color:#444;margin:1px 0;"><b>Motivo:</b> ${_sanitize(d.motivo||"--")}</p>${d.observaciones?`<p style="font-size:7.5pt;color:#666;font-style:italic;">${_sanitize(d.observaciones)}</p>`:""}</div>`).join("") : '<p style="color:#888;font-style:italic;font-size:8.5pt;">Sin derivaciones.</p>';
                               pages.push(`<div class="${pages.length>0?"pb":""}">${_hdrGn("Derivaciones / Interconsultas","#7c3aed")}<div style="background:#faf5ff;border:1px solid #ddd6fe;border-radius:4px;padding:10px 12px;margin-bottom:12px;">${derivH}</div>${_sigGn}</div>`);
+                            }
+                            if (sel.includes("incapacidad") && data.incapacidad?.aplica) {
+                              const _inc = data.incapacidad || {};
+                              const _nAL = (n) => { try { return numeroALetras(Number(n)); } catch { return String(n); } };
+                              const incH = `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:12px;margin-bottom:12px;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;"><div style="font-size:8.5pt;"><p style="margin:2px 0;"><b>Paciente:</b> ${_sanitize(data.nombres||"--")}</p><p style="margin:2px 0;"><b>CC:</b> ${_sanitize(data.docNumero||"--")}</p><p style="margin:2px 0;"><b>Edad:</b> ${_sanitize(String(data.edad||"--"))} años</p><p style="margin:2px 0;"><b>EPS:</b> ${_sanitize(data.eps||"--")}</p></div><div style="text-align:center;background:#fee2e2;border-radius:4px;padding:8px;"><p style="font-size:8pt;font-weight:900;color:#dc2626;text-transform:uppercase;margin:0 0 4px 0;">Días de Incapacidad</p><p style="font-size:28pt;font-weight:900;color:#dc2626;line-height:1;margin:0;">${_inc.dias||0}</p><p style="font-size:8pt;color:#dc2626;font-weight:700;">${_nAL(_inc.dias||0)} DÍAS</p></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:8.5pt;"><p style="margin:2px 0;"><b>Origen:</b> ${_sanitize(_inc.origen||"--")}</p><p style="margin:2px 0;"><b>Fecha inicio:</b> ${_sanitize(_inc.desde||"--")}</p><p style="margin:2px 0;"><b>Fecha fin:</b> ${_sanitize(_inc.hasta||"--")}</p><p style="margin:2px 0;"><b>Diagnóstico:</b> ${_sanitize(_inc.diagnostico||"--")}</p></div></div>`;
+                              pages.push(`<div class="${pages.length>0?"pb":""}">${_hdrGn("Incapacidad Médica","#dc2626")}${incH}${_sigGn}</div>`);
                             }
                             if (pages.length === 0) { showAlert("No hay contenido para imprimir."); return; }
                             const _combHtml = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Documentos - ${_sanitize(data.nombres||"")}</title><style>${_baseGn}.np-bar{position:fixed;bottom:20px;right:20px;z-index:9999;}.np-bar button{background:#065f46;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:900;font-size:11pt;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2);}@media print{.np-bar{display:none!important;}}</style></head><body>${pages.join("")}<div class="np-bar"><button onclick="window.print()">📥 Imprimir / Guardar PDF</button></div></body></html>`;
@@ -20270,6 +20277,7 @@ Esta historia clínica debe conservarse mínimo 20 años.
                       { k: "formula", l: "💊 Fórmula / Prescripción", available: hasMeds },
                       { k: "derivacion", l: "🔀 Derivación / Interconsulta", available: hasDeriv },
                       { k: "examenes", l: "🔬 Solicitud de Exámenes", available: hasExams },
+                      { k: "incapacidad", l: "🏥 Incapacidad Médica", available: !!data.incapacidad?.aplica },
                     ].map(item => (
                       <label key={item.k} className={`flex items-center gap-2 rounded px-1.5 py-1 ${item.available ? "cursor-pointer hover:bg-gray-50" : "opacity-40 cursor-not-allowed"}`}>
                         <input type="checkbox" checked={item.available ? !!enviarChecklist[item.k] : false} disabled={!item.available} onChange={() => { if (item.available) setEnviarChecklist(p => ({...p, [item.k]: !p[item.k]})); }} className="w-3.5 h-3.5 accent-blue-600" />
@@ -20293,6 +20301,23 @@ Esta historia clínica debe conservarse mínimo 20 años.
                         else if (selected[0] === "formula") { openPrintWindow("formula", "Fórmula Médica"); }
                         else if (selected[0] === "derivacion") { openPrintWindow("derivacion", "Derivación / Interconsulta"); }
                         else if (selected[0] === "examenes") { handlePrint("Exámenes-" + data.nombres); }
+                        else if (selected[0] === "incapacidad") {
+                          // Incapacidad premium via Blob URL
+                          const _inc = data.incapacidad || {};
+                          const _miIPS = currentUser?.empresaId ? companies.find(c => c.id === currentUser.empresaId) : null;
+                          const _docI = activeDoctorData || {};
+                          const _sigI = activeSignature || null;
+                          const _acI = "#dc2626";
+                          const _fdI = data.fechaExamen || data.fechaConsulta || new Date().toLocaleDateString("es-CO");
+                          const _nALI = (n) => { try { return numeroALetras(Number(n)); } catch { return String(n); } };
+                          const _iBody = `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:14px;margin-bottom:14px;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;"><div style="font-size:8.5pt;"><p style="margin:3px 0;"><b>Paciente:</b> ${_sanitize(data.nombres||"--")}</p><p style="margin:3px 0;"><b>Doc:</b> ${_sanitize(data.docTipo||"CC")} ${_sanitize(data.docNumero||"--")}</p><p style="margin:3px 0;"><b>Edad:</b> ${_sanitize(String(data.edad||"--"))} años</p><p style="margin:3px 0;"><b>EPS:</b> ${_sanitize(data.eps||"--")}</p><p style="margin:3px 0;"><b>Cargo:</b> ${_sanitize(data.cargo||"--")}</p></div><div style="text-align:center;background:#fee2e2;border-radius:6px;padding:10px;"><p style="font-size:8pt;font-weight:900;color:${_acI};text-transform:uppercase;margin:0 0 4px 0;">Días de Incapacidad</p><p style="font-size:32pt;font-weight:900;color:${_acI};line-height:1;margin:0;">${_inc.dias||0}</p><p style="font-size:8pt;color:${_acI};font-weight:700;">${_nALI(_inc.dias||0)} DÍAS</p></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:8.5pt;border-top:1px solid #fecaca;padding-top:10px;"><p style="margin:3px 0;"><b>Origen:</b> ${_sanitize(_inc.origen||"--")}</p><p style="margin:3px 0;"><b>Inicio:</b> ${_sanitize(_inc.desde||"--")}</p><p style="margin:3px 0;"><b>Fin:</b> ${_sanitize(_inc.hasta||"--")}</p><p style="margin:3px 0;"><b>Diagnóstico:</b> ${_sanitize(_inc.diagnostico||"--")}</p></div></div><div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:18mm;"><div style="text-align:center;width:42%;"><div style="border-top:2px solid #222;padding-top:4px;font-size:7.5pt;font-weight:700;">Firma Paciente / Responsable</div><p style="font-size:7.5pt;color:#6b7280;margin:2px 0;">Nombre: ___________________</p></div><div style="text-align:center;width:42%;">${_sigI?`<img src="${_sigI}" style="max-height:55px;max-width:150px;display:block;margin:0 auto 4px;"/>`:'<div style="height:55px;border-bottom:2px solid #222;"></div>'}<p style="font-size:8.5pt;font-weight:900;margin:3px 0;">${_sanitize(_docI.nombre||"")}</p><p style="font-size:7.5pt;color:#555;margin:1px 0;">${_sanitize(_docI.titulo||"")}</p><p style="font-size:7.5pt;color:#555;margin:1px 0;">Lic: ${_sanitize(_docI.licencia||"")}</p></div></div>`;
+                          const _iHtml = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Incapacidad - ${_sanitize(data.nombres||"")}</title><style>@page{size:letter portrait;margin:1.1cm 1.3cm 1.3cm 1.3cm;}*{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#111;margin:0;padding:1.1cm 1.3cm 1.1cm 1.3cm;padding-top:60px;}.itb{position:fixed;top:0;left:0;right:0;background:#7f1d1d;color:white;padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:9999;}.itb .iptitle{flex:1;font-size:9.5pt;font-weight:700;}.itb button{border:none;padding:6px 14px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;}.ibp{background:#10b981;color:white;}.ibc{background:#ef4444;color:white;}@media print{.itb{display:none!important;}body{padding-top:1.1cm!important;}}</style></head><body><div class="itb"><span class="iptitle">🏥 Incapacidad Médica — ${_sanitize(data.nombres||"")}</span><button class="ibp" onclick="window.print()">🖨️ Imprimir</button><button class="ibc" onclick="window.close()">✕ Cerrar</button></div><div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid ${_acI};padding-bottom:10px;margin-bottom:14px;">${_ipsDocLeftHtml(_miIPS,_docI,_acI)}<div style="width:34%;text-align:center;border-left:1px solid #ddd;border-right:1px solid #ddd;padding:0 10px;"><p style="font-size:13pt;font-weight:900;color:${_acI};text-transform:uppercase;margin:2px 0;">INCAPACIDAD MÉDICA</p><p style="font-size:7pt;color:#888;margin:2px 0;">Res. 1995/1999</p><p style="font-size:8pt;font-weight:700;color:#333;margin:5px 0 2px 0;">Fecha: ${_sanitize(_fdI)}</p></div><div style="width:32%;text-align:right;padding-left:8px;"><p style="font-size:10.5pt;font-weight:900;color:${_acI};text-transform:uppercase;margin:0 0 3px 0;">${_sanitize(data.nombres||"---")}</p><p style="font-size:7.5pt;color:#444;margin:1px 0;">${_sanitize(data.docTipo||"CC")}: <b>${_sanitize(data.docNumero||"---")}</b></p><p style="font-size:7.5pt;color:#444;margin:1px 0;">Empresa: <b>${_sanitize(data.empresa||"---")}</b></p></div></div>${_iBody}</body></html>`;
+                          const _ib = new Blob([_iHtml], {type:"text/html;charset=utf-8"});
+                          const _iu = URL.createObjectURL(_ib);
+                          const _iw = window.open(_iu, "_blank", "width=870,height=1100");
+                          if (!_iw) { URL.revokeObjectURL(_iu); showAlert("Permita ventanas emergentes."); return; }
+                          setTimeout(() => URL.revokeObjectURL(_iu), 60000);
+                        }
                         setShowEnviarPanel(false);
                         return;
                       }
@@ -20317,6 +20342,14 @@ Esta historia clínica debe conservarse mínimo 20 años.
                           if (window._lastHCCleanStyles) allStyles.push(window._lastHCCleanStyles);
                           pages.push('<div style="page-break-before:always;padding:14mm 16mm;">' + window._lastHCCleanBody + '</div>');
                         }
+                      }
+
+                      // Incapacidad médica en multi-doc
+                      if (selected.includes("incapacidad") && data.incapacidad?.aplica) {
+                        const _incM = data.incapacidad || {};
+                        const _nALM = (n) => { try { return numeroALetras(Number(n)); } catch { return String(n); } };
+                        const _acM = "#dc2626";
+                        pages.push(`<div style="page-break-before:always;padding:14mm 16mm;font-family:Arial,sans-serif;font-size:9.5pt;color:#111;"><h2 style="font-size:13pt;font-weight:900;color:${_acM};text-align:center;text-transform:uppercase;border-bottom:3px solid ${_acM};padding-bottom:8px;margin-bottom:14px;">INCAPACIDAD MÉDICA</h2><div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:14px;margin-bottom:14px;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;"><div><p style="margin:3px 0;"><b>Paciente:</b> ${_sanitize(data.nombres||"--")}</p><p style="margin:3px 0;"><b>Doc:</b> ${_sanitize(data.docNumero||"--")}</p><p style="margin:3px 0;"><b>EPS:</b> ${_sanitize(data.eps||"--")}</p><p style="margin:3px 0;"><b>Cargo:</b> ${_sanitize(data.cargo||"--")}</p></div><div style="text-align:center;background:#fee2e2;border-radius:6px;padding:10px;"><p style="font-size:8pt;font-weight:900;color:${_acM};text-transform:uppercase;margin:0 0 4px 0;">Días</p><p style="font-size:32pt;font-weight:900;color:${_acM};line-height:1;margin:0;">${_incM.dias||0}</p><p style="font-size:8pt;color:${_acM};font-weight:700;">${_nALM(_incM.dias||0)} DÍAS</p></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px solid #fecaca;padding-top:10px;"><p style="margin:3px 0;"><b>Origen:</b> ${_sanitize(_incM.origen||"--")}</p><p style="margin:3px 0;"><b>Inicio:</b> ${_sanitize(_incM.desde||"--")}</p><p style="margin:3px 0;"><b>Fin:</b> ${_sanitize(_incM.hasta||"--")}</p><p style="margin:3px 0;"><b>Diagnóstico:</b> ${_sanitize(_incM.diagnostico||"--")}</p></div></div></div>`);
                       }
 
                       if (pages.length === 0) { showAlert("No se pudo generar los documentos."); return; }
@@ -23892,15 +23925,21 @@ Esta historia clínica debe conservarse mínimo 20 años.
             {(() => {
               const _ap = aiConfig.activeProvider || "gemini";
               const _pNames = { gemini: "Gemini", openrouter: "OpenRouter", groq: "Groq", together: "Together" };
+              const _limits = { gemini: 1500, openrouter: 50, groq: 100, together: 50 };
               const _chips = Object.entries(aiCallsCount).filter(([,v]) => v > 0);
               if (!_chips.length) return null;
               return (
                 <div className="flex flex-wrap gap-1 ml-auto">
-                  {_chips.map(([prov, n]) => (
-                    <span key={prov} className={`text-[8px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-0.5 ${prov === _ap ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
-                      🤖 {_pNames[prov] || prov}: <b>{n}</b> {n === 1 ? "llamada" : "llamadas"}
-                    </span>
-                  ))}
+                  {_chips.map(([prov, n]) => {
+                    const lim = _limits[prov] || 50;
+                    const rem = Math.max(0, lim - n);
+                    const remColor = rem < 10 ? "#dc2626" : rem < 30 ? "#d97706" : "#059669";
+                    return (
+                      <span key={prov} className={`text-[8px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-0.5 ${prov === _ap ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
+                        🤖 {_pNames[prov] || prov}: <b>{n}</b> usadas · <b style={{color: remColor}}>{rem}</b> restantes
+                      </span>
+                    );
+                  })}
                 </div>
               );
             })()}
@@ -24904,13 +24943,19 @@ Esta historia clínica debe conservarse mínimo 20 años.
               {Object.values(aiCallsCount).some(v => v > 0) && (() => {
                 const _ap = aiConfig.activeProvider || "gemini";
                 const _pNames = { gemini: "Gemini", openrouter: "OpenRouter", groq: "Groq", together: "Together" };
+                const _limits = { gemini: 1500, openrouter: 50, groq: 100, together: 50 };
                 return (
                   <div className="flex gap-1 flex-wrap">
-                    {Object.entries(aiCallsCount).filter(([,v]) => v > 0).map(([prov, n]) => (
-                      <span key={prov} className={`text-[8px] font-bold px-2 py-0.5 rounded-full border ${prov === _ap ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
-                        🤖 {_pNames[prov] || prov}: <b>{n}</b>
-                      </span>
-                    ))}
+                    {Object.entries(aiCallsCount).filter(([,v]) => v > 0).map(([prov, n]) => {
+                      const lim = _limits[prov] || 50;
+                      const rem = Math.max(0, lim - n);
+                      const remColor = rem < 10 ? "#dc2626" : rem < 30 ? "#d97706" : "#059669";
+                      return (
+                        <span key={prov} className={`text-[8px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${prov === _ap ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>
+                          🤖 {_pNames[prov] || prov}: <b>{n}</b> usadas · <b style={{color: remColor}}>{rem}</b> restantes
+                        </span>
+                      );
+                    })}
                   </div>
                 );
               })()}
@@ -51176,6 +51221,19 @@ body{padding-top:52px;}
                           >
                             <Printer className="w-3 h-3" /> Deriv.
                           </button>
+                          {data.incapacidad?.aplica && (
+                            <button
+                              onClick={() =>
+                                printSection(
+                                  "gn-incapacidad",
+                                  "Incapacidad Médica"
+                                )
+                              }
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition"
+                            >
+                              <Printer className="w-3 h-3" /> Incap.
+                            </button>
+                          )}
                           <button
                             onClick={() => setShowEnviarPanel(!showEnviarPanel)}
                             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition ${showEnviarPanel ? "bg-red-500 hover:bg-red-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
@@ -51198,6 +51256,7 @@ body{padding-top:52px;}
                                     { k: "prescripcion", l: "💊 Prescripción Médica", available: hasMedsG },
                                     { k: "examenes", l: "🔬 Exámenes / Recomendaciones", available: hasPlanG },
                                     { k: "derivaciones", l: "🔀 Derivaciones / Interconsultas", available: hasDerivG },
+                                    { k: "incapacidad", l: "🏥 Incapacidad Médica", available: !!data.incapacidad?.aplica },
                                   ].map(item => (
                                     <label key={item.k} className={`flex items-center gap-2 rounded px-1.5 py-1 ${item.available ? "cursor-pointer hover:bg-gray-50" : "opacity-40 cursor-not-allowed"}`}>
                                       <input type="checkbox" checked={item.available ? !!chkG[item.k] : false} disabled={!item.available} onChange={() => { if (item.available) setChkG(p => ({...p, [item.k]: !p[item.k]})); }} className="w-3.5 h-3.5 accent-blue-600" />
@@ -51216,11 +51275,55 @@ body{padding-top:52px;}
                                       else if (sel[0] === "prescripcion") { printSection("gn-prescripcion", "Prescripción Médica"); }
                                       else if (sel[0] === "examenes") { printSection("gn-examenes", "Exámenes y Recomendaciones"); }
                                       else if (sel[0] === "derivaciones") { printSection("gn-derivaciones", "Derivaciones"); }
+                                      else if (sel[0] === "incapacidad") { printSection("gn-incapacidad", "Incapacidad Médica"); }
                                       setShowEnviarPanel(false);
                                       return;
                                     }
-                                    // Múltiples → imprimir página completa (incluye todo)
-                                    handlePrint(data.nombres || "HC General");
+                                    // Múltiples → construir combinado premium
+                                    const _mipGn = currentUser?.empresaId ? companies.find(c => c.id === currentUser.empresaId) : null;
+                                    const _docGn = _billDocData || {};
+                                    const _sigGn2 = _billDocSig || null;
+                                    const _acGn2 = "#2563eb";
+                                    const _fdGn = data.fechaConsulta || new Date().toLocaleDateString("es-CO");
+                                    const _hdrGn2 = (title, col) => {
+                                      const ac2 = /^#[0-9a-fA-F]{3,6}$/.test(col) ? col : _acGn2;
+                                      return `<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid ${ac2};padding-bottom:10px;margin-bottom:14px;">${_ipsDocLeftHtml(_mipGn,_docGn,ac2)}<div style="width:34%;text-align:center;border-left:1px solid #ddd;border-right:1px solid #ddd;padding:0 10px;"><p style="font-size:13pt;font-weight:900;color:${ac2};text-transform:uppercase;margin:2px 0;">${_sanitize(title)}</p><p style="font-size:7pt;color:#888;margin:2px 0;">Cons. General · Res. 1995/1999</p><p style="font-size:8pt;font-weight:700;color:#333;margin:5px 0 2px 0;">Fecha: ${_sanitize(_fdGn)}</p></div><div style="width:32%;text-align:right;padding-left:8px;"><p style="font-size:10.5pt;font-weight:900;color:${ac2};text-transform:uppercase;margin:0 0 3px 0;">${_sanitize(data.nombres||"---")}</p><p style="font-size:7.5pt;color:#444;margin:1px 0;">${_sanitize(data.docTipo||"CC")}: <b>${_sanitize(data.docNumero||"---")}</b> · Edad: <b>${_sanitize(String(data.edad||"--"))} años</b></p><p style="font-size:7.5pt;color:#444;margin:1px 0;">EPS: <b>${_sanitize(data.eps||"---")}</b></p></div></div>`;
+                                    };
+                                    const _sigBlockGn2 = `<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:18mm;"><div style="text-align:center;width:42%;"><div style="border-top:2px solid #222;padding-top:4px;font-size:7.5pt;font-weight:700;">Firma Paciente / Responsable</div><p style="font-size:7.5pt;color:#6b7280;margin:2px 0;">Nombre: ___________________</p></div><div style="text-align:center;width:42%;">${_sigGn2?`<img src="${_sigGn2}" style="max-height:55px;max-width:150px;display:block;margin:0 auto 4px;"/>`:'<div style="height:55px;border-bottom:2px solid #222;"></div>'}<p style="font-size:8.5pt;font-weight:900;margin:3px 0;">${_sanitize(_docGn.nombre||"")}</p><p style="font-size:7.5pt;color:#555;margin:1px 0;">${_sanitize(_docGn.titulo||"")}</p></div></div>`;
+                                    const _baseGn2 = `@page{size:letter portrait;margin:1.1cm 1.3cm 1.3cm 1.3cm;}*{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}body{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#111;margin:0;padding:1.1cm 1.3cm;}.pb{page-break-before:always;padding-top:1.1cm;}.mc{border:1px solid #d1fae5;border-left:4px solid #059669;border-radius:4px;padding:6px 10px;margin-bottom:7px;page-break-inside:avoid;background:#f0fdf4;}.dc{border:1px solid #bfdbfe;border-left:4px solid #2563eb;border-radius:4px;padding:8px 10px;margin-bottom:7px;page-break-inside:avoid;background:#eff6ff;}.sec{font-size:8.5pt;font-weight:900;text-transform:uppercase;border-bottom:1.5px solid currentColor;padding-bottom:3px;margin:10px 0 6px 0;}.ba{page-break-inside:avoid;}.np-bar{position:fixed;bottom:20px;right:20px;z-index:9999;}.np-bar button{background:#065f46;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:900;font-size:11pt;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2);}@media print{body{padding:0;}.np-bar{display:none!important;}}`;
+                                    const pgsGn = [];
+                                    if (sel.includes("prescripcion")) {
+                                      const meds = data.formulaMedicamentos || [];
+                                      const medsH = meds.length > 0 ? meds.map((m,i) => `<div class="mc" style="display:flex;gap:8px;"><span style="background:#059669;color:white;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:8pt;font-weight:900;flex-shrink:0;">${i+1}</span><div style="flex:1;"><p style="font-size:10pt;font-weight:900;color:#065f46;margin:0 0 2px 0;">${_sanitize(m.nombre||"")} <span style="font-size:8pt;font-weight:400;color:#6b7280;">${_sanitize(m.presentacion||"")}</span></p><p style="font-size:8.5pt;color:#374151;margin:1px 0;"><b>Dosis:</b> ${_sanitize(m.dosis||"--")} · <b>Frec:</b> ${_sanitize(m.frecuencia||"--")} · <b>Dur:</b> ${_sanitize(m.duracion||"--")}</p>${m.indicaciones?`<p style="font-size:8pt;color:#92400e;font-style:italic;margin:2px 0;">⚠ ${_sanitize(m.indicaciones)}</p>`:""}</div></div>`).join("") : '<p style="color:#9ca3af;font-style:italic;text-align:center;padding:12px;">Sin medicamentos.</p>';
+                                      const dx = _sanitize(data.diagnosticoPrincipal||(data.diagnosticos||[])[0]?.descripcion||"--");
+                                      pgsGn.push(`<div>${_hdrGn2("Prescripción Médica","#059669")}<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:4px;padding:10px 12px;margin-bottom:12px;"><p class="sec" style="color:#065f46;">💊 Prescripción</p>${medsH}<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;border-top:1px solid #a7f3d0;padding-top:8px;"><p style="font-size:8.5pt;"><b>Diagnóstico:</b> ${dx}</p><p style="font-size:8.5pt;"><b>Control en:</b> ${_sanitize(data.plan?.controlEn||"--")}</p></div></div>${_sigBlockGn2}</div>`);
+                                    }
+                                    if (sel.includes("examenes")) {
+                                      const dxs = (data.diagnosticos||[]).map(d=>`<p class="ba" style="font-size:8.5pt;margin:2px 0;"><b>${d.cie10||""}</b>${d.cie10?" - ":""}${d.descripcion||""}</p>`).join("");
+                                      const cond = data.plan?.conducta?`<div class="ba" style="margin-top:10px;"><p class="sec" style="color:#0d9488;">📋 Conducta</p><p style="font-size:8.5pt;white-space:pre-wrap;">${_sanitize(data.plan.conducta)}</p></div>`:"";
+                                      const paracl = data.plan?.paraclinicosSolicitados?`<div class="ba" style="margin-top:10px;"><p class="sec" style="color:#0d9488;">🔬 Paraclínicos</p><p style="font-size:8.5pt;white-space:pre-wrap;line-height:1.5;">${_sanitize(data.plan.paraclinicosSolicitados)}</p></div>`:"";
+                                      const recos = data.plan?.recomendaciones?`<div class="ba" style="margin-top:10px;"><p class="sec" style="color:#0d9488;">✅ Recomendaciones</p><p style="font-size:8.5pt;white-space:pre-wrap;line-height:1.6;">${_sanitize(data.plan.recomendaciones)}</p></div>`:"";
+                                      pgsGn.push(`<div class="${pgsGn.length>0?"pb":""}">${_hdrGn2("Exámenes y Recomendaciones","#0d9488")}<div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:4px;padding:10px 12px;margin-bottom:12px;">${dxs?`<div style="margin-bottom:8px;"><p class="sec" style="color:#0d9488;">📋 Diagnósticos</p>${dxs}</div>`:""}${cond}${paracl}${recos}</div>${_sigBlockGn2}</div>`);
+                                    }
+                                    if (sel.includes("derivaciones")) {
+                                      const derivs = data.derivaciones||[];
+                                      const derivH = derivs.length>0?derivs.map(d=>`<div class="dc"><p style="font-weight:900;font-size:9.5pt;margin:0 0 2px;">${_sanitize(d.especialidad||"--")} <span style="font-size:8pt;color:#888;font-weight:400;">(${_sanitize(d.urgencia||"Electiva")})</span></p><p style="font-size:8pt;color:#444;margin:1px 0;"><b>Motivo:</b> ${_sanitize(d.motivo||"--")}</p>${d.observaciones?`<p style="font-size:7.5pt;color:#666;font-style:italic;">${_sanitize(d.observaciones)}</p>`:""}</div>`).join(""):'<p style="color:#888;font-style:italic;font-size:8.5pt;">Sin derivaciones.</p>';
+                                      pgsGn.push(`<div class="${pgsGn.length>0?"pb":""}">${_hdrGn2("Derivaciones / Interconsultas","#7c3aed")}<div style="background:#faf5ff;border:1px solid #ddd6fe;border-radius:4px;padding:10px 12px;margin-bottom:12px;">${derivH}</div>${_sigBlockGn2}</div>`);
+                                    }
+                                    if (sel.includes("incapacidad") && data.incapacidad?.aplica) {
+                                      const _incG = data.incapacidad||{};
+                                      const _nALG = (n) => { try { return numeroALetras(Number(n)); } catch { return String(n); } };
+                                      const _acG = "#dc2626";
+                                      const incHG = `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:12px;margin-bottom:12px;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;"><div style="font-size:8.5pt;"><p><b>Paciente:</b> ${_sanitize(data.nombres||"--")}</p><p><b>CC:</b> ${_sanitize(data.docNumero||"--")}</p><p><b>Edad:</b> ${_sanitize(String(data.edad||"--"))} años</p><p><b>EPS:</b> ${_sanitize(data.eps||"--")}</p></div><div style="text-align:center;background:#fee2e2;border-radius:4px;padding:8px;"><p style="font-size:8pt;font-weight:900;color:${_acG};text-transform:uppercase;margin:0 0 4px 0;">Días de Incapacidad</p><p style="font-size:28pt;font-weight:900;color:${_acG};line-height:1;margin:0;">${_incG.dias||0}</p><p style="font-size:8pt;color:${_acG};font-weight:700;">${_nALG(_incG.dias||0)} DÍAS</p></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:8.5pt;"><p><b>Origen:</b> ${_sanitize(_incG.origen||"--")}</p><p><b>Inicio:</b> ${_sanitize(_incG.desde||"--")}</p><p><b>Fin:</b> ${_sanitize(_incG.hasta||"--")}</p><p><b>Diagnóstico:</b> ${_sanitize(_incG.diagnostico||"--")}</p></div></div>`;
+                                      pgsGn.push(`<div class="${pgsGn.length>0?"pb":""}">${_hdrGn2("Incapacidad Médica",_acG)}${incHG}${_sigBlockGn2}</div>`);
+                                    }
+                                    if (pgsGn.length === 0) { showAlert("No hay contenido para imprimir."); return; }
+                                    const _combGn = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Documentos - ${_sanitize(data.nombres||"")}</title><style>${_baseGn2}</style></head><body>${pgsGn.join("")}<div class="np-bar"><button onclick="window.print()">📥 Imprimir / Guardar PDF</button></div></body></html>`;
+                                    const _bGn = new Blob([_combGn], {type:"text/html;charset=utf-8"});
+                                    const _uGn = URL.createObjectURL(_bGn);
+                                    const _wGn = window.open(_uGn, "_blank", "width=920,height=1200");
+                                    if (!_wGn) { URL.revokeObjectURL(_uGn); showAlert("Permita ventanas emergentes."); return; }
+                                    setTimeout(() => URL.revokeObjectURL(_uGn), 60000);
                                     setShowEnviarPanel(false);
                                   }} className="flex-1 px-2 py-1.5 bg-emerald-600 text-white text-[9px] font-black rounded-lg hover:bg-emerald-700">🖨️ PDF</button>
                                   <button onClick={() => {
