@@ -10249,7 +10249,7 @@ ${baseWindowStyle}
 [contenteditable]{outline:1.5px dashed #6ee7b7;border-radius:3px;padding:1px 3px;cursor:text;}
 [contenteditable]:focus{outline:2px solid #10b981;background:#ecfdf5;}
 body{padding-top:52px;}
-@media print{.print-toolbar{display:none!important;}[contenteditable]{outline:none!important;background:transparent!important;}}
+@media print{.print-toolbar{display:none!important;}body{padding-top:0!important;}[contenteditable]{outline:none!important;background:transparent!important;}}
 </style></head><body>
 <div class="print-toolbar">
   <span class="ptitle">💊 Receta - ${_sanitize(med.nombre)}</span>
@@ -10431,7 +10431,7 @@ ${baseWindowStyle}
 [contenteditable]:focus{outline:2px solid #3b82f6;background:#eff6ff;}
 [contenteditable]:hover{outline:1.5px solid #60a5fa;}
 body{padding-top:52px;}
-@media print{.print-toolbar{display:none!important;}[contenteditable]{outline:none!important;background:transparent!important;}}
+@media print{.print-toolbar{display:none!important;}body{padding-top:0!important;}[contenteditable]{outline:none!important;background:transparent!important;}}
 </style></head><body>
 <div class="print-toolbar">
   <span class="ptitle">✏️ ${_sanitize(titleDoc)} - ${_sanitize(
@@ -14737,6 +14737,8 @@ function AppInner() {
   const [showEmailConfig, setShowEmailConfig] = useState(false);
   const [showEnviarPanel, setShowEnviarPanel] = useState(false);
   const [enviarChecklist, setEnviarChecklist] = useState({ certificado: true, historia: false, formula: false, derivacion: false, examenes: false });
+  // Estado checklist panel HC General — debe estar a nivel de componente (no dentro de IIFE)
+  const [chkGnPanel, setChkGnPanel] = useState({ historia: true, prescripcion: true, examenes: true, derivaciones: true });
   // ═══ ENVÍO INTEGRAL POR EMPRESA ═══
   const [savedInformes, setSavedInformes] = useState(() => {
     try { return JSON.parse(localStorage.getItem("siso_informes") || "[]"); } catch { return []; }
@@ -50691,7 +50693,6 @@ body{font-family:Arial,sans-serif;margin:0;background:#f5f5f5}
                   const pEdad = _sanitize(String(data.edad || "--"));
                   const pSexo = _sanitize(data.genero || "---");
                   const pEps = _sanitize(data.eps || "---");
-                  const pMotivo = _sanitize(data.motivoConsulta || "---");
                   return `<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid ${accentSafe};padding-bottom:10px;margin-bottom:14px;">
                   ${_ipsDocLeftHtml(_miIPSGn, _billDocData, accentSafe)}
                   <div style="width:34%;text-align:center;border-left:1px solid #ddd;border-right:1px solid #ddd;padding:0 10px;">
@@ -50705,7 +50706,6 @@ body{font-family:Arial,sans-serif;margin:0;background:#f5f5f5}
                     <p style="font-size:10.5pt;font-weight:900;color:${accentSafe};text-transform:uppercase;margin:0 0 3px 0;">${pNom}</p>
                     <p style="font-size:7.5pt;color:#444;margin:1px 0;">${pDTipo}: <b>${pDNum}</b> · Edad: <b>${pEdad} años</b></p>
                     <p style="font-size:7.5pt;color:#444;margin:1px 0;">Sexo: ${pSexo} · EPS: <b>${pEps}</b></p>
-                    <p style="font-size:7.5pt;color:#444;margin:1px 0;">Motivo: ${pMotivo}</p>
                   </div>
                 </div>`;
                 };
@@ -50857,7 +50857,7 @@ ${baseStyle}
 [contenteditable]{outline:1.5px dashed #93c5fd;border-radius:3px;padding:1px 3px;cursor:text;}
 [contenteditable]:focus{outline:2px solid #3b82f6;background:#eff6ff;}
 body{padding-top:52px;}
-@media print{.print-toolbar{display:none!important;}[contenteditable]{outline:none!important;background:transparent!important;}}
+@media print{.print-toolbar{display:none!important;}body{padding-top:0!important;}[contenteditable]{outline:none!important;background:transparent!important;}}
 </style></head><body>
 <div class="print-toolbar">
   <span class="ptitle">✏️ ${_sanitize(titleDoc)}</span>
@@ -50912,9 +50912,6 @@ body{padding-top:52px;}
                     <p style="font-size:8.5pt;"><b>Control en:</b> ${_sanitize(
                       data.plan?.controlEn || "--"
                     )}</p>
-                    <p style="font-size:8.5pt;"><b>Motivo:</b> ${_sanitize(
-                      data.motivoConsulta || "--"
-                    )}</p>
                   </div>
                   <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:16mm;">
                     <div style="text-align:center;width:42%;">
@@ -50954,7 +50951,7 @@ ${baseStyle}
 [contenteditable]{outline:1.5px dashed #6ee7b7;border-radius:3px;padding:1px 3px;cursor:text;}
 [contenteditable]:focus{outline:2px solid #10b981;background:#ecfdf5;}
 body{padding-top:52px;}
-@media print{.print-toolbar{display:none!important;}[contenteditable]{outline:none!important;background:transparent!important;}}
+@media print{.print-toolbar{display:none!important;}body{padding-top:0!important;}[contenteditable]{outline:none!important;background:transparent!important;}}
 </style></head><body>
 <div class="print-toolbar">
   <span class="ptitle">💊 Receta - ${_sanitize(med.nombre)}</span>
@@ -51092,7 +51089,8 @@ body{padding-top:52px;}
                             const hasMedsG = (data.formulaMedicamentos || []).length > 0;
                             const hasDerivG = (data.derivaciones || []).length > 0;
                             const hasPlanG = !!(data.plan?.paraclinicosSolicitados || data.plan?.recomendaciones || data.plan?.conducta);
-                            const [chkG, setChkG] = React.useState({ historia: true, prescripcion: true, examenes: true, derivaciones: true });
+                            const chkG = chkGnPanel;
+                            const setChkG = setChkGnPanel;
                             return (
                               <div className="absolute right-0 top-12 z-50 bg-white border border-gray-200 rounded-xl p-3 shadow-2xl w-80">
                                 <p className="text-[10px] font-black text-gray-700 uppercase mb-2">📤 Seleccione documentos:</p>
