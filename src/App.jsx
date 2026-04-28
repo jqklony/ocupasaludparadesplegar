@@ -9971,6 +9971,8 @@ const TabFormulaDerivacion = ({
     duracion: "",
     indicaciones: "",
   });
+  const [editMedIdx, setEditMedIdx] = React.useState(null);
+  const formMedRef = React.useRef(null);
   const [newDeriv, setNewDeriv] = React.useState({
     especialidad: "",
     motivo: "",
@@ -9990,13 +9992,23 @@ const TabFormulaDerivacion = ({
   }, []);
   const addMedicamento = () => {
     if (!newMed.nombre) return;
-    setData((p) => ({
-      ...p,
-      formulaMedicamentos: [
-        ...(p.formulaMedicamentos || []),
-        { ...newMed, id: Date.now() },
-      ],
-    }));
+    if (editMedIdx !== null) {
+      setData((p) => ({
+        ...p,
+        formulaMedicamentos: (p.formulaMedicamentos || []).map((m, i) =>
+          i === editMedIdx ? { ...m, ...newMed } : m
+        ),
+      }));
+      setEditMedIdx(null);
+    } else {
+      setData((p) => ({
+        ...p,
+        formulaMedicamentos: [
+          ...(p.formulaMedicamentos || []),
+          { ...newMed, id: Date.now() },
+        ],
+      }));
+    }
     setNewMed({
       nombre: "",
       presentacion: "",
@@ -10173,8 +10185,6 @@ const TabFormulaDerivacion = ({
     @media print{body{font-size:9pt;} .no-print{display:none!important;}}
   `;
   const openSingleMedWindow = (med, idx) => {
-    const w = window.open("", "_blank", "width=600,height=700");
-    if (!w) return;
     const accent = "#059669";
     const header = buildPrintHeader("Prescripción Individual", accent);
     const singleMedHtml = `
@@ -10183,32 +10193,14 @@ const TabFormulaDerivacion = ({
         <div style="flex:1;">
           <p style="font-size:12pt;font-weight:900;color:#065f46;margin:0 0 4px 0;">${_sanitize(
             med.nombre || ""
-          )} <span style="font-size:9pt;font-weight:400;color:#555;">(${_sanitize(
-      med.presentacion || ""
-    )})</span></p>
-          <p style="font-size:9.5pt;color:#374151;margin:2px 0;"><b>Dosis:</b> ${_sanitize(
-            med.dosis || "--"
-          )} &nbsp;·&nbsp; <b>Frecuencia:</b> ${_sanitize(
-      med.frecuencia || "--"
-    )} &nbsp;·&nbsp; <b>Duración:</b> ${_sanitize(med.duracion || "--")}</p>
-          ${
-            med.indicaciones
-              ? `<p style="font-size:9pt;color:#92400e;font-style:italic;margin:4px 0;">⚠ ${_sanitize(
-                  med.indicaciones
-                )}</p>`
-              : ""
-          }
+          )} <span style="font-size:9pt;font-weight:400;color:#555;">(${_sanitize(med.presentacion || "")})</span></p>
+          <p style="font-size:9.5pt;color:#374151;margin:2px 0;"><b>Dosis:</b> ${_sanitize(med.dosis || "--")} &nbsp;·&nbsp; <b>Frecuencia:</b> ${_sanitize(med.frecuencia || "--")} &nbsp;·&nbsp; <b>Duración:</b> ${_sanitize(med.duracion || "--")}</p>
+          ${med.indicaciones ? `<p style="font-size:9pt;color:#92400e;font-style:italic;margin:4px 0;">⚠ ${_sanitize(med.indicaciones)}</p>` : ""}
         </div>
       </div>
       <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:4px;padding:8px 12px;margin-top:8px;">
-        <p style="font-size:8.5pt;"><b>Diagnóstico:</b> ${_sanitize(
-          data.diagnosticoPrincipal ||
-            (data.diagnosticos || [])[0]?.descripcion ||
-            "--"
-        )}</p>
-        <p style="font-size:8.5pt;"><b>Control en:</b> ${_sanitize(
-          data.frecuenciaSeguimiento || data.plan?.controlEn || "--"
-        )}</p>
+        <p style="font-size:8.5pt;"><b>Diagnóstico:</b> ${_sanitize(data.diagnosticoPrincipal || (data.diagnosticos || [])[0]?.descripcion || "--")}</p>
+        <p style="font-size:8.5pt;"><b>Control en:</b> ${_sanitize(data.frecuenciaSeguimiento || data.plan?.controlEn || "--")}</p>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:16mm;padding-top:0;">
         <div style="text-align:center;width:42%;">
@@ -10217,28 +10209,15 @@ const TabFormulaDerivacion = ({
           <p style="font-size:7.5pt;color:#6b7280;margin:2px 0;">Documento: ____________________</p>
         </div>
         <div style="text-align:center;width:42%;">
-          ${
-            activeSignature
-              ? `<img src="${activeSignature}" style="max-height:50px;max-width:130px;object-fit:contain;display:block;margin:0 auto 4px;"/>`
-              : '<div style="height:50px;"></div>'
-          }
+          ${activeSignature ? `<img src="${activeSignature}" style="max-height:50px;max-width:130px;object-fit:contain;display:block;margin:0 auto 4px;"/>` : '<div style="height:50px;"></div>'}
           <div style="border-top:2px solid #222;padding-top:4px;">
-            <p style="font-size:8.5pt;font-weight:900;margin:2px 0;">${_sanitize(
-              activeDoctorData?.nombre || ""
-            )}</p>
-            <p style="font-size:7.5pt;color:#555;margin:1px 0;">${_sanitize(
-              activeDoctorData?.titulo || ""
-            )}</p>
-            <p style="font-size:7.5pt;color:#555;margin:1px 0;">Lic: ${_sanitize(
-              activeDoctorData?.licencia || ""
-            )}</p>
+            <p style="font-size:8.5pt;font-weight:900;margin:2px 0;">${_sanitize(activeDoctorData?.nombre || "")}</p>
+            <p style="font-size:7.5pt;color:#555;margin:1px 0;">${_sanitize(activeDoctorData?.titulo || "")}</p>
+            <p style="font-size:7.5pt;color:#555;margin:1px 0;">Lic: ${_sanitize(activeDoctorData?.licencia || "")}</p>
           </div>
         </div>
       </div>`;
-    w.document
-      .write(`<!DOCTYPE html><html lang="es"><head><title>Receta - ${_sanitize(
-      med.nombre
-    )}</title><meta charset="UTF-8"/><style>
+    const _html = `<!DOCTYPE html><html lang="es"><head><title>Receta - ${_sanitize(med.nombre)}</title><meta charset="UTF-8"/><style>
 ${baseWindowStyle}
 .print-toolbar{position:fixed;top:0;left:0;right:0;background:#065f46;color:white;padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.25);}
 .print-toolbar .ptitle{flex:1;font-size:9.5pt;font-weight:700;}
@@ -10259,14 +10238,15 @@ body{padding-top:52px;}
 </div>
 <div contenteditable="false">${header}</div>
 <div contenteditable="true" spellcheck="false">${singleMedHtml}</div>
-</body></html>`);
-    w.document.close();
-    w.focus();
+</body></html>`;
+    const _blob = new Blob([_html], {type:'text/html;charset=utf-8'});
+    const _burl = URL.createObjectURL(_blob);
+    const w = window.open(_burl, "_blank", "width=600,height=700");
+    if (!w) { URL.revokeObjectURL(_burl); return; }
+    setTimeout(() => URL.revokeObjectURL(_burl), 60000);
   };
 
   const openPrintWindow = (section, titleDoc) => {
-    const w = window.open("", "_blank", "width=870,height=1100");
-    if (!w) return;
     const accentFormula = "#059669";
     const accentDeriv = "#2563eb";
     const accent = section === "formula" ? accentFormula : accentDeriv;
@@ -10417,9 +10397,7 @@ body{padding-top:52px;}
           </div>
         </div>`;
     }
-    w.document.write(`<!DOCTYPE html><html lang="es"><head><title>${_sanitize(
-      titleDoc
-    )} - ${_sanitize(data.nombres)}</title><meta charset="UTF-8"/><style>
+    const _html2 = `<!DOCTYPE html><html lang="es"><head><title>${_sanitize(titleDoc)} - ${_sanitize(data.nombres)}</title><meta charset="UTF-8"/><style>
 ${baseWindowStyle}
 .print-toolbar{position:fixed;top:0;left:0;right:0;background:#1e3a5f;color:white;padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.25);}
 .print-toolbar .ptitle{flex:1;font-size:9.5pt;font-weight:700;letter-spacing:.2px;}
@@ -10434,16 +10412,17 @@ body{padding-top:52px;}
 @media print{.print-toolbar{display:none!important;}body{padding-top:0!important;}[contenteditable]{outline:none!important;background:transparent!important;}}
 </style></head><body>
 <div class="print-toolbar">
-  <span class="ptitle">✏️ ${_sanitize(titleDoc)} - ${_sanitize(
-      data.nombres
-    )}</span>
+  <span class="ptitle">✏️ ${_sanitize(titleDoc)} - ${_sanitize(data.nombres)}</span>
   <span class="hint">Haz clic en cualquier texto para editar antes de imprimir</span>
   <button class="btn-print" onclick="window.print()">🖨️ Imprimir ahora</button>
   <button class="btn-close" onclick="window.close()">✕ Cerrar</button>
 </div>
-<div contenteditable="false">${header}</div><div contenteditable="true" spellcheck="false">${bodyHtml}</div></body></html>`);
-    w.document.close();
-    w.focus();
+<div contenteditable="false">${header}</div><div contenteditable="true" spellcheck="false">${bodyHtml}</div></body></html>`;
+    const _blob2 = new Blob([_html2], {type:'text/html;charset=utf-8'});
+    const _burl2 = URL.createObjectURL(_blob2);
+    const w = window.open(_burl2, "_blank", "width=870,height=1100");
+    if (!w) { URL.revokeObjectURL(_burl2); return; }
+    setTimeout(() => URL.revokeObjectURL(_burl2), 60000);
     // No auto-print - el usuario edita y luego hace clic en "Imprimir ahora"
   };
   return (
@@ -10535,9 +10514,9 @@ body{padding-top:52px;}
             <Pill className="w-4 h-4" /> Prescripción Médica
           </h3>
           {/* Input nuevo medicamento */}
-          <div className="no-print mb-3 bg-white p-3 rounded-lg border border-emerald-100 space-y-2">
+          <div ref={formMedRef} className="no-print mb-3 bg-white p-3 rounded-lg border border-emerald-100 space-y-2">
             <p className="text-[10px] font-bold text-gray-600 uppercase">
-              Agregar Medicamento a la Fórmula
+              {editMedIdx !== null ? "✏️ Editando Medicamento" : "Agregar Medicamento a la Fórmula"}
             </p>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -10625,13 +10604,24 @@ body{padding-top:52px;}
                 />
               </div>
             </div>
-            <button
-              onClick={addMedicamento}
-              type="button"
-              className="w-full bg-emerald-600 text-white py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 flex items-center justify-center gap-1"
-            >
-              <Plus className="w-3 h-3" /> Agregar a la Fórmula
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={addMedicamento}
+                type="button"
+                className={`flex-1 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 ${editMedIdx !== null ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"}`}
+              >
+                {editMedIdx !== null ? <><span>✏️</span> Guardar Cambios</> : <><Plus className="w-3 h-3" /> Agregar a la Fórmula</>}
+              </button>
+              {editMedIdx !== null && (
+                <button
+                  onClick={() => { setEditMedIdx(null); setNewMed({nombre:"",presentacion:"",dosis:"",frecuencia:"",duracion:"",indicaciones:""}); }}
+                  type="button"
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200"
+                >
+                  ✕ Cancelar
+                </button>
+              )}
+            </div>
           </div>
           {/* Lista */}
           {(data.formulaMedicamentos || []).length > 0 ? (
@@ -10662,6 +10652,17 @@ body{padding-top:52px;}
                     )}
                   </div>
                   <div className="flex gap-1 shrink-0 no-print">
+                    <button
+                      onClick={() => {
+                        setNewMed({ nombre: med.nombre||"", presentacion: med.presentacion||"", dosis: med.dosis||"", frecuencia: med.frecuencia||"", duracion: med.duracion||"", indicaciones: med.indicaciones||"" });
+                        setEditMedIdx(idx);
+                        setTimeout(() => formMedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                      }}
+                      title="Editar este medicamento"
+                      className="flex items-center gap-0.5 bg-blue-50 border border-blue-300 text-blue-700 hover:bg-blue-100 rounded-lg px-2 py-1 text-[10px] font-bold transition"
+                    >
+                      ✏️ Editar
+                    </button>
                     <button
                       onClick={() => openSingleMedWindow(med, idx)}
                       title="Imprimir esta receta individual"
@@ -16820,23 +16821,30 @@ INSTRUCCIÓN: Genera mínimo 12 recomendaciones numeradas diferenciando: (A) Rec
       return;
     }
     setIsGenerating(true);
-    const prompt = `Eres médico general con más de 15 años de experiencia clínica en Colombia, especializado en medicina ambulatoria, patología crónica y aguda. Analiza la consulta médica del paciente con criterio clínico sólido y elabora el plan de manejo completo. Devuelve ÚNICAMENTE JSON.
-DATOS DEL PACIENTE: ${data.nombres} | Edad: ${data.edad}a | Género: ${
-      data.genero
-    }
-Motivo de consulta: ${data.motivoConsulta}
-Enfermedad actual: ${data.enfermedadActual || "No detallada"}
-Antecedentes: ${JSON.stringify(data.antecedentes || {})}
-Examen físico: TA ${data.examenFisico?.ta || "N/R"} | FC ${
-      data.examenFisico?.fc || "N/R"
-    } | Temp ${data.examenFisico?.temp || "N/R"} | IMC ${
-      data.examenFisico?.imc || "N/R"
-    }
-Hallazgos físicos: ${data.examenFisico?.hallazgos || "Ninguno referido"}
-Revisión por sistemas: ${JSON.stringify(data.revisionSistemas || {})}
-INSTRUCCIÓN: El análisis clínico debe ser razonado, con diagnóstico diferencial implícito. La conducta debe ser específica para este paciente. Los medicamentos deben incluir principio activo, presentación, dosis, frecuencia y duración. Las remisiones deben justificarse clínicamente. El control debe ser en tiempo específico. Lenguaje técnico-médico formal y directo.
-JSON REQUERIDO (sin markdown, sin texto adicional):
-{"diagnosticos":[{"cie10":"CIE-10","descripcion":"Nombre diagnóstico completo","tipo":"Principal/Secundario/Presuntivo"}],"plan":{"conducta":"Conducta médica detallada y razonada","medicamentos":"Resumen breve del plan farmacológico","formulaMedicamentos":[{"nombre":"Nombre genérico (principio activo)","presentacion":"Forma farmacéutica y concentración - ej: Tableta 500mg","dosis":"Cantidad por toma - ej: 1 tableta","frecuencia":"Intervalo - ej: cada 8 horas","duracion":"Ej: 7 días","indicaciones":"Indicación especial o cadena vacía"}],"paraclinicosSolicitados":"Paraclínicos con justificación clínica","remisiones":"Remisiones a especialista justificadas clínicamente o 'No aplica'","recomendaciones":"Recomendaciones específicas al paciente: dieta, actividad, signos de alarma, medidas no farmacológicas","controlEn":"Control en X días/semanas con criterios específicos"},"analisis":"Razonamiento clínico del caso en 4-5 líneas: hipótesis diagnóstica, correlación clínica y justificación del plan"}`;
+    const prompt = `Eres médico general con más de 20 años de experiencia clínica en Colombia. Actúas como un clínico experto en medicina ambulatoria, manejo de patología aguda y crónica, medicina preventiva y salud pública. Tu análisis debe ser riguroso, basado en evidencia actualizada (guías colombianas e internacionales vigentes), y absolutamente adaptado a este paciente específico. Devuelve ÚNICAMENTE JSON válido, sin markdown, sin texto adicional.
+
+DATOS COMPLETOS DEL PACIENTE:
+- Nombre: ${data.nombres} | Edad: ${data.edad} años | Género: ${data.genero}
+- Motivo de consulta: ${data.motivoConsulta}
+- Enfermedad actual: ${data.enfermedadActual || "No detallada por el usuario"}
+- Antecedentes personales: ${JSON.stringify(data.antecedentes || {})}
+- Examen físico: TA ${data.examenFisico?.ta || "N/R"} | FC ${data.examenFisico?.fc || "N/R"} | FR ${data.examenFisico?.fr || "N/R"} | Temp ${data.examenFisico?.temp || "N/R"} | SpO2 ${data.examenFisico?.spo2 || "N/R"} | IMC ${data.examenFisico?.imc || "N/R"} | Talla ${data.examenFisico?.talla || "N/R"} | Peso ${data.examenFisico?.peso || "N/R"}
+- Hallazgos físicos: ${data.examenFisico?.hallazgos || "No registrados"}
+- Revisión por sistemas: ${JSON.stringify(data.revisionSistemas || {})}
+- EPS: ${data.eps || "N/R"} | ARL: ${data.arl || "N/R"} | Empresa: ${data.empresaNombre || "N/R"} | Cargo: ${data.cargo || "N/R"}
+
+INSTRUCCIONES CLÍNICAS OBLIGATORIAS:
+1. DIAGNÓSTICOS: Incluir diagnóstico principal + diferenciales relevantes con código CIE-10 exacto. Clasificar cada uno como Principal/Secundario/Presuntivo/Diferencial.
+2. MEDICAMENTOS: Prescribir SOLO medicamentos del Plan Obligatorio de Salud (POS) cuando sea posible. Incluir: principio activo genérico (nombre comercial entre paréntesis si aplica), concentración, forma farmacéutica, dosis EXACTA, frecuencia, duración, vía de administración, indicaciones especiales (con/sin alimentos, contraindicaciones relevantes). Ajustar por edad, peso y comorbilidades.
+3. PARACLÍNICOS: Justificar cada examen solicitado con criterio clínico. Incluir laboratorios, imágenes y estudios especiales con prioridad (urgente/electivo).
+4. CONDUCTA: Ser específico en el plan: tratamiento farmacológico, no farmacológico, educación al paciente, signos de alarma que requieren consulta urgente.
+5. REMISIONES: Solo cuando estén clínicamente justificadas. Especificar especialidad, motivo clínico y urgencia.
+6. RECOMENDACIONES: Incluir cambios de estilo de vida, dieta, actividad física, higiene del sueño, y medidas preventivas específicas para este paciente.
+7. CONTROL: Especificar tiempo exacto de seguimiento y criterios de reevaluación.
+8. ANÁLISIS: Razonamiento clínico profundo: presentación clínica, hipótesis diagnóstica con justificación, correlación entre síntomas y hallazgos, pronóstico y factores modificables.
+
+JSON REQUERIDO (estructura exacta, sin modificar campos):
+{"diagnosticos":[{"cie10":"CÓDIGO-CIE10","descripcion":"Nombre diagnóstico completo y específico","tipo":"Principal|Secundario|Presuntivo|Diferencial"}],"plan":{"conducta":"Plan de manejo detallado y específico para este paciente: medidas farmacológicas y no farmacológicas, educación, signos de alarma","medicamentos":"Resumen conciso del plan farmacológico (para vista rápida)","formulaMedicamentos":[{"nombre":"Nombre genérico del principio activo","presentacion":"Forma farmacéutica + concentración exacta (ej: Tableta 500mg)","dosis":"Cantidad exacta por toma (ej: 1 tableta = 500mg)","frecuencia":"Intervalo preciso (ej: cada 8 horas = 3 veces al día)","duracion":"Días exactos (ej: 7 días)","indicaciones":"Instrucción especial obligatoria o cadena vacía si no aplica"}],"paraclinicosSolicitados":"Lista detallada de paraclínicos con justificación clínica de cada uno y prioridad","remisiones":"Especialidad + motivo clínico específico justificado, o 'No se requiere remisión en este momento'","recomendaciones":"Recomendaciones detalladas: dieta específica, actividad física permitida, signos de alarma que requieren urgencias, cuidados en casa, medidas preventivas","controlEn":"Control en X días/semanas con criterios clínicos específicos para seguimiento"},"analisis":"Razonamiento clínico exhaustivo del caso en 6-8 líneas: presentación clínica y síntomas guía, hipótesis diagnóstica principal con justificación, diagnósticos diferenciales considerados y por qué se priorizan o descartan, correlación entre hallazgos del examen físico y la impresión diagnóstica, factores de riesgo identificados, pronóstico esperado con el tratamiento propuesto"}`;
     try {
       const text = await callAI(prompt, true);
       const parsed = parseAIJSON(text);
@@ -20086,12 +20094,6 @@ Esta historia clínica debe conservarse mínimo 20 años.
                     className={_tabBlue("ordenMedica")}
                   >
                     Orden/Formula
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("solicitudExamenes")}
-                    className={_tabBlue("solicitudExamenes")}
-                  >
-                    Examenes
                   </button>
                   <button
                     onClick={() => setActiveTab("incapacidadGeneral")}
@@ -50720,8 +50722,6 @@ body{font-family:Arial,sans-serif;margin:0;background:#f5f5f5}
                   _billDocData?.titulo || ""
                 }</p></div></div>`;
                 const printSection = (sectionId, titleDoc) => {
-                  const w = window.open("", "_blank", "width=870,height=1100");
-                  if (!w) return;
                   let accent = "#2563eb";
                   let bodyHtml = "";
                   if (sectionId === "gn-prescripcion") {
@@ -50843,10 +50843,7 @@ body{font-family:Arial,sans-serif;margin:0;background:#f5f5f5}
                       data.incapacidad?.diagnostico || "--"
                     }</p></div></div>${sigBlock}`;
                   }
-                  w.document
-                    .write(`<!DOCTYPE html><html lang="es"><head><title>${_sanitize(
-                    titleDoc
-                  )}</title><meta charset="UTF-8"/><style>
+                  const _psHtml = `<!DOCTYPE html><html lang="es"><head><title>${_sanitize(titleDoc)}</title><meta charset="UTF-8"/><style>
 ${baseStyle}
 .print-toolbar{position:fixed;top:0;left:0;right:0;background:#1e3a5f;color:white;padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.25);}
 .print-toolbar .ptitle{flex:1;font-size:9.5pt;font-weight:700;}
@@ -50865,18 +50862,16 @@ body{padding-top:52px;}
   <button class="btn-print" onclick="window.print()">🖨️ Imprimir ahora</button>
   <button class="btn-close" onclick="window.close()">✕ Cerrar</button>
 </div>
-<div contenteditable="false">${buildGnHeader(
-                    titleDoc,
-                    accent
-                  )}</div><div contenteditable="true" spellcheck="false">${bodyHtml}</div></body></html>`);
-                  w.document.close();
-                  w.focus();
+<div contenteditable="false">${buildGnHeader(titleDoc, accent)}</div><div contenteditable="true" spellcheck="false">${bodyHtml}</div></body></html>`;
+                  const _psBlob = new Blob([_psHtml], {type:'text/html;charset=utf-8'});
+                  const _psBurl = URL.createObjectURL(_psBlob);
+                  const w = window.open(_psBurl, "_blank", "width=870,height=1100");
+                  if (!w) { URL.revokeObjectURL(_psBurl); return; }
+                  setTimeout(() => URL.revokeObjectURL(_psBurl), 60000);
                   // No auto-print - usuario edita y hace clic en Imprimir
                 };
                 // ── Impresión individual de receta (HC General) ──
                 const openSingleMedWindow = (med, mIdx) => {
-                  const w = window.open("", "_blank", "width=600,height=700");
-                  if (!w) return;
                   const accent = "#059669";
                   const hdr = buildGnHeader("Receta Médica", accent);
                   const docSig = _billDocSig || null;
@@ -50937,10 +50932,7 @@ body{padding-top:52px;}
                       </div>
                     </div>
                   </div>`;
-                  w.document
-                    .write(`<!DOCTYPE html><html lang="es"><head><title>Receta - ${_sanitize(
-                    med.nombre
-                  )}</title><meta charset="UTF-8"/><style>
+                  const _smHtml = `<!DOCTYPE html><html lang="es"><head><title>Receta - ${_sanitize(med.nombre)}</title><meta charset="UTF-8"/><style>
 ${baseStyle}
 .print-toolbar{position:fixed;top:0;left:0;right:0;background:#065f46;color:white;padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.25);}
 .print-toolbar .ptitle{flex:1;font-size:9.5pt;font-weight:700;}
@@ -50961,9 +50953,12 @@ body{padding-top:52px;}
 </div>
 <div contenteditable="false">${hdr}</div>
 <div contenteditable="true" spellcheck="false">${singleHtml}</div>
-</body></html>`);
-                  w.document.close();
-                  w.focus();
+</body></html>`;
+                  const _smBlob = new Blob([_smHtml], {type:'text/html;charset=utf-8'});
+                  const _smBurl = URL.createObjectURL(_smBlob);
+                  const w = window.open(_smBurl, "_blank", "width=600,height=700");
+                  if (!w) { URL.revokeObjectURL(_smBurl); return; }
+                  setTimeout(() => URL.revokeObjectURL(_smBurl), 60000);
                 };
                 return (
                   <div className="space-y-4">
