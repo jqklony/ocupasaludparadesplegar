@@ -16755,46 +16755,74 @@ JSON REQUERIDO (sin markdown, sin texto adicional):
   // ── GENERACIÓN IA SOLO RESTRICCIONES ─────────────────────────────────────
   const generateAIRestricciones = async () => {
     setIsGeneratingRestr(true);
-    const hallazgos =
+    const hallazgosAnorm =
       Object.entries(data.examenFisicoSistemas || {})
         .filter(([, v]) => v.estado === "Anormal")
         .map(([k, v]) => `${k}: ${v.hallazgo}`)
-        .join("; ") || "Sin hallazgos";
+        .join("; ") || "Sin hallazgos patológicos al examen físico";
+    const hallazgosNorm =
+      Object.entries(data.examenFisicoSistemas || {})
+        .filter(([, v]) => v.estado === "Normal")
+        .map(([k]) => k)
+        .join(", ") || "";
     const osteo = Object.entries(data.maniobrasOsteomusculares || {})
       .filter(([, v]) => v.estado === "Anormal")
       .map(([k, v]) => `${k}: ${v.hallazgo}`)
-      .join("; ");
-    const prompt = `Eres médico especialista en Medicina del Trabajo con más de 15 años de experiencia en Colombia, experto en restricciones médico-laborales, reintegro laboral y vigilancia epidemiológica. Con base en los hallazgos clínicos del trabajador, genera las restricciones médico-laborales correspondientes. Devuelve ÚNICAMENTE JSON.
-DATOS: Cargo: ${data.cargo} | Empresa: ${data.empresaNombre} | Tipo examen: ${
-      data.tipoExamen
-    }
-Riesgos ocupacionales: ${
-      Object.entries(data.riesgos || {})
-        .filter(([, v]) => v)
-        .map(([k]) => k)
-        .join(", ") || "No reportados"
-    }
-Hallazgos físicos patológicos: ${hallazgos}
-Maniobras osteomusculares positivas: ${osteo || "Ninguna"}
-IMC: ${data.imc} | TA: ${data.ta} | Diagnóstico principal: ${
-      data.diagnosticoPrincipal
-    }
-INSTRUCCIÓN: Las restricciones deben ser operativas, cuantificables (en kg, min, grados o frecuencias), con segmento anatómico identificado, tipo (TEMPORAL/PERMANENTE/PREVENTIVA), duración si temporal (ej: "Temporal 30 días", "Permanente"), y base normativa. Si el examen es egreso, post-incapacidad o retorno-laboral (Res. 1843/2025 Art. 13), incluir restricciones de reintegro progresivo.
-FORMATO DESEADO: [TIPO: Temporal X días / Permanente] (Segmento) Descripción — Normativa
+      .join("; ") || "Ninguna positiva";
+    const antec = Object.entries(data.antecedentesAgrupados || {})
+      .filter(([, v]) => v.val)
+      .map(([k, v]) => `${k}: ${v.det}`)
+      .join(" | ") || "Niega antecedentes relevantes";
+    const riesgos = Object.entries(data.riesgos || {})
+      .filter(([, v]) => v).map(([k]) => k).join(", ") || "No reportados";
+    const dxActivos = [data.diagnosticoPrincipal, data.diagnosticoSecundario1, data.diagnosticoSecundario2]
+      .filter(Boolean).join(" | ") || "Pendiente";
+    const prompt = `Eres médico especialista en Medicina del Trabajo con más de 15 años de experiencia en Colombia, experto en restricciones médico-laborales, reintegro laboral y vigilancia epidemiológica. Con base en la historia clínica COMPLETA del trabajador que se presenta a continuación, genera las restricciones médico-laborales personalizadas y adaptadas a los hallazgos encontrados. Devuelve ÚNICAMENTE JSON.
+
+════════ HISTORIA CLÍNICA COMPLETA DEL TRABAJADOR ════════
+Cargo: ${data.cargo} | Empresa: ${data.empresaNombre} | Tipo examen: ${data.tipoExamen}
+Edad: ${data.edad} años | Género: ${data.genero} | ARL: ${data.arl || "N/R"}
+Signos vitales: TA ${data.ta || "N/R"} mmHg | FC ${data.fc || "N/R"} lpm | IMC ${data.imc || "N/R"} kg/m² | Peso ${data.peso || "N/R"} kg | Talla ${data.talla || "N/R"} cm
+Hábitos: Tabaquismo ${data.habitos?.fuma || "No"} | Alcohol ${data.habitos?.alcohol || "No"} | Actividad física ${data.habitos?.deporte || "No refiere"}
+Antecedentes relevantes: ${antec}
+Riesgos ocupacionales identificados: ${riesgos}
+Hallazgos PATOLÓGICOS al examen físico: ${hallazgosAnorm}
+Sistemas NORMALES al examen: ${hallazgosNorm || "No registrados"}
+Maniobras osteomusculares positivas: ${osteo}
+Diagnósticos activos (CIE-10): ${dxActivos}
+Concepto de aptitud previo: ${data.conceptoAptitud || "Pendiente"}
+Análisis clínico IA: ${data.analisisIA ? data.analisisIA.substring(0, 400) + "..." : "No disponible"}
+══════════════════════════════════════════════════════════
+
+INSTRUCCIONES OBLIGATORIAS:
+1. PERSONALIZACIÓN: Cada restricción DEBE derivar directamente de un hallazgo clínico específico encontrado en ESTA historia clínica. Cita el hallazgo que justifica cada restricción.
+2. Si no hay hallazgos patológicos relevantes para una restricción, NO la incluyas. No generes restricciones genéricas sin sustento clínico.
+3. CUANTIFICACIÓN: Cada restricción debe ser operativa y cuantificable: en kg, minutos, grados, frecuencias o porcentajes.
+4. SEGMENTO ANATÓMICO: Identifica el segmento afectado (Miembro Superior D/I, Columna Lumbar, Columna Cervical, Miembros Inferiores, Cardiovascular, Respiratorio, General).
+5. TIPO: TEMPORAL (con duración específica) / PERMANENTE / PREVENTIVA.
+6. BASE NORMATIVA: Citar GTC-45:2012, GATISO-DME, GATISO-TME, Res. 1843/2025, Res. 2404/2019 según corresponda.
+7. Si el examen es egreso, post-incapacidad o reintegro (Res. 1843/2025 Art. 13): incluir restricciones de reintegro progresivo.
+8. Si NO hay hallazgos patológicos que justifiquen restricciones: devolver array vacío con "sinRestricciones": true y justificación.
+
 JSON REQUERIDO (sin markdown):
-{"restricciones":[{"segmento":"Miembro Superior/Lumbar/Cervical/Postural/General","tipo":"TEMPORAL/PERMANENTE/PREVENTIVA","duracion":"X semanas o N/A","texto":"Restricción específica, operativa y cuantificable para el puesto de trabajo","normativa":"GTC-45:2012 / GATISO-DME / GATISO-TME / Res. 1843/2025 / Res. 2404/2019"}]}`;
+{"sinRestricciones":false,"justificacionSinRestricciones":"","restricciones":[{"numero":1,"segmento":"Segmento anatómico específico","tipo":"TEMPORAL|PERMANENTE|PREVENTIVA","duracion":"X semanas / Permanente / N/A","hallazgoQueJustifica":"Hallazgo clínico específico de ESTA HC que genera esta restricción","texto":"Restricción operativa, cuantificable y específica para el puesto de trabajo de ESTE trabajador","normativa":"GTC-45:2012 / GATISO-DME / GATISO-TME / Res. 1843/2025 / Res. 2404/2019"}]}`;
     try {
       const text = await callAI(prompt, true);
       const parsed = parseAIJSON(text);
-      const lista = (parsed.restricciones || [])
-        .map(
-          (r, i) =>
-            `${i + 1}. [${(r.tipo || "TEMPORAL").toUpperCase()}${r.duracion && r.duracion !== "N/A" ? " - " + r.duracion : ""}] (${r.segmento || "General"}) ${r.texto || r.descripcion} — ${r.normativa || "Res. 1843/2025"}`
-        )
-        .join("\n");
+      let lista;
+      if (parsed.sinRestricciones) {
+        lista = `Sin restricciones médico-laborales activas.\n${parsed.justificacionSinRestricciones || "Trabajador apto sin restricciones según hallazgos clínicos evaluados."}`;
+      } else {
+        lista = (parsed.restricciones || [])
+          .map(
+            (r) =>
+              `${r.numero || ""}. [${(r.tipo || "TEMPORAL").toUpperCase()}${r.duracion && r.duracion !== "N/A" ? " — " + r.duracion : ""}] (${r.segmento || "General"})\n   ${r.texto || r.descripcion}\n   ↳ Justificación clínica: ${r.hallazgoQueJustifica || "Ver hallazgos HC"}\n   ↳ Normativa: ${r.normativa || "Res. 1843/2025"}`
+          )
+          .join("\n\n");
+      }
       setData((prev) => ({ ...prev, analisisRestricciones: lista }));
       showAlert(
-        "✅ Restricciones generadas por IA. Seleccione las adicionales en el checklist."
+        `✅ ${parsed.sinRestricciones ? "Sin restricciones activas." : (parsed.restricciones?.length || 0) + " restricción(es) generada(s) con justificación clínica específica."}`
       );
     } catch (e) {
       showAlert(`Error IA Restricciones: ${e.message}`);
@@ -16805,24 +16833,45 @@ JSON REQUERIDO (sin markdown):
   // ── GENERACIÓN IA SOLO RECOMENDACIONES ───────────────────────────────────
   const generateAIRecomendaciones = async () => {
     setIsGeneratingReco(true);
-    const prompt = `Eres médico especialista en Medicina del Trabajo con más de 15 años de experiencia en Colombia. Genera recomendaciones médico-laborales y de promoción de la salud ESPECÍFICAS para el trabajador evaluado. No uses recomendaciones genéricas. Responde en texto plano numerado, sin JSON, en español formal y directo.
-DATOS: Cargo: ${data.cargo} | Empresa: ${
-      data.empresaNombre
-    } | Actividad económica: ${data.actividadEconomica || "N/E"}
-Riesgos laborales identificados: ${
-      Object.entries(data.riesgos || {})
-        .filter(([, v]) => v)
-        .map(([k]) => k)
-        .join(", ") || "N/R"
-    }
-IMC: ${data.imc} | TA: ${data.ta} | Tabaquismo: ${
-      data.habitos?.fuma
-    } | Alcohol: ${data.habitos?.alcohol} | Actividad física: ${
-      data.habitos?.deporte
-    }
-Diagnóstico principal: ${data.diagnosticoPrincipal}
-Tipo de examen: ${data.tipoExamen}
-INSTRUCCIÓN: Genera mínimo 12 recomendaciones numeradas diferenciando: (A) Recomendaciones médicas y de estilo de vida (B) Recomendaciones ergonómicas específicas para el cargo (C) Recomendaciones de vigilancia epidemiológica y seguimiento (D) Recomendaciones al empleador conforme Res. 1843/2025 y Dec. 1072/2015. Lenguaje técnico-médico, formal, directo y puntual.`;
+    const hallazgosReco =
+      Object.entries(data.examenFisicoSistemas || {})
+        .filter(([, v]) => v.estado === "Anormal")
+        .map(([k, v]) => `${k}: ${v.hallazgo}`)
+        .join("; ") || "Sin hallazgos patológicos";
+    const antecReco = Object.entries(data.antecedentesAgrupados || {})
+      .filter(([, v]) => v.val)
+      .map(([k, v]) => `${k}: ${v.det}`)
+      .join(" | ") || "Niega";
+    const riesgosReco = Object.entries(data.riesgos || {})
+      .filter(([, v]) => v).map(([k]) => k).join(", ") || "No reportados";
+    const dxRecoActivos = [data.diagnosticoPrincipal, data.diagnosticoSecundario1, data.diagnosticoSecundario2]
+      .filter(Boolean).join(" | ") || "Pendiente";
+    const prompt = `Eres médico especialista en Medicina del Trabajo con más de 15 años de experiencia en Colombia. Genera recomendaciones médico-laborales PERSONALIZADAS Y ESPECÍFICAS para el trabajador evaluado, basadas DIRECTAMENTE en los hallazgos clínicos de ESTA historia clínica. Cada recomendación debe derivar de un hallazgo, antecedente, riesgo o característica específica de ESTE paciente. NO generes recomendaciones genéricas desconectadas de la HC. Responde en texto plano numerado, sin JSON, en español formal y directo.
+
+════════ HISTORIA CLÍNICA COMPLETA DEL TRABAJADOR ════════
+Cargo: ${data.cargo} | Empresa: ${data.empresaNombre} | Actividad económica: ${data.actividadEconomica || "N/E"}
+Tipo examen: ${data.tipoExamen} | Énfasis: ${data.enfasisExamen || "N/E"}
+Edad: ${data.edad} años | Género: ${data.genero} | Escolaridad: ${data.escolaridad || "N/R"}
+Signos vitales: TA ${data.ta || "N/R"} mmHg | FC ${data.fc || "N/R"} lpm | IMC ${data.imc || "N/R"} kg/m² | Peso ${data.peso || "N/R"} kg | Talla ${data.talla || "N/R"} cm
+Hábitos: Tabaquismo ${data.habitos?.fuma || "No"} | Alcohol ${data.habitos?.alcohol || "No"} | Actividad física ${data.habitos?.deporte || "No refiere"}
+Antecedentes relevantes: ${antecReco}
+Riesgos ocupacionales identificados: ${riesgosReco}
+Hallazgos patológicos al examen físico: ${hallazgosReco}
+Diagnósticos activos (CIE-10): ${dxRecoActivos}
+Concepto de aptitud: ${data.conceptoAptitud || "Pendiente"}
+Análisis clínico IA previo: ${data.analisisIA ? data.analisisIA.substring(0, 500) + "..." : "No disponible"}
+══════════════════════════════════════════════════════════
+
+INSTRUCCIÓN: Genera MÍNIMO 14 recomendaciones numeradas. Organiza en las siguientes secciones (indica la sección antes del grupo):
+
+(A) RECOMENDACIONES MÉDICAS Y DE ESTILO DE VIDA — Derivadas de los hallazgos clínicos específicos (TA, IMC, diagnósticos, antecedentes). Cada una debe citar el hallazgo que la genera.
+(B) RECOMENDACIONES ERGONÓMICAS Y PREVENTIVAS — Específicas para el CARGO y los RIESGOS identificados en ESTA HC. No genéricas.
+(C) EXÁMENES COMPLEMENTARIOS SUGERIDOS — Los que se justifican por los hallazgos de ESTA evaluación (laboratorios, imágenes, audiometría, espirometría, etc.).
+(D) DERIVACIONES A ESPECIALISTAS — Solo si los hallazgos de ESTA HC lo justifican. Especificar especialidad + motivo clínico concreto.
+(E) VIGILANCIA EPIDEMIOLÓGICA Y SEGUIMIENTO — SVE que corresponden según hallazgos y riesgos (GATISO-DME, SVE Osteomuscular, Psicosocial, Visual, Auditivo, Respiratorio, Cardiovascular, etc.).
+(F) RECOMENDACIONES AL EMPLEADOR — Conforme Res. 1843/2025, Dec. 1072/2015, Res. 0312/2019. Específicas para este cargo y hallazgos.
+
+Lenguaje técnico-médico-ocupacional, formal, directo y puntual. Cada recomendación en máximo 2 líneas.`;
     try {
       const text = await callAI(prompt, false);
       setData((prev) => ({ ...prev, recomendaciones: text.trim() }));
@@ -16846,30 +16895,67 @@ INSTRUCCIÓN: Genera mínimo 12 recomendaciones numeradas diferenciando: (A) Rec
       return;
     }
     setIsGenerating(true);
-    const prompt = `Eres médico general con más de 20 años de experiencia clínica en Colombia. Actúas como un clínico experto en medicina ambulatoria, manejo de patología aguda y crónica, medicina preventiva y salud pública. Tu análisis debe ser riguroso, basado en evidencia actualizada (guías colombianas e internacionales vigentes), y absolutamente adaptado a este paciente específico. Devuelve ÚNICAMENTE JSON válido, sin markdown, sin texto adicional.
+    const _fmtSistemas = (rs) => {
+      if (!rs) return "Sin datos";
+      const keys = { general:"General", cardiovascular:"Cardiovascular", respiratorio:"Respiratorio", digestivo:"Digestivo", genitourinario:"Genitourinario", musculoesqueletico:"Musculoesquelético", neurologico:"Neurológico", dermatologico:"Dermatológico", endocrinologico:"Endocrinológico" };
+      const items = Object.entries(keys).map(([k,l]) => rs[k] && rs[k].trim() ? `${l}: ${rs[k].trim()}` : null).filter(Boolean);
+      return items.length ? items.join(" | ") : "Sin alteraciones referidas";
+    };
+    const _fmtExSegm = (sp) => {
+      if (!sp) return "";
+      const seg = ["cabeza","cuello","torax","abdomen","extremidades","neurologico"];
+      return seg.map(k => sp[k]?.hallazgo ? `${k.charAt(0).toUpperCase()+k.slice(1)}: ${sp[k].hallazgo}` : null).filter(Boolean).join(" | ") || "Examen segmentario normal";
+    };
+    const prompt = `Eres médico general con más de 20 años de experiencia clínica en Colombia, especializado en medicina ambulatoria integral, medicina interna y salud pública. Tu razonamiento clínico es meticuloso, empático y fundamentado en evidencia actualizada (guías GPC-Minsalud e internacionales). Analizas cada paciente de forma integral —bio-psico-social— considerando su contexto ocupacional, sus antecedentes completos y todos los hallazgos clínicos. Devuelve ÚNICAMENTE JSON válido, sin markdown, sin texto adicional.
 
-DATOS COMPLETOS DEL PACIENTE:
-- Nombre: ${data.nombres} | Edad: ${data.edad} años | Género: ${data.genero}
-- Motivo de consulta: ${data.motivoConsulta}
-- Enfermedad actual: ${data.enfermedadActual || "No detallada por el usuario"}
-- Antecedentes personales: ${JSON.stringify(data.antecedentes || {})}
-- Examen físico: TA ${data.examenFisico?.ta || "N/R"} | FC ${data.examenFisico?.fc || "N/R"} | FR ${data.examenFisico?.fr || "N/R"} | Temp ${data.examenFisico?.temp || "N/R"} | SpO2 ${data.examenFisico?.spo2 || "N/R"} | IMC ${data.examenFisico?.imc || "N/R"} | Talla ${data.examenFisico?.talla || "N/R"} | Peso ${data.examenFisico?.peso || "N/R"}
-- Hallazgos físicos: ${data.examenFisico?.hallazgos || "No registrados"}
-- Revisión por sistemas: ${JSON.stringify(data.revisionSistemas || {})}
-- EPS: ${data.eps || "N/R"} | ARL: ${data.arl || "N/R"} | Empresa: ${data.empresaNombre || "N/R"} | Cargo: ${data.cargo || "N/R"}
+════════════════ HISTORIA CLÍNICA COMPLETA ════════════════
 
-INSTRUCCIONES CLÍNICAS OBLIGATORIAS:
-1. DIAGNÓSTICOS: Incluir diagnóstico principal + diferenciales relevantes con código CIE-10 exacto. Clasificar cada uno como Principal/Secundario/Presuntivo/Diferencial.
-2. MEDICAMENTOS: Prescribir SOLO medicamentos del Plan Obligatorio de Salud (POS) cuando sea posible. Incluir: principio activo genérico (nombre comercial entre paréntesis si aplica), concentración, forma farmacéutica, dosis EXACTA, frecuencia, duración, vía de administración, indicaciones especiales (con/sin alimentos, contraindicaciones relevantes). Ajustar por edad, peso y comorbilidades.
-3. PARACLÍNICOS: Justificar cada examen solicitado con criterio clínico. Incluir laboratorios, imágenes y estudios especiales con prioridad (urgente/electivo).
-4. CONDUCTA: Ser específico en el plan: tratamiento farmacológico, no farmacológico, educación al paciente, signos de alarma que requieren consulta urgente.
-5. REMISIONES: Solo cuando estén clínicamente justificadas. Especificar especialidad, motivo clínico y urgencia.
-6. RECOMENDACIONES: Incluir cambios de estilo de vida, dieta, actividad física, higiene del sueño, y medidas preventivas específicas para este paciente.
-7. CONTROL: Especificar tiempo exacto de seguimiento y criterios de reevaluación.
-8. ANÁLISIS: Razonamiento clínico profundo: presentación clínica, hipótesis diagnóstica con justificación, correlación entre síntomas y hallazgos, pronóstico y factores modificables.
+IDENTIFICACIÓN:
+Nombre: ${data.nombres} | Edad: ${data.edad} años | Género: ${data.genero}
+EPS: ${data.eps || "N/R"} | Cargo/Ocupación: ${data.cargo || "N/R"} | Empresa: ${data.empresaNombre || data.empresa || "N/R"}
 
-JSON REQUERIDO (estructura exacta, sin modificar campos):
-{"diagnosticos":[{"cie10":"CÓDIGO-CIE10","descripcion":"Nombre diagnóstico completo y específico","tipo":"Principal|Secundario|Presuntivo|Diferencial"}],"plan":{"conducta":"Plan de manejo detallado y específico para este paciente: medidas farmacológicas y no farmacológicas, educación, signos de alarma","medicamentos":"Resumen conciso del plan farmacológico (para vista rápida)","formulaMedicamentos":[{"nombre":"Nombre genérico del principio activo","presentacion":"Forma farmacéutica + concentración exacta (ej: Tableta 500mg)","dosis":"Cantidad exacta por toma (ej: 1 tableta = 500mg)","frecuencia":"Intervalo preciso (ej: cada 8 horas = 3 veces al día)","duracion":"Días exactos (ej: 7 días)","indicaciones":"Instrucción especial obligatoria o cadena vacía si no aplica"}],"paraclinicosSolicitados":"Lista detallada de paraclínicos con justificación clínica de cada uno y prioridad","remisiones":"Especialidad + motivo clínico específico justificado, o 'No se requiere remisión en este momento'","recomendaciones":"Recomendaciones detalladas: dieta específica, actividad física permitida, signos de alarma que requieren urgencias, cuidados en casa, medidas preventivas","controlEn":"Control en X días/semanas con criterios clínicos específicos para seguimiento"},"analisis":"Razonamiento clínico exhaustivo del caso en 6-8 líneas: presentación clínica y síntomas guía, hipótesis diagnóstica principal con justificación, diagnósticos diferenciales considerados y por qué se priorizan o descartan, correlación entre hallazgos del examen físico y la impresión diagnóstica, factores de riesgo identificados, pronóstico esperado con el tratamiento propuesto"}`;
+MOTIVO DE CONSULTA:
+${data.motivoConsulta}
+
+ENFERMEDAD ACTUAL (anamnesis):
+${data.enfermedadActual || "No detallada por el médico. Usar motivo de consulta como referencia."}
+
+ANTECEDENTES PERSONALES:
+• Patológicos: ${data.antecedentes?.personales || "Niega"}
+• Quirúrgicos: ${data.antecedentes?.quirurgicos || "Niega"}
+• Traumáticos: ${data.antecedentes?.traumaticos || "Niega"}
+• Farmacológicos (medicamentos actuales): ${data.antecedentes?.farmacologicos || "Niega"}
+• Alérgicos: ${data.antecedentes?.alergicos || "Niega"}
+• Familiares: ${data.antecedentes?.familiares || "Niega"}
+• Gineco-obstétricos: ${data.antecedentes?.ginecologicos || "N/A"}
+• Tóxicos/Hábitos: Tabaco: ${data.habitos?.fuma || "No"} | Alcohol: ${data.habitos?.alcohol || "No"} | Actividad física: ${data.habitos?.deporte || "No refiere"}
+
+REVISIÓN POR SISTEMAS:
+${_fmtSistemas(data.revisionSistemas)}
+
+EXAMEN FÍSICO:
+Signos vitales: TA ${data.examenFisico?.ta || "N/R"} mmHg | FC ${data.examenFisico?.fc || "N/R"} lpm | FR ${data.examenFisico?.fr || "N/R"} rpm | Temp ${data.examenFisico?.temp || "N/R"}°C | SpO2 ${data.examenFisico?.saturacion || data.examenFisico?.spo2 || "N/R"}% | Peso ${data.examenFisico?.peso || "N/R"} kg | Talla ${data.examenFisico?.talla || "N/R"} m | IMC ${data.examenFisico?.imc || "N/R"} kg/m²
+Estado general: ${data.examenFisico?.estadoGeneral || "No registrado"}
+Hallazgos físicos: ${data.examenFisico?.hallazgos || "No registrados"}
+Examen segmentario: ${_fmtExSegm(data.sistemasPorExamen)}
+
+DIAGNÓSTICOS PREVIOS / ACTIVOS: ${(data.diagnosticos || []).map(d => `${d.cie10 || ""} ${d.descripcion || ""} (${d.tipo || ""})`).join("; ") || "Ninguno"}
+
+════════════════ INSTRUCCIONES CLÍNICAS ════════════════
+
+Eres el médico tratante. Tienes toda la información de esta historia clínica. Genera el plan de manejo INTEGRAL y COMPLETO para este paciente específico. Sé riguroso, descriptivo y humano. Considera TODOS los datos al generar cada sección:
+
+1. DIAGNÓSTICOS: Principal obligatorio + diferenciales clínicamente relevantes. Código CIE-10 exacto. Clasifica cada uno.
+2. CONDUCTA: Plan detallado farmacológico Y no farmacológico. Medidas generales. Educación específica al paciente. Signos de alarma concretos para ESTE caso.
+3. MEDICAMENTOS POS: SOLO del Plan Obligatorio de Salud (POS Colombia). Principio activo genérico, concentración, forma farmacéutica, dosis exacta por toma, frecuencia, duración, vía, instrucciones especiales. Ajusta a edad/peso/comorbilidades.
+4. PARACLÍNICOS: Solo los justificados por este cuadro clínico específico. Prioridad Urgente u Electivo + justificación clínica breve de cada examen.
+5. DERIVACIONES (array): Evalúa si requiere interconsulta o remisión. Si aplica: especialidad, urgencia (Urgente/Prioritaria/Electiva), motivo clínico preciso. Array vacío si no se requiere.
+6. INCAPACIDAD: Evalúa si el cuadro justifica reposo laboral. Si aplica: días estimados razonables, origen, diagnóstico CIE-10, justificación clínica. Si NO aplica: sugerida=false.
+7. RECOMENDACIONES: Detalladas y personalizadas para ESTE paciente: dieta específica, actividad física permitida o restringida, higiene del sueño, cuidados en casa, adherencia al tratamiento, signos de alarma que requieren urgencias.
+8. ANÁLISIS CLÍNICO: Razonamiento médico EXHAUSTIVO, descriptivo y humanizado. Como si explicaras el caso a un colega: presentación clínica con síntomas guía, hipótesis diagnóstica con justificación en hallazgos específicos de ESTA historia, diferenciales y por qué se priorizan o descartan, correlación síntomas-antecedentes-examen físico, factores de riesgo y su relevancia, pronóstico con el tratamiento propuesto, consideraciones especiales de este paciente.
+
+JSON REQUERIDO (estructura exacta):
+{"diagnosticos":[{"cie10":"CÓD","descripcion":"Nombre completo y específico","tipo":"Principal|Secundario|Presuntivo|Diferencial"}],"plan":{"conducta":"Plan de manejo COMPLETO y detallado: farmacológico + no farmacológico + educación + signos de alarma específicos para ESTE paciente","medicamentos":"Resumen conciso del plan farmacológico para vista rápida","formulaMedicamentos":[{"nombre":"Principio activo genérico","presentacion":"Forma farmacéutica + concentración (ej: Tableta 500mg)","dosis":"Cantidad exacta por toma (ej: 1 tableta)","frecuencia":"Intervalo preciso (ej: cada 8 horas)","duracion":"Días exactos (ej: 7 días)","indicaciones":"Instrucción especial imprescindible o cadena vacía si no aplica"}],"paraclinicosSolicitados":"Lista de paraclínicos con justificación clínica y prioridad (Urgente/Electivo) de cada uno. Vacío si no se requieren.","remisiones":"Descripción de remisiones o vacío si ya están en derivaciones","recomendaciones":"Recomendaciones DETALLADAS y PERSONALIZADAS: dieta, actividad, signos de alarma, cuidados, prevención, adherencia","controlEn":"Tiempo exacto de seguimiento con criterios clínicos de reevaluación"},"derivaciones":[{"especialidad":"Nombre especialidad","urgencia":"Urgente|Prioritaria|Electiva","motivo":"Motivo clínico preciso y justificado","observaciones":"Información adicional relevante para el especialista"}],"incapacidad":{"sugerida":true,"dias":3,"origen":"Enfermedad General","diagnostico":"CIE-10 + descripción del diagnóstico incapacitante","justificacion":"Justificación clínica de la incapacidad y por qué esos días específicos"},"analisis":"Razonamiento clínico EXHAUSTIVO y HUMANIZADO en 8-10 líneas: describe la presentación clínica con sus síntomas guía y su evolución temporal; hipótesis diagnóstica principal con justificación basada en hallazgos específicos de ESTA historia; diferenciales considerados y por qué se priorizan o descartan; correlación entre síntomas, antecedentes relevantes y hallazgos del examen físico; factores de riesgo identificados y su relevancia para este caso; pronóstico esperado con el tratamiento propuesto; consideraciones especiales o alertas de este paciente particular"}`;
     try {
       const text = await callAI(prompt, true);
       const parsed = parseAIJSON(text);
@@ -16890,13 +16976,35 @@ JSON REQUERIDO (estructura exacta, sin modificar campos):
               id: Date.now() + i,
             }))
           : prev.formulaMedicamentos,
+        // ── Derivaciones sugeridas por IA ──
+        derivaciones: parsed.derivaciones?.length
+          ? parsed.derivaciones.map((d, i) => ({
+              especialidad: d.especialidad || "",
+              urgencia: d.urgencia || "Electiva",
+              motivo: d.motivo || "",
+              observaciones: d.observaciones || "",
+              id: Date.now() + i,
+            }))
+          : prev.derivaciones,
+        // ── Incapacidad sugerida por IA ──
+        incapacidad: parsed.incapacidad?.sugerida
+          ? {
+              ...prev.incapacidad,
+              aplica: true,
+              dias: parsed.incapacidad.dias ?? prev.incapacidad?.dias ?? 0,
+              origen: parsed.incapacidad.origen || prev.incapacidad?.origen || "Enfermedad General",
+              diagnostico: parsed.incapacidad.diagnostico || prev.incapacidad?.diagnostico || "",
+            }
+          : prev.incapacidad,
+        // ── Análisis clínico → enfermedad actual si estaba vacía ──
         enfermedadActual:
-          prev.enfermedadActual ||
-          (parsed.analisis
-            ? `ANÁLISIS IA: ${parsed.analisis}`
-            : prev.enfermedadActual),
+          prev.enfermedadActual && prev.enfermedadActual.trim().length > 10
+            ? prev.enfermedadActual
+            : parsed.analisis
+            ? parsed.analisis
+            : prev.enfermedadActual,
       }));
-      showAlert("✅ Análisis IA completado para consulta general.");
+      showAlert("✅ Análisis IA completado — diagnósticos, medicamentos, paraclínicos, derivaciones e incapacidad generados.");
     } catch (e) {
       showAlert(`Error IA: ${e.message}`);
     } finally {
