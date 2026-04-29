@@ -7602,6 +7602,7 @@ const initialOccupPatientState = {
   vigencia: "",
   analisisRestricciones: "",
   analisisIA: "",
+  conductaSeguir: "",
   sveRecomendado: [],
   restriccionesChecklist: {},
   recomendacionesChecklist: {},
@@ -16746,7 +16747,7 @@ Hábitos: Tabaquismo ${data.habitos?.fuma} | Alcohol ${
 CONTEXTO ESPECÍFICO DEL TIPO DE EXAMEN: ${_contextoTipo}
 CRITERIOS OBLIGATORIOS: 1) El concepto de aptitud debe citar el artículo de la Res. 1843/2025 correspondiente (norma vigente desde 29 abril 2025 - Res. 2346/2007 derogada). 2) Si es egreso o post-incapacidad, incluir análisis de reintegro laboral. 3) Las restricciones deben ser operativas, cuantificables y con base normativa (GTC-45, GATISO). 4) Las recomendaciones deben ser específicas para el cargo y los riesgos, no genéricas, y deben responder al contexto del tipo de examen indicado arriba.
 JSON REQUERIDO (sin markdown, sin texto adicional):
-{"diagnosticoPrincipal":"Z10.0 - EXAMEN MÉDICO OCUPACIONAL","diagnosticoSecundario1":"CIE-10 - Hallazgo clínico identificado o cadena vacía","diagnosticoSecundario2":"CIE-10 - Segundo hallazgo o cadena vacía","conceptoAptitud":"Concepto de aptitud laboral (APTO/APTO CON RESTRICCIONES/NO APTO) con justificación cargo-hallazgos. NO mencionar diagnósticos específicos, medicamentos, ni tratamientos. Solo aptitud y condiciones laborales. Conforme Res. 1843/2025 Art. 20","vigencia":"X meses con justificación clínica","recomendaciones":"Mínimo 10 recomendaciones de medicina preventiva y salud ocupacional enfocadas en cargo y riesgos. NO incluir medicamentos ni tratamiento farmacológico. NO referir tratamiento médico actual","restriccionesTexto":"Restricciones médico-laborales operativas y cuantificables (mínimo 5 si hay hallazgos), formato: [TIPO] (Segmento) Descripción - Base legal","derivaciones":[{"especialidad":"Especialidad médica (ej: Ortopedia, Neurología, Psiquiatría, Oftalmología, Cardiología...)","motivo":"Motivo clínico concreto sustentado en hallazgos objetivos de la HC","urgencia":"Urgente/Prioritaria/Electiva","objetivo":"Objetivo específico de la interconsulta"}],"examenesSugeridos":["Examen paraclínico 1"],"interconsultaResumen":"Resumen clínico para interconsulta o cadena vacía","incapacidadSugerida":{"aplica":false,"dias":0,"motivo":"","diagnosticoCIE":""},"analisisClinico":"Análisis clínico estructurado con lenguaje técnico-formal. ESTRUCTURA OBLIGATORIA: [1. INTERPRETACIÓN DE HALLAZGOS] Descripción técnica de todos los hallazgos al examen físico y paraclínicos, correlación fisiopatológica con antecedentes. [2. CORRELACIÓN CARGO-RIESGOS OCUPACIONALES] Relación entre los hallazgos y los riesgos específicos del cargo, exposición laboral y condiciones de trabajo según GTC-45 y GATISO. [3. JUSTIFICACIÓN CLÍNICA DE RESTRICCIONES Y RECOMENDACIONES] Para CADA restricción e instrucción emitida: argumentación clínica detallada del PORQUÉ se establece, sustentada en hallazgos objetivos, normativa (Res. 1843/2025, Dec. 1072/2015, GTC-45, GATISO) y evidencia médica. Si no hay restricciones, argumentar clínicamente el porqué el trabajador es APTO sin restricciones. [4. DERIVACIONES A ESPECIALIDADES SUGERIDAS] Lista numerada de cada especialidad a la cual se sugiere derivar, con: a) especialidad, b) motivo clínico específico sustentado en hallazgos, c) urgencia (Urgente/Prioritaria/Electiva), d) objetivo de la interconsulta. Si no aplica derivación, argumentar clínicamente. [5. NORMATIVA APLICABLE] Referencias específicas a normativa colombiana relevante para el caso. Mínimo 300 palabras totales.","sveRecomendado":["SVE Osteomuscular si aplica según GATISO-DME Res. 2844/2007","SVE Psicosocial si aplica según Res. 2764/2022","SVE Visual / SVE Respiratorio / SVE Neurológico / SVE Dermatológico según hallazgos"]}`;    try {
+{"diagnosticoPrincipal":"Z10.0 - EXAMEN MÉDICO OCUPACIONAL","diagnosticoSecundario1":"CIE-10 - Hallazgo clínico identificado o cadena vacía","diagnosticoSecundario2":"CIE-10 - Segundo hallazgo o cadena vacía","conceptoAptitud":"Concepto de aptitud laboral (APTO/APTO CON RESTRICCIONES/NO APTO) con justificación cargo-hallazgos. NO mencionar diagnósticos específicos, medicamentos, ni tratamientos. Solo aptitud y condiciones laborales. Conforme Res. 1843/2025 Art. 20","vigencia":"X meses con justificación clínica","derivaciones":[{"especialidad":"Especialidad médica (ej: Ortopedia, Neurología, Psiquiatría, Oftalmología, Cardiología...)","motivo":"Motivo clínico concreto sustentado en hallazgos objetivos de la HC","urgencia":"Urgente/Prioritaria/Electiva","objetivo":"Objetivo específico de la interconsulta"}],"examenesSugeridos":["Examen paraclínico 1"],"interconsultaResumen":"Resumen clínico para interconsulta o cadena vacía","incapacidadSugerida":{"aplica":false,"dias":0,"motivo":"","diagnosticoCIE":""},"analisisClinico":"Análisis clínico estructurado con lenguaje técnico-formal. ESTRUCTURA OBLIGATORIA: [1. INTERPRETACIÓN DE HALLAZGOS] Descripción técnica de todos los hallazgos al examen físico y paraclínicos, correlación fisiopatológica con antecedentes. [2. CORRELACIÓN CARGO-RIESGOS OCUPACIONALES] Relación entre los hallazgos y los riesgos específicos del cargo, exposición laboral y condiciones de trabajo según GTC-45 y GATISO. [3. JUSTIFICACIÓN CLÍNICA DEL CONCEPTO DE APTITUD] Argumentación clínica detallada del PORQUÉ se emite el concepto, sustentada en hallazgos objetivos, normativa (Res. 1843/2025, Dec. 1072/2015, GTC-45, GATISO) y evidencia médica. [4. DERIVACIONES A ESPECIALIDADES SUGERIDAS] Lista numerada de cada especialidad a la cual se sugiere derivar, con: a) especialidad, b) motivo clínico específico sustentado en hallazgos, c) urgencia, d) objetivo de la interconsulta. Si no aplica, argumentar clínicamente. [5. NORMATIVA APLICABLE] Referencias específicas a normativa colombiana relevante para el caso. Mínimo 300 palabras totales.","conductaSeguir":"Conducta a seguir y determinaciones médico-administrativas. ESTRUCTURA OBLIGATORIA: [1. CONDUCTA INMEDIATA] Acciones médicas y administrativas a ejecutar en esta consulta o en las próximas 48-72 horas (exámenes a ordenar, especialistas a remitir, notificaciones a ARL/EPS, etc.). [2. PLAN DE SEGUIMIENTO] Próximos controles, plazos, criterios de reevaluación del concepto de aptitud, indicadores de mejoría o deterioro a vigilar. [3. PRONÓSTICO MÉDICO-LABORAL] Pronóstico funcional y laboral a corto/mediano plazo considerando cargo, hallazgos, antecedentes y riesgos. Probabilidad de reintegro pleno, con restricciones o necesidad de reubicación. [4. DETERMINACIONES ADMINISTRATIVAS Y LEGALES] Solo si aplican: a) Necesidad de reporte a ARL (presunta enfermedad laboral, accidente de trabajo, riesgo inminente), b) Indicación de calificación de origen (Res. 1843/2025 Art. 28, Dec. 1477/2014 Tabla de Enfermedades Laborales), c) Concepto de reubicación laboral o reconversión de mano de obra (Res. 1843/2025 Art. 22), d) Restricciones con impacto contractual (períodos de prueba, cargos de riesgo crítico), e) Notificación a medicina legal si hay hallazgos de lesión de causa externa. Si no aplica ninguna determinación legal, indicar explícitamente 'Sin determinaciones administrativas especiales para este caso'.","sveRecomendado":["SVE Osteomuscular si aplica según GATISO-DME Res. 2844/2007","SVE Psicosocial si aplica según Res. 2764/2022","SVE Visual / SVE Respiratorio / SVE Neurológico / SVE Dermatológico según hallazgos"]}`;    try {
       let text;
       try {
         text = await callAI(prompt, true);
@@ -16797,9 +16798,8 @@ JSON REQUERIDO (sin markdown, sin texto adicional):
         diagnosticoSecundario2: dxSec2Final || prev.diagnosticoSecundario2,
         conceptoAptitud: parsed.conceptoAptitud || prev.conceptoAptitud,
         vigencia: parsed.vigencia || prev.vigencia,
-        recomendaciones: parsed.recomendaciones || prev.recomendaciones,
-        analisisRestricciones:
-          parsed.restriccionesTexto || prev.analisisRestricciones,
+        // NOTA: recomendaciones y restricciones NO se tocan desde aquí —
+        // se generan con sus botones independientes (generateAIRestricciones / generateAIRecomendaciones)
         formulaMedica: parsed.formulaMedica || prev.formulaMedica,
         formulaMedicamentos: parsed.formulaMedicamentos?.length
           ? parsed.formulaMedicamentos.map((m, i) => ({
@@ -16873,6 +16873,13 @@ JSON REQUERIDO (sin markdown, sin texto adicional):
           analisisIA: parsed.analisisClinico,
         }));
       }
+      // ── Guardar Conducta a Seguir ──
+      if (parsed.conductaSeguir) {
+        setData((prev) => ({
+          ...prev,
+          conductaSeguir: parsed.conductaSeguir,
+        }));
+      }
       // ── Guardar SVE Recomendado por IA ──
       if (parsed.sveRecomendado?.length > 0) {
         setData((prev) => ({
@@ -16892,6 +16899,9 @@ JSON REQUERIDO (sin markdown, sin texto adicional):
           : "",
         parsed.analisisClinico
           ? `\n• Análisis clínico generado`
+          : "",
+        parsed.conductaSeguir
+          ? `\n• Conducta a seguir y determinaciones generadas`
           : "",
         parsed.sveRecomendado?.length > 0
           ? `\n• ${parsed.sveRecomendado.filter(s => s && !s.includes("si aplica")).length} SVE sugerido(s)`
@@ -16963,9 +16973,10 @@ INSTRUCCIONES OBLIGATORIAS:
 6. BASE NORMATIVA: Citar GTC-45:2012, GATISO-DME, GATISO-TME, Res. 1843/2025, Res. 2404/2019 según corresponda.
 7. Si el examen es egreso, post-incapacidad o reintegro (Res. 1843/2025 Art. 13): incluir restricciones de reintegro progresivo.
 8. Si NO hay hallazgos patológicos que justifiquen restricciones: devolver array vacío con "sinRestricciones": true y justificación.
+9. ⚠️ PROHIBICIÓN LEGAL EXPRESA (Res. 1843/2025 Art. 21 — confidencialidad del diagnóstico): En el campo "texto" y "hallazgoQueJustifica" NO incluyas nombres de diagnósticos clínicos (enfermedades, síndromes, patologías), NO menciones medicamentos, NO describas tratamientos. Solo describe la LIMITACIÓN FUNCIONAL LABORAL en términos operativos: qué actividad está limitada, en qué medida y por cuánto tiempo. Ejemplo correcto: "Evitar levantamiento de cargas superiores a 10 kg" — NO: "Por lumbalgia crónica L4-L5 no levantar pesos".
 
 JSON REQUERIDO (sin markdown):
-{"sinRestricciones":false,"justificacionSinRestricciones":"","restricciones":[{"numero":1,"segmento":"Segmento anatómico específico","tipo":"TEMPORAL|PERMANENTE|PREVENTIVA","duracion":"X semanas / Permanente / N/A","hallazgoQueJustifica":"Hallazgo clínico específico de ESTA HC que genera esta restricción","texto":"Restricción operativa, cuantificable y específica para el puesto de trabajo de ESTE trabajador","normativa":"GTC-45:2012 / GATISO-DME / GATISO-TME / Res. 1843/2025 / Res. 2404/2019"}]}`;
+{"sinRestricciones":false,"justificacionSinRestricciones":"","restricciones":[{"numero":1,"segmento":"Segmento anatómico específico","tipo":"TEMPORAL|PERMANENTE|PREVENTIVA","duracion":"X semanas / Permanente / N/A","hallazgoQueJustifica":"Hallazgo funcional observado (NO diagnóstico, NO enfermedad) que sustenta la restricción","texto":"Restricción operativa y cuantificable: describe QUÉ actividad está limitada, EN QUÉ MEDIDA y POR CUÁNTO TIEMPO. Sin diagnósticos, sin medicamentos, sin tratamientos.","normativa":"GTC-45:2012 / GATISO-DME / GATISO-TME / Res. 1843/2025 / Res. 2404/2019"}]}`;
     try {
       const text = await callAI(prompt, true);
       const parsed = parseAIJSON(text);
@@ -17021,6 +17032,8 @@ Diagnósticos activos (CIE-10): ${dxRecoActivos}
 Concepto de aptitud: ${data.conceptoAptitud || "Pendiente"}
 Análisis clínico IA previo: ${data.analisisIA ? data.analisisIA.substring(0, 500) + "..." : "No disponible"}
 ══════════════════════════════════════════════════════════
+
+⚠️ PROHIBICIÓN LEGAL EXPRESA (Res. 1843/2025 Art. 21 — confidencialidad diagnóstica): NO incluyas nombres de diagnósticos clínicos, nombres de enfermedades, síndromes ni patologías en las recomendaciones. NO menciones medicamentos específicos, dosis ni tratamientos farmacológicos. Las recomendaciones son de medicina preventiva, ergonomía, vigilancia epidemiológica y conducta laboral — NO de tratamiento médico. Ejemplo correcto: "Realizar pausas activas de 10 minutos cada 2 horas por el cargo de trabajo con exposición biomecánica" — NO: "Por hernia discal L4-L5 no flexionar columna y tomar ibuprofeno".
 
 INSTRUCCIÓN: Genera MÍNIMO 14 recomendaciones numeradas. Organiza en las siguientes secciones (indica la sección antes del grupo):
 
@@ -19934,6 +19947,9 @@ Esta historia clínica debe conservarse mínimo 20 años.
 
     // ═══ 18. ANÁLISIS CLÍNICO IA ═══
     if (data.analisisIA) sections.push(sec("🧠", "Análisis Clínico") + '<div style="padding:6px 10px;font-size:9pt;white-space:pre-wrap;line-height:1.5;background:#fefce8;border:1px solid #fde68a;border-radius:4px;margin:4px 0;">' + _nl(data.analisisIA) + '</div>');
+
+    // ═══ 18b. CONDUCTA A SEGUIR Y DETERMINACIONES ═══
+    if (data.conductaSeguir) sections.push(sec("🗂️", "Conducta a Seguir y Determinaciones Médico-Administrativas") + '<div style="padding:6px 10px;font-size:9pt;white-space:pre-wrap;line-height:1.5;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;margin:4px 0;">' + _nl(data.conductaSeguir) + '</div>');
 
     // ═══ 19. SVE ═══
     if (data.sveRecomendado?.length > 0) {
@@ -24373,6 +24389,40 @@ Esta historia clínica debe conservarse mínimo 20 años.
               />
             </div>
           )}
+          {/* ── CONDUCTA A SEGUIR (generada por IA — campo independiente) ── */}
+          {data.conductaSeguir ? (
+            <div className="mt-3">
+              <label className="block text-[10px] font-black text-blue-700 uppercase mb-1">
+                🗂️ Conducta a Seguir &amp; Determinaciones Médico-Administrativas <span className="ai-label-print-hide">(generado por IA)</span>
+              </label>
+              <textarea
+                value={data.conductaSeguir || ""}
+                onChange={(e) => setData(p => ({ ...p, conductaSeguir: e.target.value }))}
+                rows={7}
+                className="w-full p-3 border-2 border-blue-200 rounded-xl text-xs bg-blue-50/40 focus:border-blue-400 focus:outline-none"
+                placeholder="Conducta a seguir, pronóstico y determinaciones administrativas/legales."
+                style={{ resize: "vertical" }}
+              />
+              <p className="text-[9px] text-blue-400 mt-1">
+                Incluye: conducta inmediata · plan de seguimiento · pronóstico médico-laboral · determinaciones administrativas y legales según corresponda.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-3">
+              <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
+                🗂️ Conducta a Seguir &amp; Determinaciones
+              </label>
+              <textarea
+                value={data.conductaSeguir || ""}
+                onChange={(e) => setData(p => ({ ...p, conductaSeguir: e.target.value }))}
+                rows={3}
+                className="w-full p-2 border border-gray-200 rounded-xl text-xs focus:border-blue-400 focus:outline-none"
+                placeholder="Se generará automáticamente con el análisis de IA, o puede escribirlo manualmente. Incluye: conducta, pronóstico y determinaciones administrativas/legales."
+                style={{ resize: "vertical" }}
+              />
+            </div>
+          )}
+
           {/* ── SVE - Sistema de Vigilancia Epidemiológica (Punto 9) ── */}
           <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
             <label className="block text-[10px] font-black text-amber-800 uppercase mb-2">
