@@ -13908,7 +13908,14 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
         )}
       </div>
 
-      <div className={`flex-1 p-4 mx-auto w-full space-y-4 mt-2 ${(tipoBusqueda === "empresa" || resultadosEmpresa.length > 0) ? "max-w-5xl" : "max-w-lg"}`}>
+      <div className={`flex-1 p-4 mx-auto w-full mt-2 ${(tipoBusqueda === "empresa" || resultadosEmpresa.length > 0) ? "max-w-5xl space-y-4" : resultado ? "max-w-5xl" : "max-w-lg space-y-4"}`}>
+
+        {/* ── Layout condicional: 2 columnas con resultado individual, 1 columna sin resultado ── */}
+        <div className={resultado && !resultadosEmpresa.length ? "grid grid-cols-1 lg:grid-cols-[370px_1fr] gap-5 items-start" : "space-y-4"}>
+
+        {/* ── Columna izquierda: búsqueda ── */}
+        <div className="space-y-3">
+
         {/* ── Instrucciones ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-teal-100 p-4">
           <div className="flex items-start gap-3">
@@ -14037,6 +14044,119 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
           </p>
         </div>
 
+        </div>{/* fin columna izquierda */}
+
+        {/* ── Columna derecha: resultado individual (solo en modo 2 columnas) ── */}
+        {resultado && !resultadosEmpresa.length && (
+          <div className="min-w-0">
+            {(() => {
+              const col = colorAptitud(resultado.conceptoAptitud);
+              return (
+                <div className="bg-white rounded-2xl shadow-sm border border-teal-100 overflow-hidden">
+                  {/* Header resultado */}
+                  <div className={`px-5 py-4 ${col.bg} border-b border-gray-100`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                          Resultado de tu evaluación
+                        </p>
+                        <p className={`font-black text-base mt-0.5 ${col.text}`}>
+                          {col.dot}{" "}
+                          {resultado.conceptoAptitud || "Pendiente de concepto"}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-black px-3 py-1.5 rounded-full border ${col.badge}`}>
+                        {resultado.estadoHistoria || "Cerrada"}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Datos */}
+                  <div className="p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        ["👤 Nombre", resultado.nombres],
+                        ["🪪 Documento", `${resultado.docTipo || "CC"} ${resultado.docNumero}`],
+                        ["🏭 Empresa", resultado.empresaNombre || "--"],
+                        ["💼 Cargo", resultado.cargo || "--"],
+                        ["🔬 Tipo de examen", resultado.tipoExamen || "--"],
+                        ["📅 Fecha evaluación", resultado.fechaExamen || "--"],
+                        ["👨‍⚕️ Médico evaluador", resultado.medicoNombre || "--"],
+                        ["🔑 Código verificación", resultado.codigoVerificacion || "--"],
+                      ].map(([k, v]) => (
+                        <div key={k} className="bg-gray-50 rounded-lg p-2.5 min-w-0">
+                          <p className="text-[9px] font-black text-gray-400 uppercase truncate">{k}</p>
+                          <p className="text-xs font-bold text-gray-800 mt-0.5 break-words">{v || "--"}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {resultado.restricciones && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                        <p className="text-[10px] font-black text-amber-700 uppercase mb-1">⚠️ Restricciones / Recomendaciones</p>
+                        <p className="text-xs text-amber-800 leading-relaxed">{resultado.restricciones}</p>
+                      </div>
+                    )}
+
+                    {/* ── DOCUMENTOS EMITIDOS ──────────────────────────────── */}
+                    {(() => {
+                      const meds = resultado.formulaMedicamentos || [];
+                      const derivs = resultado.derivaciones || [];
+                      const exams = resultado.solicitudExamenes || [];
+                      const incap = resultado.incapacidad || {};
+                      const hasDocs = meds.length > 0 || derivs.length > 0 || exams.length > 0 || incap?.aplica;
+                      if (!hasDocs) return null;
+                      const docBtns = [
+                        meds.length > 0 && { section: "formula", label: "💊 Receta Médica", sub: `${meds.length} medicamento${meds.length !== 1 ? "s" : ""}`, color: "bg-emerald-600 hover:bg-emerald-700" },
+                        derivs.length > 0 && { section: "derivaciones", label: "🏥 Derivaciones", sub: `${derivs.length} especialidad${derivs.length !== 1 ? "es" : ""}`, color: "bg-violet-600 hover:bg-violet-700" },
+                        exams.length > 0 && { section: "examenes", label: "🔬 Exámenes", sub: `${exams.length} examen${exams.length !== 1 ? "es" : ""}`, color: "bg-teal-600 hover:bg-teal-700" },
+                        incap?.aplica && { section: "incapacidad", label: "🛌 Incapacidad", sub: `${incap.dias || 0} día${(incap.dias || 0) !== 1 ? "s" : ""}`, color: "bg-red-600 hover:bg-red-700" },
+                      ].filter(Boolean);
+                      return (
+                        <div className="border border-indigo-100 bg-indigo-50 rounded-xl p-3">
+                          <p className="text-[10px] font-black text-indigo-700 uppercase tracking-wider mb-2">📋 Documentos Emitidos en tu Consulta</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {docBtns.map((btn) => (
+                              <button key={btn.section} onClick={() => _portalPrint(btn.section, resultado)} className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl text-white font-black text-[11px] shadow-sm transition ${btn.color}`}>
+                                <span className="text-sm">{btn.label}</span>
+                                <span className="text-[9px] font-normal opacity-90">{btn.sub}</span>
+                                <span className="text-[9px] opacity-75 mt-0.5">📥 Descargar PDF</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* ── DESCARGAR CERTIFICADO PDF ─────────────────────────── */}
+                    <button
+                      onClick={() => {
+                        const html = _generarCertificadoDesdePortal(resultado);
+                        const w = window.open("", "_blank", "width=920,height=1150");
+                        if (!w) { alert("El navegador bloqueó la ventana emergente. Permita los popups para descargar el certificado."); return; }
+                        const htmlConBtn = html.replace("</body>", '<div class="np-dl"><button onclick="window.print()">📥 Guardar / Imprimir PDF</button><p>En el diálogo de impresión,<br/>selecciona <b>Guardar como PDF</b></p></div></body>');
+                        w.document.write(htmlConBtn);
+                        w.document.close();
+                        w.focus();
+                      }}
+                      className="w-full py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-black text-sm rounded-xl flex items-center justify-center gap-2.5 shadow-sm transition"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17a3 3 0 003 3h12a3 3 0 003-3v-1M3 17V7a3 3 0 013-3h8l5 5v8" />
+                      </svg>
+                      Descargar Certificado PDF
+                    </button>
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-[10px] text-blue-700 leading-relaxed">
+                      <p className="font-black mb-0.5">🔒 Información confidencial - Res. 1995/1999</p>
+                      <p>Tu historia clínica completa es custodiada por el médico ocupacional. Para consultas sobre tu resultado, comunícate con el servicio médico.</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        </div>{/* fin grid/wrapper columnas */}
+
         {/* ── Documentación por periodo (Portal Empresa Completo) ── */}
         {/* FIX React #310: componente real en lugar de IIFE con hooks ilegales */}
         {resultadosEmpresa.length > 0 && (
@@ -14136,10 +14256,10 @@ const PortalPublicoTrabajador = ({ sbUrl, sbKey, onVolver }) => {
           </div>
         )}
 
-        {/* ── Resultado ── */}
-        {resultado &&
+        {/* ── Resultado — renderizado en columna derecha del grid (ver arriba) ── */}
+        {false &&
           (() => {
-            const col = colorAptitud(resultado.conceptoAptitud);
+            const col = colorAptitud(resultado?.conceptoAptitud);
             return (
               <div className="bg-white rounded-2xl shadow-sm border border-teal-100 overflow-hidden">
                 {/* Header resultado */}
