@@ -17255,12 +17255,29 @@ JSON REQUERIDO (estructura exacta):
     try {
       const text = await callAI(prompt, true);
       const parsed = parseAIJSON(text);
+      // Normalizar campos string del plan: la IA a veces devuelve arrays/objetos en vez de strings
+      const _normPlanStr = (v) => {
+        if (!v) return "";
+        if (typeof v === "string") return v;
+        if (Array.isArray(v)) return v.map(e => typeof e === "string" ? e : `${e.nombre || e.name || ""}${e.prioridad ? " (" + e.prioridad + ")" : ""}${e.justificacion ? " — " + e.justificacion : ""}${e.motivo ? " — " + e.motivo : ""}`).join("\n");
+        if (typeof v === "object") return Object.entries(v).map(([k, val]) => `${k}: ${val}`).join(" | ");
+        return String(v);
+      };
+      const _safePlan = parsed.plan ? {
+        ...parsed.plan,
+        paraclinicosSolicitados: _normPlanStr(parsed.plan.paraclinicosSolicitados),
+        recomendaciones: _normPlanStr(parsed.plan.recomendaciones),
+        conducta: _normPlanStr(parsed.plan.conducta),
+        remisiones: _normPlanStr(parsed.plan.remisiones),
+        medicamentos: _normPlanStr(parsed.plan.medicamentos),
+        controlEn: _normPlanStr(parsed.plan.controlEn),
+      } : null;
       setData((prev) => ({
         ...prev,
         diagnosticos: parsed.diagnosticos?.length
           ? parsed.diagnosticos
           : prev.diagnosticos,
-        plan: { ...prev.plan, ...parsed.plan },
+        plan: _safePlan ? { ...prev.plan, ..._safePlan } : prev.plan,
         formulaMedicamentos: parsed.plan?.formulaMedicamentos?.length
           ? parsed.plan.formulaMedicamentos.map((m, i) => ({
               ...m,
@@ -52067,7 +52084,12 @@ body{padding-top:52px;}
                             Paraclínicos / Exámenes Solicitados
                           </h4>
                           <p className="text-xs whitespace-pre-wrap leading-relaxed">
-                            {data.plan.paraclinicosSolicitados}
+                            {(() => {
+                              const v = data.plan.paraclinicosSolicitados;
+                              if (typeof v === "string") return v;
+                              if (Array.isArray(v)) return v.map(e => typeof e === "string" ? e : `${e.nombre || ""}${e.prioridad ? " (" + e.prioridad + ")" : ""}${e.justificacion ? " — " + e.justificacion : ""}`).join("\n");
+                              return JSON.stringify(v);
+                            })()}
                           </p>
                         </div>
                       )}
@@ -52077,7 +52099,7 @@ body{padding-top:52px;}
                             Remisiones / Interconsultas
                           </h4>
                           <p className="text-xs whitespace-pre-wrap">
-                            {data.plan.remisiones}
+                            {typeof data.plan.remisiones === "string" ? data.plan.remisiones : JSON.stringify(data.plan.remisiones)}
                           </p>
                         </div>
                       )}
@@ -52087,7 +52109,7 @@ body{padding-top:52px;}
                             Recomendaciones al Paciente
                           </h4>
                           <p className="text-xs whitespace-pre-wrap leading-relaxed">
-                            {data.plan.recomendaciones}
+                            {typeof data.plan.recomendaciones === "string" ? data.plan.recomendaciones : Array.isArray(data.plan.recomendaciones) ? data.plan.recomendaciones.join("\n") : JSON.stringify(data.plan.recomendaciones)}
                           </p>
                         </div>
                       )}
@@ -52097,7 +52119,7 @@ body{padding-top:52px;}
                             Conducta Médica
                           </h4>
                           <p className="text-xs whitespace-pre-wrap">
-                            {data.plan.conducta}
+                            {typeof data.plan.conducta === "string" ? data.plan.conducta : JSON.stringify(data.plan.conducta)}
                           </p>
                         </div>
                       )}
