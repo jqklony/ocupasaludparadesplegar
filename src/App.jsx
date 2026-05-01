@@ -17251,7 +17251,7 @@ Eres el médico tratante. Tienes toda la información de esta historia clínica.
 8. ANÁLISIS CLÍNICO: Razonamiento médico EXHAUSTIVO, descriptivo y humanizado. Como si explicaras el caso a un colega: presentación clínica con síntomas guía, hipótesis diagnóstica con justificación en hallazgos específicos de ESTA historia, diferenciales y por qué se priorizan o descartan, correlación síntomas-antecedentes-examen físico, factores de riesgo y su relevancia, pronóstico con el tratamiento propuesto, consideraciones especiales de este paciente.
 
 JSON REQUERIDO (estructura exacta):
-{"diagnosticos":[{"cie10":"CÓD","descripcion":"Nombre completo y específico","tipo":"Principal|Secundario|Presuntivo|Diferencial"}],"plan":{"conducta":"Plan de manejo COMPLETO y detallado: farmacológico + no farmacológico + educación + signos de alarma específicos para ESTE paciente","medicamentos":"Resumen conciso del plan farmacológico para vista rápida","formulaMedicamentos":[{"nombre":"Principio activo genérico","presentacion":"Forma farmacéutica + concentración (ej: Tableta 500mg)","dosis":"Cantidad exacta por toma (ej: 1 tableta)","frecuencia":"Intervalo preciso (ej: cada 8 horas)","duracion":"Días exactos (ej: 7 días)","indicaciones":"Instrucción especial imprescindible o cadena vacía si no aplica"}],"paraclinicosSolicitados":"Lista de paraclínicos con justificación clínica y prioridad (Urgente/Electivo) de cada uno. Vacío si no se requieren.","remisiones":"Descripción de remisiones o vacío si ya están en derivaciones","recomendaciones":"Recomendaciones DETALLADAS y PERSONALIZADAS: dieta, actividad, signos de alarma, cuidados, prevención, adherencia","controlEn":"Tiempo exacto de seguimiento con criterios clínicos de reevaluación"},"derivaciones":[{"especialidad":"Nombre especialidad","urgencia":"Urgente|Prioritaria|Electiva","motivo":"Motivo clínico preciso y justificado","observaciones":"Información adicional relevante para el especialista"}],"incapacidad":{"sugerida":true,"dias":3,"origen":"Enfermedad General","diagnostico":"CIE-10 + descripción del diagnóstico incapacitante","justificacion":"Justificación clínica de la incapacidad y por qué esos días específicos"},"analisis":"Razonamiento clínico EXHAUSTIVO y HUMANIZADO en 8-10 líneas: describe la presentación clínica con sus síntomas guía y su evolución temporal; hipótesis diagnóstica principal con justificación basada en hallazgos específicos de ESTA historia; diferenciales considerados y por qué se priorizan o descartan; correlación entre síntomas, antecedentes relevantes y hallazgos del examen físico; factores de riesgo identificados y su relevancia para este caso; pronóstico esperado con el tratamiento propuesto; consideraciones especiales o alertas de este paciente particular"}`;
+{"diagnosticos":[{"cie10":"CÓD","descripcion":"Nombre completo y específico","tipo":"Principal|Secundario|Presuntivo|Diferencial"}],"plan":{"conducta":"Plan de manejo COMPLETO y detallado: farmacológico + no farmacológico + educación + signos de alarma específicos para ESTE paciente","medicamentos":"Resumen conciso del plan farmacológico para vista rápida","formulaMedicamentos":[{"nombre":"Principio activo genérico","presentacion":"Forma farmacéutica + concentración (ej: Tableta 500mg)","dosis":"Cantidad exacta por toma (ej: 1 tableta)","frecuencia":"Intervalo preciso (ej: cada 8 horas)","duracion":"Días exactos (ej: 7 días)","indicaciones":"Instrucción especial imprescindible o cadena vacía si no aplica"}],"paraclinicosSolicitados":"Resumen textual del plan de paraclínicos para el expediente médico.","examenesSolicitados":[{"nombre":"Nombre exacto del examen o paraclínico (ej: Hemograma completo, Glicemia en ayunas, Ecografía abdominal)","urgente":false,"justificacion":"Razón clínica concreta en 1 línea basada en los hallazgos de ESTA historia"}],"remisiones":"Descripción de remisiones o vacío si ya están en derivaciones","recomendaciones":"Recomendaciones DETALLADAS y PERSONALIZADAS: dieta, actividad, signos de alarma, cuidados, prevención, adherencia","controlEn":"Tiempo exacto de seguimiento con criterios clínicos de reevaluación"},"derivaciones":[{"especialidad":"Nombre especialidad","urgencia":"Urgente|Prioritaria|Electiva","motivo":"Motivo clínico preciso y justificado","observaciones":"Información adicional relevante para el especialista"}],"incapacidad":{"sugerida":true,"dias":3,"origen":"Enfermedad General","diagnostico":"CIE-10 + descripción del diagnóstico incapacitante","justificacion":"Justificación clínica de la incapacidad y por qué esos días específicos"},"analisis":"Razonamiento clínico EXHAUSTIVO y HUMANIZADO en 8-10 líneas: describe la presentación clínica con sus síntomas guía y su evolución temporal; hipótesis diagnóstica principal con justificación basada en hallazgos específicos de ESTA historia; diferenciales considerados y por qué se priorizan o descartan; correlación entre síntomas, antecedentes relevantes y hallazgos del examen físico; factores de riesgo identificados y su relevancia para este caso; pronóstico esperado con el tratamiento propuesto; consideraciones especiales o alertas de este paciente particular"}`;
     try {
       const text = await callAI(prompt, true);
       const parsed = parseAIJSON(text);
@@ -17317,7 +17317,28 @@ JSON REQUERIDO (estructura exacta):
             ? parsed.analisis
             : prev.enfermedadActual,
       }));
-      showAlert("✅ Análisis IA completado — diagnósticos, medicamentos, paraclínicos, derivaciones e incapacidad generados.");
+      // ── Exámenes sugeridos → solicitudExamenes ──
+      if (parsed.examenesSolicitados?.length > 0) {
+        setData((prev) => {
+          const existing = prev.solicitudExamenes || [];
+          const existingNames = new Set(existing.map(e => (e.nombre || "").toLowerCase().trim()));
+          const newExams = parsed.examenesSolicitados
+            .filter(e => {
+              const nom = typeof e === "string" ? e : (e.nombre || "");
+              return nom && !existingNames.has(nom.toLowerCase().trim());
+            })
+            .map((e, i) => ({
+              nombre: typeof e === "string" ? e : (e.nombre || ""),
+              fecha: new Date().toISOString().split("T")[0],
+              urgente: typeof e === "object" ? !!e.urgente : false,
+              justificacion: typeof e === "object" ? (e.justificacion || "") : "",
+              _fromAI: true,
+              id: Date.now() + i,
+            }));
+          return newExams.length > 0 ? { ...prev, solicitudExamenes: [...existing, ...newExams] } : prev;
+        });
+      }
+      showAlert(`✅ Análisis IA completado — diagnósticos, medicamentos, paraclínicos, derivaciones e incapacidad generados.${parsed.examenesSolicitados?.length > 0 ? `\n• ${parsed.examenesSolicitados.length} examen(es) sugerido(s) añadidos a la orden` : ""}`);
     } catch (e) {
       showAlert(`Error IA: ${e.message}`);
     } finally {
@@ -51352,6 +51373,59 @@ body{font-family:Arial,sans-serif;margin:0;background:#f5f5f5}
                 }</p><p style="font-size:7.5pt;color:#555;margin:1px 0;">${
                   _billDocData?.titulo || ""
                 }</p></div></div>`;
+                // ── ORDEN DE EXÁMENES PARACLÍNICOS — PDF dedicado ──────────
+                const openGnExamenesWindow = () => {
+                  const accent = "#0d9488";
+                  const hdr = buildGnHeader("Orden de Exámenes Paraclínicos", accent);
+                  const exams = data.solicitudExamenes || [];
+                  const examTableHtml = exams.length > 0
+                    ? `<table style="width:100%;border-collapse:collapse;font-size:8.5pt;">
+                        <thead><tr style="background:#ccfbf1;">
+                          <th style="padding:5px 8px;text-align:center;border:1px solid #99f6e4;width:36px;">#</th>
+                          <th style="padding:5px 8px;text-align:left;border:1px solid #99f6e4;">Examen / Paraclínico</th>
+                          <th style="padding:5px 8px;text-align:left;border:1px solid #99f6e4;">Justificación Clínica</th>
+                          <th style="padding:5px 8px;text-align:center;border:1px solid #99f6e4;width:75px;">Prioridad</th>
+                          <th style="padding:5px 8px;text-align:center;border:1px solid #99f6e4;width:70px;">Recibido ☐</th>
+                        </tr></thead>
+                        <tbody>${exams.map((e, i) =>
+                          `<tr style="background:${i % 2 === 0 ? "white" : "#f0fdfa"};">
+                            <td style="padding:5px 8px;border:1px solid #ccfbf1;text-align:center;font-weight:900;color:#0d9488;">${i + 1}</td>
+                            <td style="padding:5px 8px;border:1px solid #ccfbf1;font-weight:700;">${_sanitize(e.nombre || "")}</td>
+                            <td style="padding:5px 8px;border:1px solid #ccfbf1;font-size:8pt;color:#555;">${_sanitize(e.justificacion || "Según criterio médico")}</td>
+                            <td style="padding:5px 8px;border:1px solid #ccfbf1;text-align:center;">${e.urgente
+                              ? '<span style="background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:50px;font-weight:700;font-size:7.5pt;">Urgente</span>'
+                              : '<span style="background:#dcfce7;color:#166534;padding:1px 7px;border-radius:50px;font-weight:700;font-size:7.5pt;">Rutina</span>'
+                            }</td>
+                            <td style="padding:5px 8px;border:1px solid #ccfbf1;text-align:center;">☐</td>
+                          </tr>`
+                        ).join("")}</tbody>
+                      </table>`
+                    : data.plan?.paraclinicosSolicitados
+                    ? `<div style="white-space:pre-wrap;font-size:8.5pt;line-height:1.5;padding:6px 0;">${_sanitize(typeof data.plan.paraclinicosSolicitados === "string" ? data.plan.paraclinicosSolicitados : JSON.stringify(data.plan.paraclinicosSolicitados))}</div>`
+                    : '<p style="color:#9ca3af;font-style:italic;text-align:center;padding:16px 0;">Sin exámenes registrados. Use el análisis IA o agréguelos manualmente.</p>';
+                  const dxHtml = (data.diagnosticos || []).map((d, i) =>
+                    `<p style="font-size:8.5pt;margin:2px 0;"><b>${_sanitize(d.cie10 || "")}</b>${d.cie10 ? " — " : ""}${_sanitize(d.descripcion || "")} <span style="color:#9ca3af;font-size:7.5pt;">(${_sanitize(d.tipo || "")})</span></p>`
+                  ).join("");
+                  const bodyHtml = `
+                    <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:4px;padding:10px 12px;margin-bottom:12px;">
+                      <p class="sec-title" style="color:#0d9488;">🔬 Exámenes Paraclínicos Solicitados</p>
+                      ${examTableHtml}
+                      ${dxHtml ? `<div style="margin-top:10px;border-top:1px solid #99f6e4;padding-top:8px;"><p class="sec-title" style="color:#0d9488;">Diagnóstico(s) que motivan los exámenes</p>${dxHtml}</div>` : ""}
+                    </div>
+                    <div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:8px 12px;font-size:7.5pt;color:#92400e;page-break-inside:avoid;">
+                      <b>📋 Instrucciones:</b> Presentar esta orden y documento de identidad. Los resultados deben entregarse directamente al médico ordenador. Vigencia de la orden: 30 días desde la fecha de expedición.
+                    </div>
+                    ${sigBlock}`;
+                  const fullHtml = `<!DOCTYPE html><html lang="es"><head><title>Orden Exámenes — ${_sanitize(data.nombres)}</title><meta charset="UTF-8"/><style>${baseStyle}.print-toolbar{position:fixed;top:0;left:0;right:0;background:#0d9488;color:white;padding:8px 14px;display:flex;align-items:center;gap:10px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.25);}.print-toolbar .ptitle{flex:1;font-size:9.5pt;font-weight:700;letter-spacing:.3px;}.print-toolbar button{border:none;padding:6px 14px;border-radius:6px;font-weight:900;cursor:pointer;font-size:9pt;}.btn-print{background:#10b981;color:white;}.btn-close{background:#ef4444;color:white;}[contenteditable]{outline:1.5px dashed #5eead4;border-radius:3px;padding:1px 3px;cursor:text;}[contenteditable]:focus{outline:2px solid #0d9488;background:#f0fdfa;}body{padding-top:52px;}@media print{.print-toolbar{display:none!important;}body{padding-top:0!important;}[contenteditable]{outline:none!important;background:transparent!important;}}</style></head><body>
+                    <div class="print-toolbar"><span class="ptitle">🔬 Orden de Exámenes — ${_sanitize(data.nombres)}</span><button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button><button class="btn-close" onclick="window.close()">✕ Cerrar</button></div>
+                    <div contenteditable="false">${hdr}</div><div contenteditable="true" spellcheck="false">${bodyHtml}</div>
+                    </body></html>`;
+                  const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
+                  const burl = URL.createObjectURL(blob);
+                  const w = window.open(burl, "_blank", "width=900,height=1100");
+                  if (!w) { URL.revokeObjectURL(burl); return; }
+                  setTimeout(() => URL.revokeObjectURL(burl), 60000);
+                };
                 const printSection = (sectionId, titleDoc) => {
                   let accent = "#2563eb";
                   let bodyHtml = "";
@@ -51695,6 +51769,13 @@ body{padding-top:52px;}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-teal-600 text-white hover:bg-teal-700 transition"
                           >
                             <Printer className="w-3 h-3" /> Exám.
+                          </button>
+                          <button
+                            onClick={() => openGnExamenesWindow()}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-cyan-600 text-white hover:bg-cyan-700 transition"
+                            title="Generar Orden de Exámenes Paraclínicos (PDF independiente)"
+                          >
+                            <Printer className="w-3 h-3" /> 🔬 Orden Exám.
                           </button>
                           <button
                             onClick={() =>
